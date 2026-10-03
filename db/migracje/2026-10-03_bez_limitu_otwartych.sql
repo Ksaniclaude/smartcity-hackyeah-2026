@@ -1,4 +1,4 @@
--- Delta (2026-10-03, 6): bez limitu otwartych pytań na kategorię (było: 3 „miasto”, 5 „na luzie”).
+-- Delta (2026-10-03, 8): bez limitu otwartych pytań na kategorię (było: 3 „miasto”, 5 „na luzie”).
 create or replace function public.admin_otworz(p_pytanie bigint, p_kurs_otwarcia double precision[] default null)
 returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
