@@ -26,7 +26,18 @@ select * from public.aktywnosc(null, 5) limit 1;
 select * from public.najwieksi_gracze(1, 5) limit 1;
 select * from public.ranking(5) limit 1;
 select public.profil_publiczny('nikt');
+select kursy_1h, gracze_rynku, prog_widocznosci from public.v_pytania limit 1;
+select public.kurs_widoczny(1), public.prog_pytania(1), public.kursy_godzine_temu(1), public.gracze_rynku(1);
 reset role;
+-- funkcje wewnętrzne niedostępne dla anon
+do $$ begin
+  set local role anon;
+  begin perform public.ranking_graczy(); raise exception 'anon może wołać ranking_graczy';
+  exception when insufficient_privilege then null; end;
+  begin perform public.miejsce_w_rankingu(gen_random_uuid()); raise exception 'anon może wołać miejsce_w_rankingu';
+  exception when insufficient_privilege then null; end;
+  reset role;
+end $$;
 set local role authenticated;
 select count(*) from public.v_pytania;
 select count(*) from public.v_moje_pozycje;
@@ -36,7 +47,9 @@ SQL
 echo "role: OK"
 
 echo "symulacja 100 graczy (2 i 3 odpowiedzi):"
-psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/symulacja.sql 2>&1 | grep -E "SYMULACJA|ERROR|BŁĄD" || true
+WYNIK_SYM=$(psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/symulacja.sql 2>&1 || true)
+echo "$WYNIK_SYM" | grep -E "SYMULACJA|ERROR|BŁĄD" || true
+if ! echo "$WYNIK_SYM" | grep -q "SYMULACJA OK"; then echo "symulacja: BŁĄD"; exit 1; fi
 
 echo "zakłady równoległe (8 procesów x 40 zakładów na jednym pytaniu):"
 # przygotowanie: admin, pytanie, 8 graczy
@@ -89,18 +102,25 @@ declare v_pyt bigint; v_suma double precision; v_koszt double precision; v_wydan
 begin
   select wartosc::bigint into v_pyt from public.ustawienia where klucz = 'test_pytanie';
   select q, b, liczba_prognoz into v_q, v_b, v_liczba from public.pytania where id = v_pyt;
-  select count(*) into v_tr from public.transakcje where pytanie = v_pyt;
   select sum(x) into v_suma from unnest(public.kursy(v_q, v_b)) as x;
   -- koszt od stanu otwarcia (q0 = b*ln(p)) do stanu końcowego = suma stawek
   v_koszt := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q) as x))
            - v_b * ln((select sum(exp(x / v_b)) from unnest(public.q_z_kursu(array[0.4, 0.4, 0.2], v_b)) as x));
-  select coalesce(sum(wydane_punkty), 0) into v_wydane from public.pozycje where pytanie = v_pyt;
+  -- jedna strona rynku: zakład na inną odpowiedź najpierw sprzedaje udziały, więc wpływ animatora to kupno minus sprzedaż
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_wydane from public.transakcje where pytanie = v_pyt;
+  select count(*) into v_tr from public.transakcje where pytanie = v_pyt and typ = 'kupno';
   select sum(saldo) into v_sald from public.gracze where nick like 'rown_%' and not czy_admin;
   if abs(v_suma - 1) > 1e-9 then raise exception 'kursy nie sumują się do 1: %', v_suma; end if;
-  if v_liczba <> v_tr then raise exception 'licznik prognoz % <> transakcji %', v_liczba, v_tr; end if;
-  if abs(v_koszt - v_wydane) > 1e-6 then raise exception 'koszt % <> wydane % (zgubiony zakład przy równoległości)', v_koszt, v_wydane; end if;
-  if abs((8 * 1000 - v_sald) - v_wydane) > 1e-6 then raise exception 'salda % nie zgadzają się z wydanymi %', v_sald, v_wydane; end if;
-  raise notice 'RÓWNOLEGLE OK: % zakładów, wydane %, suma kursów %, stan spójny', v_tr, v_wydane, v_suma;
+  if v_liczba <> v_tr then raise exception 'licznik prognoz % <> transakcji kupna %', v_liczba, v_tr; end if;
+  -- zwroty ze sprzedaży są zaokrąglane w dół do 0,0001 pkt, a resztki warte mniej niż 0,0001 pkt są zerowane bez wpisu
+  if abs(v_koszt - v_wydane) > 0.0002 * (select count(*) from public.transakcje where pytanie = v_pyt) + 0.01 then
+    raise exception 'koszt % <> wpływy % (zgubiony zakład przy równoległości)', v_koszt, v_wydane;
+  end if;
+  if abs((8 * 1000 - v_sald) - v_wydane) > 1e-6 then raise exception 'salda % nie zgadzają się z wpływami %', v_sald, v_wydane; end if;
+  if exists (select 1 from public.pozycje z group by z.gracz, z.pytanie having count(*) filter (where z.udzialy > 0) > 1) then
+    raise exception 'ktoś ma udziały po obu stronach rynku';
+  end if;
+  raise notice 'RÓWNOLEGLE OK: % zakładów, wpływy %, suma kursów %, stan spójny', v_tr, v_wydane, v_suma;
 end $$;
 SQL
 

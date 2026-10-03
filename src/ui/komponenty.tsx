@@ -118,6 +118,29 @@ export function Wskaznik({
   );
 }
 
+/** Numer miejsca w rankingu przy nicku: „#3”. Nic, gdy gracz nie jest w rankingu. */
+export function OdznakaMiejsca({ miejsce, duza = false }: { miejsce: number | null | undefined; duza?: boolean }) {
+  if (miejsce == null) return null;
+  return (
+    <span className={`miejsce-odznaka ${miejsce <= 3 ? "top" : ""} ${duza ? "duza" : ""}`} title={`${miejsce}. miejsce w rankingu`}>
+      #{miejsce}
+    </span>
+  );
+}
+
+/** Zysk/strata z jawnym znakiem, zielony/czerwony; `miejsca` = miejsca po przecinku. */
+export function ZyskStrata({ wartosc, miejsca = 0, sufiks = " pkt" }: { wartosc: number; miejsca?: number; sufiks?: string }) {
+  const zaokr = Number(wartosc.toFixed(miejsca));
+  const klasa = zaokr > 0 ? "zysk" : zaokr < 0 ? "strata" : "zero";
+  const tekst = zaokr > 0 ? `+${liczba(zaokr, miejsca)}` : zaokr < 0 ? `−${liczba(-zaokr, miejsca)}` : liczba(0, miejsca);
+  return (
+    <span className={`zysk-strata ${klasa}`}>
+      {tekst}
+      {sufiks}
+    </span>
+  );
+}
+
 export function Awatar({ nick, duzy = false }: { nick: string; duzy?: boolean }) {
   return (
     <span className={`awatar ${duzy ? "awatar-duzy" : ""}`} aria-hidden="true">
@@ -197,7 +220,7 @@ export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolea
 /* ---------- nagłówek ---------- */
 
 export function Naglowek() {
-  const { gracz, konto, stan, otworzModal } = useSesja();
+  const { gracz, konto, stan, otworzModal, portfel } = useSesja();
   const [motyw, przelaczMotyw] = useMotyw();
   const klasa = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "aktywny" : ""}`;
   return (
@@ -243,10 +266,13 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Profil">
+            <Link to="/profil" className="portfel" title="Profil: portfel na żywo">
               <div>
-                <span className="etykieta">Punkty</span>
-                <span className="wartosc">{liczba(Math.floor(gracz.saldo))}</span>
+                <span className="etykieta">Portfel</span>
+                <span className="wartosc">
+                  {portfel ? liczba(Math.round(portfel.wartosc)) : liczba(Math.floor(gracz.saldo))}
+                  {portfel ? <ZyskStrata wartosc={Math.round(portfel.zysk)} sufiks="" /> : null}
+                </span>
               </div>
               <Awatar nick={gracz.nick} />
             </Link>

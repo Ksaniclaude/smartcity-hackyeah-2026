@@ -74,7 +74,10 @@ begin
       then (array['wykonawca', 'decyzja_polityczna', 'pieniadze', 'formalnosci', 'inne'])[1 + floor(random() * 5)::int]::public.powod
       else null end;
 
-    select coalesce(sum(wydane_punkty), 0) into v_wydane from public.pozycje where gracz = v_id and pytanie = v_pyt;
+    -- jedna strona rynku: udziały na innych odpowiedziach zostaną sprzedane w tej samej transakcji,
+    -- więc limit 200 dotyczy wydanych na wybraną odpowiedź, a saldo rośnie o zwrot ze sprzedaży
+    select coalesce(sum(wydane_punkty), 0) into v_wydane
+      from public.pozycje where gracz = v_id and pytanie = v_pyt and odpowiedz = v_odp;
     select saldo into v_saldo from public.gracze where id = v_id;
 
     begin
@@ -82,8 +85,16 @@ begin
       v_liczba := v_liczba + 1;
 
       -- limit 200 na pytanie i saldo muszą być respektowane
-      if v_wydane + v_stawka > 200 or v_saldo < v_stawka then
+      if v_wydane + v_stawka > 200 or v_saldo + (v_wynik ->> 'zwrot_ze_sprzedazy')::numeric < v_stawka then
         raise exception 'Zakład przeszedł mimo limitu (wydane %, stawka %, saldo %)', v_wydane, v_stawka, v_saldo;
+      end if;
+      -- po zakładzie gracz ma udziały tylko na jednej odpowiedzi
+      if exists (select 1 from public.pozycje where gracz = v_id and pytanie = v_pyt and odpowiedz <> v_odp and udzialy > 0) then
+        raise exception 'Gracz ma udziały po obu stronach rynku';
+      end if;
+      -- miejsce w rankingu: po zakładzie gracz jest w rankingu
+      if (v_wynik ->> 'miejsce_po') is null or (v_wynik ->> 'miejsce_po')::integer < 1 then
+        raise exception 'Brak miejsca w rankingu po zakładzie: %', v_wynik;
       end if;
 
       -- kursy sumują się do 1
@@ -92,12 +103,13 @@ begin
         raise exception 'Kursy nie sumują się do 1: %', v_suma;
       end if;
 
-      -- koszt C(q_po) - C(q_przed) = stawka (sprawdzenie wzoru LMSR)
+      -- koszt C(q_po) - C(q_przed) = stawka - zwrot ze sprzedaży drugiej strony (sprawdzenie wzoru LMSR;
+      -- zwrot jest zaokrąglany w dół do 0,0001 pkt, stąd tolerancja)
       select q into v_q_po from public.pytania where id = v_pyt;
       v_koszt := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q_po) as x))
                - v_b * ln((select sum(exp(x / v_b)) from unnest(v_q_przed) as x));
-      if abs(v_koszt - v_stawka) > 1e-6 then
-        raise exception 'Koszt % nie zgadza się ze stawką %', v_koszt, v_stawka;
+      if abs(v_koszt - (v_stawka - (v_wynik ->> 'zwrot_ze_sprzedazy')::double precision)) > 1e-3 then
+        raise exception 'Koszt % nie zgadza się ze stawką % minus zwrot %', v_koszt, v_stawka, v_wynik ->> 'zwrot_ze_sprzedazy';
       end if;
 
       -- kurs postawionej odpowiedzi rośnie
@@ -120,11 +132,19 @@ begin
     end if;
   end loop;
 
-  -- suma sald + suma wydanych = suma początkowa (punkty nie giną)
+  -- suma sald + (kupno - sprzedaż) = suma początkowa (punkty nie giną)
   select sum(saldo) into v_suma_sald_po from public.gracze where id = any(v_gracze);
-  select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where gracz = any(v_gracze);
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_suma_wydanych
+    from public.transakcje where gracz = any(v_gracze);
   if abs(v_suma_sald_przed - v_suma_sald_po - v_suma_wydanych) > 1e-6 then
     raise exception 'Bilans się nie zgadza: % - % <> %', v_suma_sald_przed, v_suma_sald_po, v_suma_wydanych;
+  end if;
+  -- kurs sprzed godziny: tuż po otwarciu równa się kursowi otwarcia; statystyka graczy tylko po rozstrzygnięciu
+  if (select kursy_1h from public.v_pytania where id = v_pyt2) is distinct from (select kursy_otwarcia from public.v_pytania where id = v_pyt2) then
+    raise exception 'kursy_1h świeżego rynku powinny być kursem otwarcia';
+  end if;
+  if (select gracze_rynku from public.v_pytania where id = v_pyt3) is not null then
+    raise exception 'gracze_rynku powinno być puste przed rozstrzygnięciem';
   end if;
 
   -- rozstrzygnięcie pytania z 3 odpowiedziami: wypłata = suma udziałów trafionej odpowiedzi
@@ -137,11 +157,42 @@ begin
   if abs((v_suma_sald_po - v_suma_sald_przed) - v_suma_udzialow) > 0.0001 * 100 then
     raise exception 'Wypłata % nie zgadza się z udziałami %', v_suma_sald_po - v_suma_sald_przed, v_suma_udzialow;
   end if;
-  -- strata animatora ograniczona przez b*ln(n)
-  select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where pytanie = v_pyt3;
+  -- strata animatora (wypłata minus wpływy netto z kupna i sprzedaży) ograniczona przez b*ln(n)
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_suma_wydanych
+    from public.transakcje where pytanie = v_pyt3;
   if v_suma_udzialow - v_suma_wydanych > 1000 * ln(3) + 1e-6 then
     raise exception 'Strata animatora % przekracza b*ln(3)', v_suma_udzialow - v_suma_wydanych;
   end if;
+  -- statystyka do ekranu rozstrzygnięcia: trafiło <= graczy, graczy > 0
+  if (select (gracze_rynku ->> 'graczy')::int from public.v_pytania where id = v_pyt3) <= 0
+     or (select (gracze_rynku ->> 'trafilo')::int from public.v_pytania where id = v_pyt3)
+        > (select (gracze_rynku ->> 'graczy')::int from public.v_pytania where id = v_pyt3) then
+    raise exception 'gracze_rynku po rozstrzygnięciu: %', (select gracze_rynku from public.v_pytania where id = v_pyt3);
+  end if;
+  if (select (gracze_rynku ->> 'trafilo')::int from public.v_pytania where id = v_pyt3) <> (v_wyplata ->> 'graczy')::int then
+    raise exception 'gracze_rynku.trafilo % <> graczy z wypłatą %', (select gracze_rynku from public.v_pytania where id = v_pyt3), v_wyplata;
+  end if;
+
+  -- próg per rynek: admin ustawia 1000 i kurs znika, zdejmuje i wraca; domyślny próg to 2
+  perform public.admin_ustaw_prog(v_pyt2, 1000);
+  if (select kursy from public.v_pytania where id = v_pyt2) is not null or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 1000 then
+    raise exception 'Próg per rynek nie ukrył kursu';
+  end if;
+  if (select count(*) from public.historia_kursu(v_pyt2)) <> 0 then raise exception 'Historia widoczna mimo progu'; end if;
+  perform public.admin_ustaw_prog(v_pyt2, null);
+  if (select kursy from public.v_pytania where id = v_pyt2) is null or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 2 then
+    raise exception 'Próg domyślny powinien wynosić 2 i odsłaniać kurs';
+  end if;
+  if public.admin_ustaw_prog_domyslny(1) <> 1 then raise exception 'Domyślny próg nie zapisał się'; end if;
+  if public.prog_widocznosci_kursu() <> 1 or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 1 then
+    raise exception 'Domyślny próg z ustawień nie działa';
+  end if;
+  delete from public.ustawienia where klucz = 'prog_widocznosci_kursu';
+  -- ranking ma kolejne miejsca, a profil publiczny zwraca miejsce lidera = 1
+  if (select array_agg(nick) from public.ranking(3)) <> (select array_agg(nick order by miejsce) from public.ranking_graczy() where miejsce <= 3) then
+    raise exception 'Ranking nie jest w kolejności miejsc';
+  end if;
+  if (public.profil_publiczny((select nick from public.ranking(1))) ->> 'miejsce')::int <> 1 then raise exception 'Profil lidera bez miejsca 1'; end if;
 
   -- unieważnienie pytania z 2 odpowiedziami: pełny zwrot
   select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where pytanie = v_pyt2;

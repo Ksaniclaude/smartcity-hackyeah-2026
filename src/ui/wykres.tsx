@@ -36,6 +36,14 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
   const pad = { l: 8, r: 44, t: 12, b: 24 };
   const wybrane = serie ?? (odpowiedzi.length === 2 ? [0] : odpowiedzi.map((_, i) => i));
 
+  // Nowy punkt (po własnej prognozie albo odpytaniu): ostatni odcinek rysuje się animacją, punkt pulsuje.
+  const liczbaRef = useRef(0);
+  const [animacja, setAnimacja] = useState(0);
+  useEffect(() => {
+    if (liczbaRef.current > 0 && historia.length > liczbaRef.current) setAnimacja((a) => a + 1);
+    liczbaRef.current = historia.length;
+  }, [historia.length]);
+
   const { punkty, t0, t1 } = useMemo(() => {
     const pkt = historia
       .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
@@ -73,6 +81,12 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
 
   const ostatni = punkty[punkty.length - 1];
   const akt = hover != null ? punkty[hover] : ostatni;
+  const ostatniOdcinek = (i: number) => {
+    if (punkty.length < 2) return "";
+    const a = punkty[punkty.length - 2];
+    const b = punkty[punkty.length - 1];
+    return `M${x(a.t).toFixed(1)},${y(a.kursy[i] ?? 0).toFixed(1)} H${x(b.t).toFixed(1)} V${y(b.kursy[i] ?? 0).toFixed(1)} H${(szer - pad.r).toFixed(1)}`;
+  };
 
   const naRuch = (e: MouseEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -114,12 +128,31 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
         {wybrane.map((i) => (
           <path key={i} d={sciezka(i)} fill="none" stroke={KOLORY[i]} strokeWidth={2.2} strokeLinejoin="round" />
         ))}
+        {animacja > 0 && punkty.length >= 2
+          ? wybrane.map((i) => (
+              <path
+                key={`n${animacja}-${i}`}
+                d={ostatniOdcinek(i)}
+                pathLength={1}
+                className="wykres-odcinek-nowy"
+                fill="none"
+                stroke={KOLORY[i]}
+                strokeWidth={3.2}
+                strokeLinejoin="round"
+              />
+            ))
+          : null}
         {hover != null ? (
           <line x1={x(akt.t)} x2={x(akt.t)} y1={pad.t} y2={wysokosc - pad.b} className="wykres-kursor" />
         ) : null}
         {wybrane.map((i) => (
           <circle key={i} cx={x(akt.t)} cy={y(akt.kursy[i] ?? 0)} r={4} fill={KOLORY[i]} />
         ))}
+        {animacja > 0 && hover == null
+          ? wybrane.map((i) => (
+              <circle key={`p${animacja}-${i}`} cx={x(ostatni.t)} cy={y(ostatni.kursy[i] ?? 0)} r={4} fill="none" stroke={KOLORY[i]} strokeWidth={2} className="wykres-punkt-nowy" />
+            ))
+          : null}
         <text x={pad.l} y={wysokosc - 6} className="wykres-os">
           {new Date(t0).toLocaleDateString("pl-PL", { day: "numeric", month: "short" })}
         </text>

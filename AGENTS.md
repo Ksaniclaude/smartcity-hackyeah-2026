@@ -14,5 +14,9 @@
 - Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Stare sesje
   anonimowe są podnoszone do konta przy rejestracji (updateUser).
 - Nie wymyślaj pytań, terminów, źródeł ani liczb z zamówień publicznych. Puste dane mają być widoczne jako puste.
+- Próg ukrycia kursu: `prog_widocznosci_kursu()` czyta `ustawienia.prog_widocznosci_kursu` (domyślnie 2), a `pytania.prog_widocznosci`
+  nadpisuje go per rynek; do sprawdzania widoczności używaj `kurs_widoczny(id)`, nie porównuj progu ręcznie.
+- Jedna strona rynku na gracza: `postaw_prognoze` najpierw sprzedaje udziały na innych odpowiedziach (pole `sprzedano` w wyniku).
+  Testy w `db/test` i `scripts/test_db_local.sh` liczą bilans z transakcji (kupno − sprzedaż), nie z `wydane_punkty`.
 - Sprawdzenie UI bez sieci: `npm run build && npm run test:ui` (Chromium, zamockowane Supabase).
 - Deploy: Vercel (projekt `zdaza`), zmienne `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`.

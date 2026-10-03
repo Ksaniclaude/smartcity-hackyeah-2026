@@ -1,13 +1,14 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { pobierzPytania } from "@/api/api";
+import { pobierzAktywnosc, pobierzPytania } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
-import type { Pytanie } from "@/api/types";
+import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
-import { usePolling } from "@/ui/hooks";
-import { KafelekKategorii, Komunikat, OdznakaStatusu, Szkielet, Szukajka, Wskaznik, formatujDateKrotko } from "@/ui/komponenty";
-import { odmien, pkt } from "@/ui/tekst";
+import { useBlysk, usePolling } from "@/ui/hooks";
+import { Awatar, KafelekKategorii, Komunikat, OdznakaStatusu, Szkielet, Szukajka, Wskaznik, formatujDateKrotko } from "@/ui/komponenty";
+import { czasTemu, liczba, odmien, pkt } from "@/ui/tekst";
+import { klasaTypu } from "@/pages/Aktywnosc";
 
 /* ---------- filtry i sortowanie (stan trzymany w adresie: ?f= ?s= ?q=) ---------- */
 
@@ -131,7 +132,14 @@ interface PropsKarty {
   przelaczObserwowanie: (id: number) => void;
 }
 
-/** Karta jak na giełdzie prognoz: kafelek, tytuł, wskaźnik kursu, przyciski Tak/Nie albo lista odpowiedzi, stopka. */
+/** Zmiana kursu pierwszej odpowiedzi w punktach procentowych od godziny (albo od otwarcia, gdy rynek młodszy). */
+function zmianaOdGodziny(p: Pytanie): number | null {
+  if (!p.kursy || !p.kursy_1h) return null;
+  return Math.round((p.kursy[0] - p.kursy_1h[0]) * 100);
+}
+
+/** Karta jak na giełdzie prognoz: kafelek, tytuł, wskaźnik kursu, przyciski Tak/Nie albo lista odpowiedzi, stopka.
+ *  Zmiana kursu między odpytaniami podświetla kartę na zielono/czerwono przez ok. 1 s. */
 function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
   const navigate = useNavigate();
   const otwarte = p.status === "otwarte";
@@ -140,6 +148,8 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
   const kursy = p.kursy;
   const kursyOtwarcia = p.kursy_otwarcia ?? null;
   const nowy = otwarte && (dniOdOtwarcia(p, Date.now()) ?? Number.POSITIVE_INFINITY) < 3;
+  const blysk = useBlysk(kursy ? kursy[0] : null);
+  const zmiana1h = otwarte ? zmianaOdGodziny(p) : null;
 
   // Rozstrzygnięcie: ile tłum dawał na faktyczny wynik i czy trafił (wynik miał najwyższy kurs).
   const wynik = p.status === "rozstrzygniete" && p.wynik != null ? p.wynik : null;
@@ -211,7 +221,7 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
   }
 
   return (
-    <article className="rynek">
+    <article className={`rynek ${blysk ? `blysk-${blysk}` : ""}`}>
       <Link to={`/pytanie/${p.id}`} className={`rynek-gora ${wskaznik ? "" : "bez-wskaznika"}`}>
         <KafelekKategorii kategoria={p.kategoria} />
         <h3 className="rynek-tytul">
@@ -231,6 +241,11 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
       </Link>
       {tresc}
       <div className="rynek-dol" style={{ flexWrap: "wrap" }}>
+        {zmiana1h != null ? (
+          <span className={`zmiana-1h ${zmiana1h > 0 ? "gora" : zmiana1h < 0 ? "dol" : "zero"}`} title="zmiana kursu od godziny">
+            {zmiana1h > 0 ? `▲ ${zmiana1h} pp` : zmiana1h < 0 ? `▼ ${-zmiana1h} pp` : "= 0 pp"} / 1 godz.
+          </span>
+        ) : null}
         <span>{pkt(p.obrot)} obrotu</span>
         <span aria-hidden="true">·</span>
         {otwarte && kursy == null ? (
@@ -296,6 +311,57 @@ function Sekcja({ tytul, pusto, lista, obserwowane, przelaczObserwowanie }: Prop
   );
 }
 
+/* ---------- ticker świeżych ruchów ---------- */
+
+const DZIESIEC_MINUT = 10 * 60 * 1000;
+
+/** Ostatnie 5 ruchów i licznik prognoz z ostatnich 10 minut (dane z RPC aktywnosc, odpytywane co 5 s). */
+function Ticker({ ruchy, laduje }: { ruchy: Aktywnosc[] | null; laduje: boolean }) {
+  if (!ruchy) return laduje ? <div className="ticker szkielet-ticker" aria-hidden="true" /> : null;
+  const teraz = Date.now();
+  const ostatnie10 = ruchy.filter((r) => r.udzialy > 0 && teraz - new Date(r.czas).getTime() <= DZIESIEC_MINUT).length;
+  const piec = ruchy.slice(0, 5);
+  return (
+    <section className="ticker" aria-label="Świeże ruchy">
+      <div className="ticker-naglowek">
+        <span className="ticker-kropka" aria-hidden="true" />
+        <b>Świeże ruchy</b>
+        <span className="ticker-licznik">{odmien(ostatnie10, "prognoza", "prognozy", "prognoz")} w ostatnich 10 minutach</span>
+        <Link to="/aktywnosc" className="prawy">
+          Cała aktywność
+        </Link>
+      </div>
+      {piec.length === 0 ? (
+        <p className="ticker-pusto">Jeszcze nikt nie postawił punktów.</p>
+      ) : (
+        <ul className="ticker-lista">
+          {piec.map((r) => (
+            <li key={r.id}>
+              <Awatar nick={r.nick} />
+              <span className="ticker-kto">
+                <Link to={`/u/${encodeURIComponent(r.nick)}`}>{r.nick}</Link>{" "}
+                {r.udzialy < 0 ? (
+                  <>
+                    sprzedał {liczba(-r.udzialy, 1)} udz. na <span className={klasaTypu(r.odpowiedz - 1)}>{r.odpowiedz_tekst}</span>
+                  </>
+                ) : (
+                  <>
+                    {liczba(r.stawka)} pkt na <span className={klasaTypu(r.odpowiedz - 1)}>{r.odpowiedz_tekst}</span>
+                  </>
+                )}
+              </span>
+              <Link to={`/pytanie/${r.pytanie}`} className="ticker-rynek">
+                {r.tresc}
+              </Link>
+              <span className="ticker-czas">{czasTemu(r.czas)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /* ---------- strona główna ---------- */
 
 const PUSTO_OTWARTE = "Na razie brak otwartych rynków";
@@ -307,6 +373,7 @@ export default function Lista() {
   const { stan, gracz, konto, otworzModal } = useSesja();
   const [params, setParams] = useSearchParams();
   const { dane, blad, laduje } = usePolling(pobierzPytania, 5000);
+  const { dane: ruchy, laduje: ladujeRuchy } = usePolling(() => pobierzAktywnosc(null, 100), 5000, "ticker");
   const [obserwowane, setObserwowane] = useState<number[]>(czytajObserwowane);
 
   const filtr = czytajFiltr(params.get("f"));
@@ -451,6 +518,8 @@ export default function Lista() {
             </div>
           </section>
         ) : null}
+
+        {!q && filtr === "wszystkie" ? <Ticker ruchy={ruchy} laduje={ladujeRuchy} /> : null}
 
         {q && dane ? (
           <p className="wynik-szukania">
