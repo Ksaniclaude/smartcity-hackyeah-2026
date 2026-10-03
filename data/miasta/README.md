@@ -1,13 +1,20 @@
-# Kandydaci na rynki z innych miast (research 3.10.2026)
+# Kandydaci na rynki: Polska i miasta (research 3.10.2026)
 
-Pliki `warszawa.csv`, `wroclaw.csv`, `lodz.csv`, `poznan.csv`, `gdansk.csv`, `katowice.csv` i scalony
+Pliki `polska.csv` (rynki ogólnopolskie: celebryci, freak fighty, reality show, polityka, sport, muzyka, gospodarka),
+`warszawa.csv`, `wroclaw.csv`, `lodz.csv`, `poznan.csv`, `gdansk.csv`, `katowice.csv` i scalony
 `wszystkie.csv` (posortowany po terminie). Kolumny: `miasto, kategoria, horyzont, tresc, kryterium, link_zrodla,
 termin, uwaga`. Horyzont: `krotki` (do ok. 30 dni), `sredni` (do końca 2026 / I kw. 2027), `dlugi` (2027+).
 Notatki z researchu każdego miasta są w pliku `.md` obok CSV.
 
+## Zasady treści
+
+Tematy nie są ograniczone (zob. `ZASADY_PYTANIA` w `src/api/types.ts`). Rynki o osobach publicznych dotyczą ich
+publicznych działań (występ, walka, decyzja, publikacja), nie życia prywatnego ani zdrowia. Rynki polityczne
+(dymisje, weta, sondaże) są dozwolone.
+
 ## Zastrzeżenie: wszystko do sprawdzenia przed otwarciem rynku
 
-Research robiły agenty wyłącznie przez wyszukiwarkę. **Żadna strona źródłowa nie została otwarta**, bo pobieranie
+Research (miasta: agenty, `polska.csv`: sesja główna) szedł wyłącznie przez wyszukiwarkę. **Żadna strona źródłowa nie została otwarta**, bo pobieranie
 stron było zablokowane przez sieć środowiska. Treść, daty i liczby pochodzą z tytułów i opisów wyników wyszukiwania,
 nie z treści artykułów. Nic nie jest wymyślone (każdy link pojawił się w wynikach), ale przed użyciem:
 
