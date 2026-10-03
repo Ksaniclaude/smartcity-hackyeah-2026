@@ -7,5 +7,5 @@ const key = import.meta.env.VITE_SUPABASE_KEY;
 export const konfiguracjaOk = Boolean(url && key);
 
 export const supabase = createClient(url || "https://brak-konfiguracji.supabase.co", key || "brak", {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });

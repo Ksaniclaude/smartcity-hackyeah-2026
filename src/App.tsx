@@ -1,16 +1,18 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SesjaProvider, useSesja, useUruchomSesje } from "@/api/sesja";
 import Admin from "@/pages/Admin";
-import Liczba from "@/pages/Liczba";
+import Aktywnosc from "@/pages/Aktywnosc";
 import Lista from "@/pages/Lista";
 import Miasto from "@/pages/Miasto";
 import Profil from "@/pages/Profil";
+import ProfilPubliczny from "@/pages/ProfilPubliczny";
 import Pytanie from "@/pages/Pytanie";
 import Qr from "@/pages/Qr";
+import Ranking from "@/pages/Ranking";
 import Start from "@/pages/Start";
 import Zaproponuj from "@/pages/Zaproponuj";
-import { DolnaNawigacja, Komunikat, Ladowanie, Naglowek } from "@/ui/komponenty";
+import { DolnaNawigacja, Komunikat, Ladowanie, Modale, Naglowek, StopkaStrony } from "@/ui/komponenty";
 
 /** Ekrany wymagające gracza z nickiem (profil, propozycje, admin). Rynki są publiczne. */
 function WymagaGracza({ children }: { children: ReactNode }) {
@@ -32,12 +34,21 @@ function WymagaGracza({ children }: { children: ReactNode }) {
 }
 
 function Uklad() {
-  const { gracz } = useSesja();
+  useUruchomSesje();
   const { pathname } = useLocation();
+  const { stan, konto, gracz, modal, otworzModal } = useSesja();
   const pelnyEkran = pathname === "/qr";
+  // Konto e-mail bez nicku (np. zaraz po kliknięciu w link potwierdzający): raz otwieramy okno nicku.
+  const pytanoONick = useRef(false);
+  useEffect(() => {
+    if (stan === "brak_nicku" && konto && !gracz && modal === null && !pytanoONick.current) {
+      pytanoONick.current = true;
+      otworzModal("nick");
+    }
+  }, [stan, konto, gracz, modal, otworzModal]);
   return (
     <div className="aplikacja">
-      {!pelnyEkran ? <Naglowek nick={gracz?.nick} saldo={gracz?.saldo} /> : null}
+      {!pelnyEkran ? <Naglowek /> : null}
       <Routes>
         <Route path="/" element={<Lista />} />
         <Route path="/pytanie/:id" element={<Pytanie />} />
@@ -65,13 +76,18 @@ function Uklad() {
             </WymagaGracza>
           }
         />
-        <Route path="/start" element={<Start />} />
+        <Route path="/u/:nick" element={<ProfilPubliczny />} />
+        <Route path="/ranking" element={<Ranking />} />
+        <Route path="/aktywnosc" element={<Aktywnosc />} />
         <Route path="/miasto" element={<Miasto />} />
-        <Route path="/liczba" element={<Liczba />} />
+        <Route path="/liczba" element={<Navigate to="/" replace />} />
+        <Route path="/start" element={<Navigate to="/" replace />} />
         <Route path="/qr" element={<Qr />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {!pelnyEkran ? <StopkaStrony /> : null}
       {!pelnyEkran ? <DolnaNawigacja /> : null}
+      <Modale />
     </div>
   );
 }

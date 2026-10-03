@@ -1,69 +1,324 @@
-import { Link } from "react-router-dom";
-import { pobierzMojePozycje } from "@/api/api";
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { pobierzMojePozycje, pobierzMojeTransakcje } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja } from "@/api/sesja";
-import { ETYKIETY_STATUSU } from "@/api/types";
-import { usePolling } from "@/ui/hooks";
-import { Komunikat, Ladowanie, Odznaka, formatujDate } from "@/ui/komponenty";
-import { punkty } from "@/ui/tekst";
+import type { MojaPozycja, MojaTransakcja } from "@/api/types";
+import { useAkcja, usePolling } from "@/ui/hooks";
+import { IkKsiezyc, IkSlonce } from "@/ui/ikony";
+import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaStatusu, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
+import { czasTemu, liczba, pkt } from "@/ui/tekst";
+import { klasaTypu } from "@/pages/Aktywnosc";
+import { zeZnakiem } from "@/pages/Ranking";
 
-export default function Profil() {
-  const { gracz } = useSesja();
-  const { dane, blad, laduje } = usePolling(pobierzMojePozycje, 5000);
-  const pozycje = dane ?? [];
-  const rozstrzygniete = pozycje.filter((p) => p.status === "rozstrzygniete");
-  const trafione = rozstrzygniete.filter((p) => p.trafione).length;
+type Tab = "pozycje" | "historia" | "ustawienia";
+const ZAKLADKI: { klucz: Tab; etykieta: string }[] = [
+  { klucz: "pozycje", etykieta: "Pozycje" },
+  { klucz: "historia", etykieta: "Historia" },
+  { klucz: "ustawienia", etykieta: "Ustawienia" },
+];
 
+/** Kolumna „Wynik”: po rozstrzygnięciu trafione/chybione, wcześniej termin. */
+function Wynik({ p }: { p: MojaPozycja }) {
+  if (p.status === "rozstrzygniete" && p.wynik) {
+    if (p.trafione) return <span className="trafione">trafione, +{liczba(p.wyplata, 1)} pkt</span>;
+    return (
+      <span className="chybione">
+        chybione (było: {p.odpowiedzi[p.wynik - 1]}){p.wyplata > 0 ? `, wypłata +${liczba(p.wyplata, 1)} pkt` : ""}
+      </span>
+    );
+  }
+  if (p.status === "uniewaznione") return <span className="mala">zwrot</span>;
+  if (p.status === "zamkniete") return <span className="mala">zamknięte, czeka na wynik</span>;
+  return <span className="mala">do {formatujDateKrotko(p.termin)}</span>;
+}
+
+/** Własna transakcja: zakład albo sprzedaż udziałów. */
+function WpisTransakcji({ t, nick }: { t: MojaTransakcja; nick: string }) {
+  const sprzedaz = t.udzialy < 0;
+  const odpowiedz = t.pytania?.odpowiedzi[t.odpowiedz - 1] ?? `odpowiedź ${t.odpowiedz}`;
+  const typ = <span className={klasaTypu(t.odpowiedz - 1)}>{odpowiedz}</span>;
   return (
-    <main className="ekran">
-      <h1>{gracz?.nick}</h1>
-      <div className="zestawienie">
-        <div>
-          <div className="etykieta">Saldo</div>
-          <div className="wartosc">{punkty(Math.floor(gracz?.saldo ?? 0))}</div>
+    <div className="wpis">
+      <Awatar nick={nick} />
+      <div>
+        <div className="kto">
+          {sprzedaz ? (
+            <span>
+              sprzedałeś <b>{liczba(-t.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(t.stawka)} pkt</b>
+            </span>
+          ) : (
+            <span>
+              postawiłeś <b>{liczba(t.stawka)} pkt</b> na {typ}
+            </span>
+          )}
+          <span>
+            · kurs {procent(t.kurs_przed)} → {procent(t.kurs_po)}
+          </span>
+          <span className="prawy">{czasTemu(t.czas)}</span>
         </div>
-        <div>
-          <div className="etykieta">Trafność</div>
-          <div className="wartosc">
-            trafił {trafione} z {rozstrzygniete.length}
-          </div>
+        <div className="tresc">
+          <Link to={`/pytanie/${t.pytanie}`}>{t.pytania?.tresc ?? `Rynek nr ${t.pytanie}`}</Link>
         </div>
+        {t.komentarz ? <div className="mala">„{t.komentarz}”</div> : null}
       </div>
-      <p className="mala">
-        Punktów nie da się kupić ani wymienić. Liczy się tylko to, czy wiesz lepiej niż tłum.
-      </p>
+    </div>
+  );
+}
 
+function Historia({ nick }: { nick: string }) {
+  const { dane, blad, laduje } = usePolling(() => pobierzMojeTransakcje(100), 10000);
+  const wpisy = dane ?? [];
+  return (
+    <div className="waska" style={{ maxWidth: 820 }}>
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
-
-      <h2>Twoje prognozy</h2>
-      {dane && pozycje.length === 0 ? (
+      {dane && wpisy.length === 0 ? (
         <p className="pusto">
-          Jeszcze nic nie prognozujesz. <Link to="/">Wybierz pytanie</Link>.
+          Jeszcze nie masz żadnej transakcji. <Link to="/">Wybierz rynek</Link>.
         </p>
       ) : null}
-      {pozycje.map((p) => (
-        <Link to={`/pytanie/${p.pytanie}`} className="karta karta-link" key={p.pytanie}>
-          <Odznaka kategoria={p.kategoria} />{" "}
-          {p.status !== "otwarte" ? <span className="odznaka odznaka-status">{ETYKIETY_STATUSU[p.status]}</span> : null}
-          <div className="tresc">{p.tresc}</div>
-          <div className="meta">
-            <span>
-              Twój typ: <b>{p.odpowiedzi[p.odpowiedz_glowna - 1]}</b>
-            </span>
-            <span>wydane {punkty(p.wydane)}</span>
-            {p.status === "rozstrzygniete" && p.wynik ? (
-              <span className={p.trafione ? "trafione" : "chybione"}>
-                {p.trafione ? `trafione, +${p.wyplata.toFixed(1)} pkt` : `chybione (było: ${p.odpowiedzi[p.wynik - 1]})`}
-              </span>
-            ) : p.kursy ? (
-              <span>kurs {procent(p.kursy[p.odpowiedz_glowna - 1])}</span>
-            ) : (
-              <span>do {formatujDate(p.termin)}</span>
-            )}
-          </div>
-        </Link>
+      {wpisy.map((t) => (
+        <WpisTransakcji key={t.id} t={t} nick={nick} />
       ))}
+    </div>
+  );
+}
+
+function Ustawienia() {
+  const { gracz, konto, ustawNick, wyloguj } = useSesja();
+  const navigate = useNavigate();
+  const [motyw, przelaczMotyw] = useMotyw();
+  const [nick, setNick] = useState(gracz?.nick ?? "");
+  const [zapisano, setZapisano] = useState(false);
+  const zapis = useAkcja(async (nowy: string) => {
+    await ustawNick(nowy);
+    setZapisano(true);
+  });
+  const wylogowanie = useAkcja(async () => {
+    await wyloguj();
+    navigate("/");
+  });
+  const czysty = nick.trim();
+  const bezZmian = czysty === (gracz?.nick ?? "");
+
+  return (
+    <div className="waska" style={{ maxWidth: 560 }}>
+      <div className="karta">
+        <h3>Nick</h3>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (czysty.length < 2 || bezZmian) return;
+            void zapis.wykonaj(czysty);
+          }}
+        >
+          <label className="pole">
+            <span className="etykieta">Nick (widzą go inni gracze przy prognozach i w rankingu)</span>
+            <input
+              type="text"
+              value={nick}
+              onChange={(e) => {
+                setNick(e.target.value);
+                setZapisano(false);
+              }}
+              minLength={2}
+              maxLength={24}
+              autoComplete="nickname"
+              required
+            />
+            <div className="pomoc">2–24 znaki: litery, cyfry, _ . -</div>
+          </label>
+          {zapis.blad ? <Komunikat typ="blad">{zapis.blad}</Komunikat> : null}
+          {zapisano && bezZmian ? <Komunikat typ="ok">Nick zapisany.</Komunikat> : null}
+          <button className="przycisk przycisk-glowny" type="submit" disabled={zapis.trwa || czysty.length < 2 || bezZmian}>
+            {zapis.trwa ? "Chwila…" : "Zapisz nick"}
+          </button>
+        </form>
+      </div>
+
+      <div className="karta">
+        <h3>Konto</h3>
+        <p>
+          Zalogowano jako <b>{konto?.email ?? "–"}</b>
+          {konto && !konto.potwierdzony ? <span className="mala"> (e-mail jeszcze niepotwierdzony)</span> : null}
+        </p>
+      </div>
+
+      <div className="karta">
+        <h3>Wygląd</h3>
+        <button type="button" className="przycisk przycisk-drugi przycisk-glowny" onClick={przelaczMotyw}>
+          {motyw === "ciemny" ? <IkSlonce width={18} height={18} /> : <IkKsiezyc width={18} height={18} />}
+          {motyw === "ciemny" ? "Jasny motyw" : "Ciemny motyw"}
+        </button>
+      </div>
+
+      <div className="karta">
+        <h3>Sesja</h3>
+        <p className="mala">
+          Zalogujesz się ponownie e-mailem i hasłem.
+        </p>
+        {wylogowanie.blad ? <Komunikat typ="blad">{wylogowanie.blad}</Komunikat> : null}
+        <button
+          type="button"
+          className="przycisk przycisk-drugi przycisk-glowny"
+          disabled={wylogowanie.trwa}
+          onClick={() => void wylogowanie.wykonaj()}
+        >
+          Wyloguj
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Portfel gracza (/profil): statystyki, pozycje, historia transakcji, ustawienia. Wymaga nicku. */
+export default function Profil() {
+  const { gracz, konto, wyloguj } = useSesja();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const t = params.get("tab");
+  const tab: Tab = t === "historia" || t === "ustawienia" ? t : "pozycje";
+  const { dane, blad, laduje } = usePolling(pobierzMojePozycje, 5000);
+  const wylogowanie = useAkcja(async () => {
+    await wyloguj();
+    navigate("/");
+  });
+
+  const nick = gracz?.nick ?? "";
+  const pozycje = dane ?? [];
+  const saldo = Math.floor(gracz?.saldo ?? 0);
+  const wartoscUdzialow = pozycje
+    .filter((p) => p.status === "otwarte" || p.status === "zamkniete")
+    .reduce((s, p) => s + p.wartosc, 0);
+  const portfel = Math.round(saldo + wartoscUdzialow);
+  const zysk = portfel - 1000;
+  const rozstrzygniete = pozycje.filter((p) => p.status === "rozstrzygniete");
+  const trafione = rozstrzygniete.filter((p) => p.trafione === true).length;
+
+  const ustawTab = (nowy: Tab) => {
+    const nowe = new URLSearchParams(params);
+    if (nowy === "pozycje") nowe.delete("tab");
+    else nowe.set("tab", nowy);
+    setParams(nowe, { replace: true });
+  };
+
+  return (
+    <main className="kontener">
+      <div className="profil-naglowek" style={{ flexWrap: "wrap" }}>
+        <Awatar nick={nick} duzy />
+        <div>
+          <h1>{nick}</h1>
+          <div className="pod">{konto?.email}</div>
+        </div>
+        <div className="przyciski akcje" style={{ marginLeft: "auto", marginTop: 0 }}>
+          <button
+            type="button"
+            className="przycisk przycisk-maly przycisk-drugi"
+            disabled={wylogowanie.trwa}
+            onClick={() => void wylogowanie.wykonaj()}
+          >
+            Wyloguj
+          </button>
+        </div>
+      </div>
+
+      <div className="staty">
+        <div className="stat">
+          <div className="etykieta">Wartość portfela</div>
+          <div className="wartosc">{dane ? pkt(portfel) : "–"}</div>
+          <div className="pod">punkty + udziały po kursie</div>
+        </div>
+        <div className="stat">
+          <div className="etykieta">Punkty</div>
+          <div className="wartosc">{liczba(saldo)}</div>
+          <div className="pod">do postawienia</div>
+        </div>
+        <div className="stat">
+          <div className="etykieta">Zysk/strata</div>
+          <div className={`wartosc ${dane && zysk > 0 ? "zysk" : dane && zysk < 0 ? "strata" : ""}`}>{dane ? zeZnakiem(zysk) : "–"}</div>
+          <div className="pod">wobec 1000 pkt na start</div>
+        </div>
+        <div className="stat">
+          <div className="etykieta">Trafność</div>
+          <div className="wartosc">{dane ? `${trafione} z ${rozstrzygniete.length}` : "–"}</div>
+          <div className="pod">rozstrzygnięte rynki</div>
+        </div>
+      </div>
+
+      {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
+      {wylogowanie.blad ? <Komunikat typ="blad">{wylogowanie.blad}</Komunikat> : null}
+
+      <div className="zakladki" role="tablist">
+        {ZAKLADKI.map((z) => (
+          <button
+            type="button"
+            role="tab"
+            key={z.klucz}
+            aria-selected={tab === z.klucz}
+            className={tab === z.klucz ? "aktywna" : ""}
+            onClick={() => ustawTab(z.klucz)}
+          >
+            {z.etykieta}
+            {z.klucz === "pozycje" && dane ? <span className="licznik">{pozycje.length}</span> : null}
+          </button>
+        ))}
+      </div>
+
+      {tab === "pozycje" ? (
+        <>
+          {laduje && !dane ? <Ladowanie /> : null}
+          {dane && pozycje.length === 0 ? (
+            <p className="pusto">
+              Jeszcze nic nie prognozujesz. <Link to="/">Wybierz rynek</Link>.
+            </p>
+          ) : null}
+          {pozycje.length > 0 ? (
+            <div className="tabela-owijka">
+              <table className="tabela">
+                <thead>
+                  <tr>
+                    <th>Rynek</th>
+                    <th>Twój typ</th>
+                    <th className="liczba">Udziały</th>
+                    <th className="liczba">Kurs teraz</th>
+                    <th className="liczba">Wartość</th>
+                    <th>Wynik</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pozycje.map((p) => {
+                    const i = p.odpowiedz_glowna - 1;
+                    return (
+                      <tr key={p.pytanie}>
+                        <td>
+                          <Link to={`/pytanie/${p.pytanie}`}>{p.tresc}</Link>
+                          <div className="pomoc">
+                            <Odznaka kategoria={p.kategoria} /> <OdznakaStatusu status={p.status} />
+                          </div>
+                        </td>
+                        <td>
+                          <span className={klasaTypu(i)}>{p.odpowiedzi[i]}</span>
+                        </td>
+                        <td className="liczba">{liczba(p.udzialy_glowne, 1)}</td>
+                        <td className="liczba">{p.kursy ? procent(p.kursy[i]) : <span className="mala">ukryty</span>}</td>
+                        <td className="liczba">{liczba(p.wartosc, 1)} pkt</td>
+                        <td>
+                          <Wynik p={p} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </>
+      ) : tab === "historia" ? (
+        <Historia nick={nick} />
+      ) : (
+        <Ustawienia />
+      )}
     </main>
   );
 }

@@ -13,6 +13,28 @@ psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/00_shim_auth.sql
 psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/schema.sql
 echo "schemat: OK"
 
+echo "dostęp ról anon/authenticated do widoków i funkcji odczytu:"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q <<'SQL'
+begin;
+set local role anon;
+select count(*) from public.v_pytania;
+select * from public.rozklad_powodow() limit 1;
+select * from public.komentarze_pytania(1, 5) limit 1;
+select * from public.komentarze_rynku(1, 5) limit 1;
+select * from public.historia_kursu(1) limit 1;
+select * from public.aktywnosc(null, 5) limit 1;
+select * from public.najwieksi_gracze(1, 5) limit 1;
+select * from public.ranking(5) limit 1;
+select public.profil_publiczny('nikt');
+reset role;
+set local role authenticated;
+select count(*) from public.v_pytania;
+select count(*) from public.v_moje_pozycje;
+select count(*) from public.gracze;
+rollback;
+SQL
+echo "role: OK"
+
 echo "symulacja 100 graczy (2 i 3 odpowiedzi):"
 psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/symulacja.sql 2>&1 | grep -E "SYMULACJA|ERROR|BŁĄD" || true
 
@@ -79,6 +101,58 @@ begin
   if abs(v_koszt - v_wydane) > 1e-6 then raise exception 'koszt % <> wydane % (zgubiony zakład przy równoległości)', v_koszt, v_wydane; end if;
   if abs((8 * 1000 - v_sald) - v_wydane) > 1e-6 then raise exception 'salda % nie zgadzają się z wydanymi %', v_sald, v_wydane; end if;
   raise notice 'RÓWNOLEGLE OK: % zakładów, wydane %, suma kursów %, stan spójny', v_tr, v_wydane, v_suma;
+end $$;
+SQL
+
+
+echo "sprzedaż udziałów (zwrot = C(q) - C(q'), saldo rośnie o zwrot, kursy sumują się do 1):"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare r record; v_pyt bigint; v_w jsonb; v_b double precision; v_q1 double precision[]; v_q2 double precision[];
+        v_c1 double precision; v_c2 double precision; v_saldo1 numeric; v_saldo2 numeric; v_suma double precision;
+        v_n int := 0; v_po double precision;
+begin
+  select wartosc::bigint into v_pyt from public.ustawienia where klucz = 'test_pytanie';
+  for r in select z.gracz, z.odpowiedz, z.udzialy from public.pozycje z where z.pytanie = v_pyt and z.udzialy > 0.5 order by z.udzialy desc limit 6 loop
+    perform set_config('request.jwt.claims', json_build_object('sub', r.gracz, 'role', 'authenticated')::text, true);
+    select q, b into v_q1, v_b from public.pytania where id = v_pyt;
+    select saldo into v_saldo1 from public.gracze where id = r.gracz;
+    v_w := public.sprzedaj_udzialy(v_pyt, r.odpowiedz, r.udzialy / 2);
+    select q into v_q2 from public.pytania where id = v_pyt;
+    select saldo into v_saldo2 from public.gracze where id = r.gracz;
+    v_c1 := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q1) as x));
+    v_c2 := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q2) as x));
+    if abs((v_c1 - v_c2) - (v_w->>'zwrot')::double precision) > 2e-4 then
+      raise exception 'Zwrot % <> C(q)-C(q'') = %', v_w->>'zwrot', v_c1 - v_c2;
+    end if;
+    if (v_w->>'zwrot')::numeric <= 0 or (v_w->>'zwrot')::double precision > r.udzialy / 2 then
+      raise exception 'Zwrot poza zakresem: %', v_w;
+    end if;
+    if v_saldo2 - v_saldo1 <> (v_w->>'zwrot')::numeric then
+      raise exception 'Saldo wzrosło o % zamiast o %', v_saldo2 - v_saldo1, v_w->>'zwrot';
+    end if;
+    select udzialy into v_po from public.pozycje where gracz = r.gracz and pytanie = v_pyt and odpowiedz = r.odpowiedz;
+    if abs(v_po - r.udzialy / 2) > 1e-9 then raise exception 'Udziały po sprzedaży: % zamiast %', v_po, r.udzialy / 2; end if;
+    select sum(x) into v_suma from unnest(public.kursy(v_q2, v_b)) as x;
+    if abs(v_suma - 1) > 1e-9 then raise exception 'Kursy po sprzedaży nie sumują się do 1: %', v_suma; end if;
+    if (v_w->>'kurs_po')::double precision >= (v_w->>'kurs_przed')::double precision then
+      raise exception 'Kurs nie spadł po sprzedaży: %', v_w;
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  if v_n = 0 then raise exception 'Brak pozycji do testu sprzedaży'; end if;
+  -- sprzedaż więcej niż się ma = sprzedaż wszystkiego; potem brak udziałów → błąd
+  select z.gracz, z.odpowiedz, z.udzialy into r from public.pozycje z where z.pytanie = v_pyt and z.udzialy > 0 limit 1;
+  perform set_config('request.jwt.claims', json_build_object('sub', r.gracz, 'role', 'authenticated')::text, true);
+  v_w := public.sprzedaj_udzialy(v_pyt, r.odpowiedz, 1e9);
+  if (v_w->>'udzialy_pozostale')::double precision <> 0 then raise exception 'Nie sprzedano wszystkiego: %', v_w; end if;
+  begin
+    perform public.sprzedaj_udzialy(v_pyt, r.odpowiedz, 1);
+    raise exception 'Sprzedaż bez udziałów przeszła';
+  exception when others then
+    if sqlerrm not like 'Nie masz udziałów%' then raise; end if;
+  end;
+  raise notice 'SPRZEDAŻ OK: % sprzedaży zgodnych z funkcją kosztu', v_n;
 end $$;
 SQL
 

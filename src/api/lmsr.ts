@@ -17,3 +17,16 @@ export function procent(kurs: number | null | undefined): string {
   if (kurs == null || Number.isNaN(kurs)) return "–";
   return `${Math.round(kurs * 100)}%`;
 }
+
+/**
+ * Podgląd sprzedaży u udziałów odpowiedzi o kursie p (LMSR, zależy tylko od p i b):
+ *   zwrot   = -b * ln(1 - p * (1 - e^(-u/b)))
+ *   kurs po = p * e^(-u/b) / (1 - p + p * e^(-u/b))
+ * Wynik wiążący zwraca RPC sprzedaj_udzialy.
+ */
+export function podgladSprzedazy(kurs: number, udzialy: number, b = B) {
+  const e = Math.exp(-udzialy / b);
+  const zwrot = -b * Math.log(1 - kurs * (1 - e));
+  const kursPo = (kurs * e) / (1 - kurs + kurs * e);
+  return { zwrot, kursPo };
+}

@@ -9,7 +9,7 @@ import { odmien } from "@/ui/tekst";
 
 function Powody({ rozklad }: { rozklad: RozkladPowodu[] }) {
   const razem = rozklad.reduce((s, r) => s + r.liczba, 0);
-  if (razem === 0) return <span className="pusto">brak</span>;
+  if (razem === 0) return <span className="mala">brak</span>;
   const posortowane = [...rozklad].sort((a, b) => b.liczba - a.liczba);
   return (
     <div>
@@ -47,9 +47,9 @@ export default function Miasto() {
   const t = terminowosc;
 
   return (
-    <main className="ekran ekran-szeroki">
+    <main className="kontener">
       <h1>Zdążą? Widok dla miasta</h1>
-      <p>
+      <p className="mala">
         Mieszkańcy stawiają punkty na to, czy miejskie terminy zostaną dotrzymane. Poniżej: terminy oficjalne,
         wiara mieszkańców i powody, dla których w termin nie wierzą. Winnego nie wskazujemy, robi to rozkład
         powodów.
@@ -61,15 +61,17 @@ export default function Miasto() {
           {t.roboty_budowlane.odsetek != null
             ? `, w robotach budowlanych ${Math.round(t.roboty_budowlane.odsetek * 100)}%`
             : ""}{" "}
-          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy).{" "}
-          <Link to="/liczba">Szczegóły</Link>
+          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy).
         </Komunikat>
       ) : null}
 
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
 
-      <h2>Terminy, które mieszkańcy oceniają teraz</h2>
+      <h2 className="sekcja-tytul">
+        Terminy, które mieszkańcy oceniają teraz
+        {dane ? <span className="licznik">{aktywne.length}</span> : null}
+      </h2>
       {dane && aktywne.length === 0 ? <p className="pusto">Brak otwartych pytań w kategorii „miasto”.</p> : null}
       {aktywne.length > 0 ? (
         <div className="tabela-owijka">
@@ -78,9 +80,9 @@ export default function Miasto() {
               <tr>
                 <th>Co</th>
                 <th>Termin oficjalny</th>
-                <th>Mieszkańcy: że zdążą</th>
-                <th>Po terminie / wstrzymane</th>
-                <th>Prognoz</th>
+                <th className="liczba">Mieszkańcy: że zdążą</th>
+                <th className="liczba">Po terminie / wstrzymane</th>
+                <th className="liczba">Prognoz</th>
                 <th>Powody niewiary</th>
                 <th>Komentarz urzędu</th>
               </tr>
@@ -106,7 +108,7 @@ export default function Miasto() {
                   <td style={{ minWidth: 220 }}>
                     <Powody rozklad={powody.filter((r) => r.pytanie === p.id)} />
                   </td>
-                  <td>{p.komentarz_urzedu ?? <span className="pusto">brak</span>}</td>
+                  <td>{p.komentarz_urzedu ?? <span className="mala">brak</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -116,7 +118,9 @@ export default function Miasto() {
 
       {zakonczone.length > 0 ? (
         <>
-          <h2>Rozstrzygnięte</h2>
+          <h2 className="sekcja-tytul">
+            Rozstrzygnięte<span className="licznik">{zakonczone.length}</span>
+          </h2>
           <div className="tabela-owijka">
             <table className="tabela">
               <thead>
@@ -124,7 +128,7 @@ export default function Miasto() {
                   <th>Co</th>
                   <th>Termin oficjalny</th>
                   <th>Wynik</th>
-                  <th>Mieszkańcy dawali</th>
+                  <th className="liczba">Mieszkańcy dawali</th>
                   <th>Powody</th>
                   <th>Komentarz urzędu</th>
                 </tr>
@@ -158,7 +162,7 @@ export default function Miasto() {
                     <td style={{ minWidth: 220 }}>
                       <Powody rozklad={powody.filter((r) => r.pytanie === p.id)} />
                     </td>
-                    <td>{p.komentarz_urzedu ?? <span className="pusto">brak</span>}</td>
+                    <td>{p.komentarz_urzedu ?? <span className="mala">brak</span>}</td>
                   </tr>
                 ))}
               </tbody>
