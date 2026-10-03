@@ -7,7 +7,6 @@ czy miasto dotrzyma terminu, a kurs pokazuje, ile w to wierzą. Projekt na HackY
 - **Widok dla miasta (bez logowania):** https://zdaza.vercel.app/miasto
 - **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
 - **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
-- **Liczba z zamówień publicznych:** https://zdaza.vercel.app/liczba
 
 Dwie kategorie rynków:
 
@@ -103,8 +102,8 @@ Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje praw
 `scripts/zamowienia.ts` pobiera z publicznej wyszukiwarki Biuletynu Zamówień Publicznych
 (`https://ezamowienia.gov.pl/mo-board/api/v1/Board/Search`) ogłoszenia o wykonaniu umowy krakowskich jednostek
 miejskich, dociąga szczegóły i liczy odsetek umów wykonanych w pierwotnym terminie (ogółem i dla robót budowlanych).
-Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/liczba`,
-`/miasto`, na stronę główną i jako kurs otwarcia rynków „miasto”.
+Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/miasto`,
+na stronę główną i jako kurs otwarcia rynków „miasto”.
 
 ```bash
 npm run zamowienia -- --od=2024-01-01 --do=2025-12-31      # pełny przebieg
@@ -142,7 +141,7 @@ wcześniej zepsuł produkcję).
 | `db/test/` | Namiastka `auth` do lokalnego Postgresa i symulacja |
 | `src/api/` | Klient Supabase, RPC, sesja (anonimowa i e-mail), podgląd LMSR |
 | `src/ui/` | `styles.css` (design system, jasny i ciemny motyw), `komponenty.tsx` (nagłówek, nawigacja, modale, wskaźnik), `wykres.tsx` (SVG), ikony |
-| `src/pages/` | `Lista` (rynki), `Pytanie` (rynek), `Profil`, `ProfilPubliczny`, `Ranking`, `Aktywnosc`, `Miasto`, `Admin`, `Liczba`, `Qr`, `Zaproponuj`, `Start` |
+| `src/pages/` | `Lista` (rynki), `Pytanie` (rynek), `Profil`, `ProfilPubliczny`, `Ranking`, `Aktywnosc`, `Miasto`, `Admin`, `Qr`, `Zaproponuj`, `Start` |
 | `src/dane/terminowosc.json` | Liczba z zamówień publicznych (generowana skryptem) |
 | `scripts/` | `zamowienia.ts`, `terminowosc.ts` (BZP), `pytania_startowe.ts` (wgranie CSV), `test_db_local.sh`, `test_ui.ts` |
 | `data/` | `pytania_startowe.csv` (realne pytania), `umowy.csv` (szablon BZP) |
@@ -170,7 +169,7 @@ Claude Code (Anthropic), w tym z równoległymi agentami do researchu i budowy e
 
 ## Ograniczenia
 
-- Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie; bez tego na ekranie jest „brak danych”.
+- Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie; bez tego nie pokazuje się nigdzie.
 - Terminy pytań startowych pochodzą z komunikatów znalezionych wyszukiwarką; strony nie były otwierane z środowiska
   budowania (blokada sieci). Sprawdź linki przed demem.
 - Bez własnego SMTP Supabase wysyła tylko kilka maili na godzinę, dlatego na demo lepiej wyłączyć potwierdzanie

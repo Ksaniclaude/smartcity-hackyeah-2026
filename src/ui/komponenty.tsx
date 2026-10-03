@@ -12,7 +12,6 @@ import {
   IkInfo,
   IkKalendarz,
   IkKsiezyc,
-  IkLink,
   IkLuz,
   IkMiasto,
   IkPlus,
@@ -198,7 +197,7 @@ export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolea
 /* ---------- nagłówek ---------- */
 
 export function Naglowek() {
-  const { gracz, stan, otworzModal } = useSesja();
+  const { gracz, konto, stan, otworzModal } = useSesja();
   const [motyw, przelaczMotyw] = useMotyw();
   const klasa = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "aktywny" : ""}`;
   return (
@@ -253,6 +252,10 @@ export function Naglowek() {
             </Link>
           ) : stan === "laduje" ? (
             <span className="szkielet szkielet-przycisk" />
+          ) : konto ? (
+            <button type="button" className="pigulka pigulka-pelna" onClick={() => otworzModal("nick")}>
+              Podaj nick
+            </button>
           ) : (
             <>
               <button type="button" className="pigulka ukryj-mobil" onClick={() => otworzModal("konto", "logowanie")}>
@@ -303,12 +306,8 @@ export function StopkaStrony() {
     <footer className="stopka-strony">
       <div className="stopka-wnetrze">
         <Link to="/miasto">Widok dla miasta</Link>
-        <Link to="/liczba">Terminowość umów (BZP)</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
         <Link to="/admin">Panel</Link>
-        <a href="https://github.com/ksaniclaude/smartcity-hackyeah-2026" target="_blank" rel="noreferrer">
-          Kod
-        </a>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
     </footer>
@@ -456,7 +455,7 @@ function ModalJakToDziala() {
 /** Rejestracja i logowanie e-mailem (jak na giełdach prognoz). Sesja anonimowa z nickiem
  *  jest podnoszona do stałego konta, więc punkty zostają. */
 function ModalKonta() {
-  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
+  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, odswiezGracza, ustawNick } = useSesja();
   const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(opcjaModalu === "logowanie" ? "logowanie" : "rejestracja");
   const [email, setEmail] = useState("");
   const [haslo, setHaslo] = useState("");
@@ -469,11 +468,13 @@ function ModalKonta() {
   const rejestracja = useAkcja(async () => {
     const w = await zarejestruj(email.trim(), haslo);
     if (w.wymagaPotwierdzenia) {
-      setInfo("Wysłaliśmy link potwierdzający na podany adres. Po kliknięciu w link konto będzie stałe.");
+      // Supabase ma włączone potwierdzanie e-maila: sesja powstanie po kliknięciu w link z poczty.
+      setInfo("Wysłaliśmy link potwierdzający na podany adres. Kliknij w niego, a potem zaloguj się i podaj nick.");
+      return;
     }
-    if (!gracz && nick.trim().length >= 2) await ustawNick(nick.trim());
+    if (nick.trim().length >= 2) await ustawNick(nick.trim());
     await odswiezGracza();
-    if (!w.wymagaPotwierdzenia) zamknijModal();
+    zamknijModal();
   });
   const logowanie = useAkcja(async () => {
     await zalogujEmailem(email.trim(), haslo);
@@ -504,9 +505,7 @@ function ModalKonta() {
       <p className="pod">
         {tryb === "logowanie"
           ? "Zaloguj się e-mailem i hasłem, które podałeś przy rejestracji."
-          : gracz && konto?.anonimowy
-            ? "Twoje punkty i prognozy zostaną przy koncie, a zalogujesz się na innym telefonie."
-            : "Załóż konto: nick, e-mail i hasło. Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
+          : "Załóż konto: nick, e-mail i hasło. Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
       </p>
       <div className="modal-zakladki" role="tablist">
         <button type="button" role="tab" className={tryb === "rejestracja" ? "aktywna" : ""} onClick={() => setTryb("rejestracja")}>
@@ -638,12 +637,6 @@ function ModalWiecej() {
           </Link>
         </li>
         <li>
-          <Link to="/liczba" onClick={zamknijModal}>
-            <IkKalendarz />
-            Terminowość umów (BZP)
-          </Link>
-        </li>
-        <li>
           <Link to="/zaproponuj" onClick={zamknijModal}>
             <IkPlus />
             Zaproponuj pytanie
@@ -662,11 +655,10 @@ function ModalWiecej() {
           </button>
         </li>
         <li>
-          <a href="https://github.com/ksaniclaude/smartcity-hackyeah-2026" target="_blank" rel="noreferrer">
-            <IkLink />
-            Kod i dokumentacja
-            <span className="pod">GitHub</span>
-          </a>
+          <Link to="/admin" onClick={zamknijModal}>
+            <IkProfil />
+            Panel admina
+          </Link>
         </li>
       </ul>
       {gracz ? (

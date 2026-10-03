@@ -59,13 +59,21 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const k = await pobierzKonto();
-        if (!k) {
-          setKonto(null);
-          setGracz(null);
-          setStan("brak_nicku");
-          return;
+        if (k) {
+          if (k.anonimowy) {
+            // sesja anonimowa ze starszej wersji gry: gra wymaga konta e-mail, więc ją porzucamy
+            await wylogujKonto();
+          } else {
+            const g = await pobierzGracza();
+            setKonto(k);
+            setGracz(g);
+            setStan(g ? "gotowy" : "brak_nicku");
+            return;
+          }
         }
-        await odswiezGracza();
+        setKonto(null);
+        setGracz(null);
+        setStan("brak_nicku");
       } catch (e) {
         setBlad(komunikatBledu(e));
         setStan("blad");

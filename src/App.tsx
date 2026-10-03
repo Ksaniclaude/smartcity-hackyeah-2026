@@ -3,7 +3,6 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SesjaProvider, useSesja, useUruchomSesje } from "@/api/sesja";
 import Admin from "@/pages/Admin";
 import Aktywnosc from "@/pages/Aktywnosc";
-import Liczba from "@/pages/Liczba";
 import Lista from "@/pages/Lista";
 import Miasto from "@/pages/Miasto";
 import Profil from "@/pages/Profil";
@@ -71,7 +70,7 @@ function Uklad() {
         <Route path="/ranking" element={<Ranking />} />
         <Route path="/aktywnosc" element={<Aktywnosc />} />
         <Route path="/miasto" element={<Miasto />} />
-        <Route path="/liczba" element={<Liczba />} />
+        <Route path="/liczba" element={<Navigate to="/" replace />} />
         <Route path="/start" element={<Navigate to="/" replace />} />
         <Route path="/qr" element={<Qr />} />
         <Route path="*" element={<Navigate to="/" replace />} />

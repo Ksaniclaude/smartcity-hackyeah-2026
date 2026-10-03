@@ -66,19 +66,13 @@ export async function pobierzKonto(): Promise<Konto | null> {
 }
 
 /**
- * Rejestracja e-mailem (signUp). Jeśli w przeglądarce została sesja anonimowa ze starszej
- * wersji gry, jest podnoszona do stałego konta przez updateUser, więc punkty zostają.
- * Zwraca true, gdy Supabase wymaga potwierdzenia e-maila (link w skrzynce).
+ * Rejestracja e-mailem (signUp). Ewentualna sesja anonimowa ze starszej wersji gry jest porzucana:
+ * jej podniesienie przez updateUser wymagałoby potwierdzenia e-maila, więc konto zakładamy od nowa.
+ * Zwraca true, gdy Supabase wymaga potwierdzenia e-maila (sesja powstanie po kliknięciu w link).
  */
 export async function zarejestruj(email: string, haslo: string): Promise<{ wymagaPotwierdzenia: boolean }> {
   const { data } = await supabase.auth.getSession();
-  if (data.session?.user) {
-    const r = await supabase.auth.updateUser({ email, password: haslo });
-    if (r.error) throw new Error(komunikatBledu(r.error));
-    const u = r.data.user;
-    const wymaga = Boolean(u?.new_email) && !u?.email_confirmed_at;
-    return { wymagaPotwierdzenia: wymaga };
-  }
+  if (data.session) await supabase.auth.signOut();
   const r = await supabase.auth.signUp({ email, password: haslo });
   if (r.error) throw new Error(komunikatBledu(r.error));
   return { wymagaPotwierdzenia: !r.data.session };

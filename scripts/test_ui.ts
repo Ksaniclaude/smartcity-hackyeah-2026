@@ -1,6 +1,6 @@
 // Test ścieżki gracza w prawdziwym Chromium (playwright-core) na zamockowanym Supabase:
 // rynki jako gość → prognoza (nick w modalu) → rynek „miasto” z powodem → komentarz → sprzedaż →
-// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /liczba, /qr. Zrzuty: telefon,
+// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /qr. Zrzuty: telefon,
 // desktop, jasny motyw. Nie potrzebuje sieci.
 //
 // Użycie: npm run build && npm run test:ui   (build z VITE_SUPABASE_URL=https://test.supabase.local VITE_SUPABASE_KEY=test)
@@ -429,7 +429,7 @@ async function main() {
     await zrzut(page2, "miasto");
     await ctx2.close();
 
-    console.log("8. /admin, /liczba, /qr");
+    console.log("8. /admin, /qr");
     await page.goto(`${ADRES}/admin`);
     await oczekuj(page, "Panel admina");
     await page.getByLabel("Hasło").fill("zle");
@@ -440,8 +440,6 @@ async function main() {
     await oczekuj(page, "Dodaj pytanie");
     await oczekuj(page, "wyniki sportowe");
     await zrzut(page, "admin");
-    await page.goto(`${ADRES}/liczba`);
-    await oczekuj(page, "Brak przeliczonych danych");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });
 

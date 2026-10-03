@@ -1,10 +1,14 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useSesja } from "@/api/sesja";
-import { FormularzNicku } from "@/ui/komponenty";
 
-/** Gość wszedł na /profil, /zaproponuj albo /admin: konto e-mail jest potrzebne (a po zalogowaniu jeszcze nick). */
+/** Gość wszedł na /profil, /zaproponuj albo /admin: od razu otwieramy rejestrację
+ *  (albo formularz nicku, gdy konto e-mail nie ma jeszcze nicku). */
 export default function Start() {
   const { konto, otworzModal } = useSesja();
+  useEffect(() => {
+    otworzModal(konto ? "nick" : "konto", konto ? null : "rejestracja");
+  }, [konto, otworzModal]);
   return (
     <main className="ekran">
       <h1 className="start-tytul">
@@ -14,41 +18,30 @@ export default function Start() {
         Rynek prognoz dla Krakowa. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
         wierzą.
       </p>
-      <div className="start-zasady">
-        <div>
-          <b>1</b>
-          <span>Zakładasz konto (nick, e-mail, hasło) i dostajesz 1000 punktów.</span>
-        </div>
-        <div>
-          <b>2</b>
-          <span>Stawiasz punkty na odpowiedzi, kurs się przesuwa. Udziały możesz sprzedać przed terminem.</span>
-        </div>
-        <div>
-          <b>3</b>
-          <span>
-            Każdy udział trafionej odpowiedzi wypłaca 1 punkt. <strong>Punktów nie da się kupić ani wymienić.</strong>
-          </span>
+      <div className="karta">
+        <h3>{konto ? "Jeszcze nick" : "Ten ekran wymaga konta"}</h3>
+        <p className="mala">
+          {konto
+            ? "Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach."
+            : "Załóż konto (nick, e-mail, hasło) i dostań 1000 punktów albo zaloguj się, jeśli już je masz."}
+        </p>
+        <div className="przyciski">
+          {konto ? (
+            <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("nick")}>
+              Podaj nick
+            </button>
+          ) : (
+            <>
+              <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
+                Zarejestruj się
+              </button>
+              <button type="button" className="przycisk przycisk-glowny przycisk-drugi" onClick={() => otworzModal("konto", "logowanie")}>
+                Zaloguj się
+              </button>
+            </>
+          )}
         </div>
       </div>
-      {konto ? (
-        <div className="karta">
-          <h3>Jeszcze nick</h3>
-          <p className="mala">Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach.</p>
-          <FormularzNicku etykietaPrzycisku="Zapisz nick" />
-        </div>
-      ) : (
-        <div className="karta">
-          <h3>Ten ekran wymaga konta</h3>
-          <div className="przyciski">
-            <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
-              Zarejestruj się
-            </button>
-            <button type="button" className="przycisk przycisk-glowny przycisk-drugi" onClick={() => otworzModal("konto", "logowanie")}>
-              Zaloguj się
-            </button>
-          </div>
-        </div>
-      )}
       <p className="stopka">
         <Link to="/">Wróć do rynków</Link>
       </p>
