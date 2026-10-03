@@ -23,12 +23,6 @@ export function Ladowanie({ tekst = "Ładowanie…" }: { tekst?: string }) {
   return <div className="ladowanie">{tekst}</div>;
 }
 
-export function Data({ iso }: { iso: string | null | undefined }) {
-  if (!iso) return <>–</>;
-  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
-  return <>{d.toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" })}</>;
-}
-
 export function formatujDate(iso: string | null | undefined): string {
   if (!iso) return "–";
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
@@ -39,14 +33,37 @@ export function Naglowek({ nick, saldo }: { nick?: string; saldo?: number }) {
   return (
     <header className="naglowek">
       <Link to="/" className="logo">
-        Zdążą?
+        Zdążą<span>?</span>
       </Link>
       {nick ? (
         <Link to="/profil" className="saldo">
-          {nick} · <b>{Math.floor(saldo ?? 0)}</b> pkt
+          {nick} <b>{Math.floor(saldo ?? 0)} pkt</b>
         </Link>
       ) : null}
     </header>
+  );
+}
+
+function IkonaLista() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </svg>
+  );
+}
+function IkonaProfil() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+function IkonaMiasto() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6M9 12h.01M15 12h.01" />
+    </svg>
   );
 }
 
@@ -55,15 +72,47 @@ export function DolnaNawigacja() {
   return (
     <nav className="dol-nav">
       <NavLink to="/" end className={klasa}>
-        <span className="ikona">❓</span>Pytania
+        <IkonaLista />
+        Rynki
       </NavLink>
       <NavLink to="/profil" className={klasa}>
-        <span className="ikona">🎯</span>Profil
+        <IkonaProfil />
+        Profil
       </NavLink>
       <NavLink to="/miasto" className={klasa}>
-        <span className="ikona">🏛️</span>Miasto
+        <IkonaMiasto />
+        Miasto
       </NavLink>
     </nav>
+  );
+}
+
+/** Pasek podziału kursów (tak / nie / trzecia odpowiedź) z legendą. */
+export function PasekRynku({ odpowiedzi, kursy }: { odpowiedzi: string[]; kursy: number[] | null }) {
+  const klasy = ["tak", "nie", "trzeci"];
+  if (!kursy) {
+    return (
+      <div className="pasek-rynku">
+        <i style={{ width: "100%", background: "#eef0f3" }} />
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="pasek-rynku">
+        {kursy.map((k, i) => (
+          <i key={i} className={klasy[i] ?? "trzeci"} style={{ width: `${Math.max(0, k * 100)}%` }} />
+        ))}
+      </div>
+      <div className="legenda">
+        {odpowiedzi.map((o, i) => (
+          <span key={i} className={klasy[i] ?? "trzeci"}>
+            <i />
+            {o} {procent(kursy[i])}
+          </span>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -82,11 +131,11 @@ export function Kursy({
       {odpowiedzi.map((o, i) => {
         const k = kursy ? kursy[i] : null;
         return (
-          <div key={i} className={`odpowiedz ${wynik === i + 1 ? "trafiona" : ""}`}>
+          <div key={i} className={`odpowiedz o-${i + 1} ${wynik === i + 1 ? "trafiona" : ""}`}>
             {k != null ? <span className="pasek" style={{ width: `${Math.round(k * 100)}%` }} /> : null}
             <span className="nazwa">
               {o}
-              {wynik === i + 1 ? " ✓" : ""}
+              {wynik === i + 1 ? " — wynik" : ""}
             </span>
             <span className="kurs">{procent(k)}</span>
           </div>
@@ -94,20 +143,4 @@ export function Kursy({
       })}
     </div>
   );
-}
-
-/** Krótki opis kursu do listy: "zdążą 41%" albo "kurs ukryty (3/10 prognoz)". */
-export function opisKursu(p: {
-  kategoria: Kategoria;
-  kursy: number[] | null;
-  kurs_widoczny: boolean;
-  liczba_prognoz: number;
-  prog_widocznosci: number;
-  odpowiedzi: string[];
-}): string {
-  if (!p.kurs_widoczny || !p.kursy) {
-    return `kurs ukryty do ${p.prog_widocznosci} prognoz (${p.liczba_prognoz}/${p.prog_widocznosci})`;
-  }
-  if (p.kategoria === "miasto") return `${procent(p.kursy[0])}, że zdążą`;
-  return `${p.odpowiedzi[0]} ${procent(p.kursy[0])}`;
 }

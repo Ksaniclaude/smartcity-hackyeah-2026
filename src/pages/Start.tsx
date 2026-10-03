@@ -5,7 +5,7 @@ import { useAkcja } from "@/ui/hooks";
 import { Komunikat } from "@/ui/komponenty";
 import { terminowosc } from "@/dane/terminowosc";
 
-/** Pierwszy ekran: nick i zasady w trzech zdaniach. */
+/** Pierwszy ekran: nick i zasady w trzech punktach. */
 export default function Start() {
   const { ustawNick } = useSesja();
   const [nick, setNick] = useState("");
@@ -20,15 +20,29 @@ export default function Start() {
 
   return (
     <main className="ekran">
-      <h1>Zdążą?</h1>
+      <h1 className="start-tytul">
+        Czy miasto zdąży<span>?</span>
+      </h1>
       <p>
-        Mieszkańcy prognozują punktami sprawdzalne pytania o swoje miasto: czy urząd dotrzyma terminu i czy
-        jutro będzie czym oddychać.
+        Rynek prognoz dla Krakowa. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje,
+        ile w to wierzą.
       </p>
-      <p>
-        <b>Punktów nie da się kupić ani wymienić.</b> Udział jest darmowy, nagród nie ma. Dostajesz 1000 punktów na
-        start, a każda trafiona prognoza je pomnaża.
-      </p>
+      <div className="start-zasady">
+        <div>
+          <b>1</b>
+          <span>Dostajesz 1000 punktów. Stawiasz je na odpowiedzi, kurs się przesuwa.</span>
+        </div>
+        <div>
+          <b>2</b>
+          <span>Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Rozstrzygamy według publicznego źródła.</span>
+        </div>
+        <div>
+          <b>3</b>
+          <span>
+            <strong>Punktów nie da się kupić ani wymienić.</strong> Udział jest darmowy, nagród nie ma.
+          </span>
+        </div>
+      </div>
       {odsetek != null ? (
         <p className="mala">
           Tylko {Math.round(odsetek * 100)}% umów krakowskich jednostek miejskich wykonano w pierwotnym terminie.{" "}

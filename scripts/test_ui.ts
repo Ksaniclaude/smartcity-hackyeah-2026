@@ -167,6 +167,8 @@ async function oczekuj(page: Page, tekst: string, ms = 8000) {
   console.log(`  ✓ „${tekst}”`);
 }
 
+let stronaDoZrzutu: Page | null = null;
+
 async function main() {
   const serwer = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort", "--host", "127.0.0.1"], { stdio: "ignore" });
   try {
@@ -174,39 +176,41 @@ async function main() {
     const browser = await chromium.launch({ executablePath: chromiumPath(), args: ["--no-sandbox"] });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "pl-PL" });
     const page = await ctx.newPage();
+    stronaDoZrzutu = page;
     page.on("pageerror", (e) => console.log(`  błąd strony: ${e.message}`));
     page.on("console", (msg) => {
       if (msg.type() === "error") console.log(`  console.error: ${msg.text().slice(0, 200)}`);
     });
     await ctx.route(`${SUPABASE}/**`, mock);
 
-    console.log("1. Ekran startowy");
+    console.log("1. Strona główna jako gość (rynki bez nicku)");
     await page.goto(`${ADRES}/`);
-    await oczekuj(page, "Punktów nie da się kupić ani wymienić");
-    await zrzut(page, "start");
-    await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
-    await page.getByRole("button", { name: /Zaczynam/ }).click();
-
-    console.log("2. Lista pytań");
-    await oczekuj(page, "Na luzie");
-    await oczekuj(page, "41%, że zdążą");
+    await oczekuj(page, "Przeglądasz jako gość");
+    await oczekuj(page, "41%");
     await oczekuj(page, "tłum się pomylił");
-    await zrzut(page, "lista");
+    await zrzut(page, "rynki_gosc");
 
-    console.log("3. Pytanie „na luzie” i prognoza");
-    await page.getByText("indeks jakości powietrza").click();
+    console.log("2. Klik „tak” na karcie → pytanie → nick → prognoza");
+    await page.getByRole("button", { name: /^tak/ }).first().click();
     await oczekuj(page, "Kryterium rozstrzygnięcia");
-    await page.getByRole("button", { name: /^tak/ }).click();
+    await oczekuj(page, "Żeby postawić, podaj nick");
+    await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
+    await page.getByRole("button", { name: "Dalej" }).click();
+    await oczekuj(page, "Masz 1000 punktów");
     await page.getByRole("button", { name: /Stawiam/ }).click();
     await oczekuj(page, "przesunęła kurs z 41% na 44%");
     await zrzut(page, "prognoza");
-    await oczekuj(page, "krowodrza_42 · 990 pkt".replace(" · ", " · "), 8000).catch(() => console.log("  (saldo w nagłówku nie odświeżyło się)"));
+    await oczekuj(page, "krowodrza_42", 8000);
+
+    console.log("3. Lista z nickiem");
+    await page.goto(`${ADRES}/`);
+    await oczekuj(page, "41%");
+    await zrzut(page, "rynki");
 
     console.log("4. Pytanie „miasto”: zestawienie i powód");
-    await page.goto(`${ADRES}/pytanie/1`);
+    await page.goto(`${ADRES}/pytanie/1?odp=2`);
     await oczekuj(page, "Oficjalnie");
     await oczekuj(page, "41%, że zdążą");
-    await page.getByRole("button", { name: /^po terminie/ }).click();
     const przycisk = page.getByRole("button", { name: /Wybierz powód/ });
     await przycisk.waitFor({ timeout: 5000 });
     await page.getByRole("button", { name: "wykonawca", exact: true }).click();
@@ -257,7 +261,16 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
   console.error("TEST UI NIEUDANY:", e);
+  if (stronaDoZrzutu) {
+    try {
+      fs.mkdirSync(ZRZUTY, { recursive: true });
+      await stronaDoZrzutu.screenshot({ path: path.join(ZRZUTY, "99_blad.png"), fullPage: true });
+      console.error("Tekst strony:", (await stronaDoZrzutu.textContent("body"))?.replace(/\s+/g, " ").slice(0, 1500));
+    } catch {
+      /* brak zrzutu */
+    }
+  }
   process.exit(1);
 });

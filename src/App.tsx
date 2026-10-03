@@ -12,7 +12,7 @@ import Start from "@/pages/Start";
 import Zaproponuj from "@/pages/Zaproponuj";
 import { DolnaNawigacja, Komunikat, Ladowanie, Naglowek } from "@/ui/komponenty";
 
-/** Ekrany gracza: logowanie anonimowe, a bez nicku ekran startowy. */
+/** Ekrany wymagające gracza z nickiem (profil, propozycje, admin). Rynki są publiczne. */
 function WymagaGracza({ children }: { children: ReactNode }) {
   useUruchomSesje();
   const { stan, blad, uruchom } = useSesja();
@@ -39,22 +39,8 @@ function Uklad() {
     <div className="aplikacja">
       {!pelnyEkran ? <Naglowek nick={gracz?.nick} saldo={gracz?.saldo} /> : null}
       <Routes>
-        <Route
-          path="/"
-          element={
-            <WymagaGracza>
-              <Lista />
-            </WymagaGracza>
-          }
-        />
-        <Route
-          path="/pytanie/:id"
-          element={
-            <WymagaGracza>
-              <Pytanie />
-            </WymagaGracza>
-          }
-        />
+        <Route path="/" element={<Lista />} />
+        <Route path="/pytanie/:id" element={<Pytanie />} />
         <Route
           path="/profil"
           element={
@@ -79,6 +65,7 @@ function Uklad() {
             </WymagaGracza>
           }
         />
+        <Route path="/start" element={<Start />} />
         <Route path="/miasto" element={<Miasto />} />
         <Route path="/liczba" element={<Liczba />} />
         <Route path="/qr" element={<Qr />} />
