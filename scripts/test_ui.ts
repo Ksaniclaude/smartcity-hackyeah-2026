@@ -343,16 +343,16 @@ async function main() {
     await oczekuj(page, "tłum się pomylił");
     await zrzut(page, "rynki_gosc");
 
-    console.log("2. Klik „Tak” na karcie → rynek → konto → nick w modalu → prognoza");
+    console.log("2. Klik „Tak” na karcie → rynek → rejestracja (nick, e-mail, hasło) → prognoza");
     await page.locator(".rynek-przyciski .kup-tak").first().click();
     await oczekuj(page, "Zasady");
     await page.getByRole("button", { name: /Zaloguj się, żeby postawić/ }).click();
     await oczekuj(page, "Witaj w Zdążą?");
     await zrzut(page, "modal_konta", false);
-    await page.getByRole("button", { name: /Graj bez konta/ }).click();
-    await oczekuj(page, "Podaj nick");
     await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
-    await page.getByRole("button", { name: "Zaczynam" }).click();
+    await page.getByPlaceholder("ty@przyklad.pl").fill("krowodrza@przyklad.pl");
+    await page.getByLabel(/Hasło/).fill("haslo123");
+    await page.getByRole("button", { name: "Załóż konto" }).click();
     await page.getByRole("button", { name: /^Postaw/ }).first().waitFor({ timeout: 8000 });
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();

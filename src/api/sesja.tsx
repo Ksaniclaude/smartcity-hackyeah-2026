@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { komunikatBledu, pobierzGracza, pobierzKonto, ustawNick as ustawNickApi, wylogujKonto, zalogujAnonimowo, type Konto } from "./api";
+import { komunikatBledu, pobierzGracza, pobierzKonto, ustawNick as ustawNickApi, wylogujKonto, type Konto } from "./api";
 import { konfiguracjaOk } from "./supabase";
 import type { Gracz } from "./types";
 
+/** brak_nicku = gość bez konta (konto null) albo konto e-mail bez nicku (konto ustawione). */
 type Stan = "nowa" | "laduje" | "brak_nicku" | "gotowy" | "blad";
 export type Modal = "nick" | "jak" | "konto" | "szukaj" | "wiecej" | null;
 export type OpcjaModalu = "rejestracja" | "logowanie" | null;
@@ -44,6 +45,8 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setStan(g ? "gotowy" : "brak_nicku");
   }, []);
 
+  /** Sprawdza zapisaną sesję (bez sieci). Gość bez konta ma stan „brak_nicku” i konto = null;
+   *  konto zakłada się e-mailem w modalu rejestracji (jak na giełdach prognoz). */
   const uruchom = useCallback(() => {
     if (uruchomiono.current) return;
     uruchomiono.current = true;
@@ -55,7 +58,13 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setStan("laduje");
     (async () => {
       try {
-        await zalogujAnonimowo();
+        const k = await pobierzKonto();
+        if (!k) {
+          setKonto(null);
+          setGracz(null);
+          setStan("brak_nicku");
+          return;
+        }
         await odswiezGracza();
       } catch (e) {
         setBlad(komunikatBledu(e));

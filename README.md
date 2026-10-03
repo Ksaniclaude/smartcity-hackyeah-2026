@@ -22,7 +22,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 | Polymarket | Zdążą? |
 | --- | --- |
-| Sign up / Log in (e-mail) | Rejestracja i logowanie e-mailem (Supabase Auth). Można też grać bez konta, tylko z nickiem (sesja anonimowa); rejestracja podnosi tę sesję do stałego konta, więc punkty zostają. |
+| Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
 | Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
@@ -35,7 +35,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 ## Zasady gry
 
-- Nowy gracz dostaje 1000 punktów. Każdy rynek ma 2 albo 3 odpowiedzi; kursy ustala automatyczny animator LMSR
+- Nowy gracz zakłada konto i dostaje 1000 punktów. Każdy rynek ma 2 albo 3 odpowiedzi; kursy ustala automatyczny animator LMSR
   (b = 1000). Po prognozie gracz widzi, jak przesunął kurs.
 - Na jeden rynek można wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki rynek ma mniej niż 10 prognoz
   (do tego czasu widać kurs otwarcia ustawiony przez admina).
@@ -63,7 +63,7 @@ VITE_SUPABASE_URL=… VITE_SUPABASE_KEY=… ADMIN_HASLO=… npm run pytania -- -
 
 ## Stack
 
-React 19 + Vite + TypeScript, Supabase (Postgres, Auth: sesje anonimowe i e-mail, funkcje RPC), Vercel. Bez osobnego
+React 19 + Vite + TypeScript, Supabase (Postgres, Auth e-mail, funkcje RPC), Vercel. Bez osobnego
 backendu. Klient tylko czyta (RLS, widoki `security_invoker`, uprawnienia kolumnowe ukrywają stan rynku `q`), każdy
 zapis idzie przez funkcję RPC `SECURITY DEFINER`, która sprawdza gracza po `auth.uid()` i trzyma blokadę wiersza
 rynku (`SELECT … FOR UPDATE`), więc równoległe zakłady są bezpieczne. Design: własny system w CSS (tokeny kolorów
@@ -89,10 +89,11 @@ npm run dev
    values ('haslo_admina', extensions.crypt('TU_WPISZ_HASLO', extensions.gen_salt('bf')))
    on conflict (klucz) do update set wartosc = excluded.wartosc;
    ```
-3. Authentication → Sign In / Providers: włącz **Allow anonymous sign-ins** (gra bez konta) i **Email** (rejestracja).
-   Na demo wyłącz **Confirm email**, inaczej rejestracja wymaga kliknięcia w link z poczty (Supabase wysyła
-   kilka maili na godzinę bez własnego SMTP). Domyślny limit to 30 anonimowych logowań na godzinę z jednego IP
-   (Authentication → Rate Limits); na prezentacji z jednej sieci Wi-Fi warto go podnieść.
+3. Authentication → Sign In / Providers: włącz **Email** (rejestracja i logowanie). Na demo wyłącz
+   **Confirm email**, inaczej rejestracja wymaga kliknięcia w link z poczty (Supabase bez własnego SMTP wysyła
+   tylko kilka maili na godzinę). Logowanie anonimowe nie jest już potrzebne (sesje anonimowe z poprzedniej
+   wersji są podnoszone do konta przy rejestracji). Sprawdź limity w Authentication → Rate Limits (rejestracje
+   i logowania z jednego IP) przed prezentacją z jednej sieci Wi-Fi.
 4. W projekcie Vercel ustaw `VITE_SUPABASE_URL` i `VITE_SUPABASE_KEY` (klucz publishable, publiczny z założenia).
 
 Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje prawa admina (`gracze.czy_admin`).
@@ -172,8 +173,8 @@ Claude Code (Anthropic), w tym z równoległymi agentami do researchu i budowy e
 - Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie; bez tego na ekranie jest „brak danych”.
 - Terminy pytań startowych pochodzą z komunikatów znalezionych wyszukiwarką; strony nie były otwierane z środowiska
   budowania (blokada sieci). Sprawdź linki przed demem.
-- Gra bez konta = jedna przeglądarka; rejestracja e-mailem to naprawia. Bez własnego SMTP Supabase wysyła tylko
-  kilka maili na godzinę, dlatego na demo lepiej wyłączyć potwierdzanie e-maila.
+- Bez własnego SMTP Supabase wysyła tylko kilka maili na godzinę, dlatego na demo lepiej wyłączyć potwierdzanie
+  e-maila (inaczej nowi gracze czekają na link).
 - Hasło admina jest wspólne dla zespołu.
 - Nicki i komentarze graczy są publiczne (aktywność, ranking, komentarze), jak na giełdach prognoz.
 - Supabase domyślnie limituje anonimowe logowania do 30 na godzinę z jednego IP.

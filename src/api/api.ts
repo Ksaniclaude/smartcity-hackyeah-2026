@@ -66,8 +66,8 @@ export async function pobierzKonto(): Promise<Konto | null> {
 }
 
 /**
- * Rejestracja e-mailem. Sesja anonimowa (z nickiem i punktami) jest podnoszona do stałego
- * konta przez updateUser, więc punkty zostają. Bez sesji: zwykłe signUp.
+ * Rejestracja e-mailem (signUp). Jeśli w przeglądarce została sesja anonimowa ze starszej
+ * wersji gry, jest podnoszona do stałego konta przez updateUser, więc punkty zostają.
  * Zwraca true, gdy Supabase wymaga potwierdzenia e-maila (link w skrzynce).
  */
 export async function zarejestruj(email: string, haslo: string): Promise<{ wymagaPotwierdzenia: boolean }> {
@@ -99,16 +99,6 @@ export async function zmienHaslo(nowe: string): Promise<void> {
   if (r.error) throw new Error(komunikatBledu(r.error));
 }
 
-
-/** Zwraca id zalogowanego (anonimowo) użytkownika; loguje, jeśli trzeba. */
-export async function zalogujAnonimowo(): Promise<string> {
-  const { data } = await supabase.auth.getSession();
-  if (data.session?.user) return data.session.user.id;
-  const r = await supabase.auth.signInAnonymously();
-  if (r.error) throw new Error(komunikatBledu(r.error));
-  if (!r.data.user) throw new Error("Nie udało się zalogować anonimowo");
-  return r.data.user.id;
-}
 
 export async function pobierzGracza(): Promise<Gracz | null> {
   const r = await supabase.from("gracze").select("id, nick, saldo, czy_admin").maybeSingle();

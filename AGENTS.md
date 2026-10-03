@@ -11,7 +11,8 @@
 - Interfejs po polsku, najpierw telefon. Odświeżanie przez odpytywanie co 5 s, bez realtime.
 - Design: `src/ui/styles.css` (tokeny, ciemny motyw domyślnie, jasny po wyborze), wspólne komponenty w
   `src/ui/komponenty.tsx`. Wzorzec: giełdy prognoz (Polymarket). Bez emoji i ozdobnych gradientów.
-- Konto: sesja anonimowa z nickiem albo e-mail (Supabase Auth); rejestracja podnosi sesję anonimową do stałego konta.
+- Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Stare sesje
+  anonimowe są podnoszone do konta przy rejestracji (updateUser).
 - Nie wymyślaj pytań, terminów, źródeł ani liczb z zamówień publicznych. Puste dane mają być widoczne jako puste.
 - Sprawdzenie UI bez sieci: `npm run build && npm run test:ui` (Chromium, zamockowane Supabase).
 - Deploy: Vercel (projekt `zdaza`), zmienne `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`.

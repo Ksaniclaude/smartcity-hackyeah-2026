@@ -365,7 +365,7 @@ export function FormularzNicku({ etykietaPrzycisku = "Zaczynam" }: { etykietaPrz
       }}
     >
       <label className="pole">
-        <span className="etykieta">Nick (tylko tyle o Tobie zapisujemy)</span>
+        <span className="etykieta">Nick (widzą go inni gracze)</span>
         <input
           type="text"
           value={nick}
@@ -403,7 +403,7 @@ function ModalNicku() {
   return (
     <Modal tytul="Podaj nick" onClose={zamknijModal}>
       <p className="pod">
-        Dostaniesz 1000 punktów na prognozy. Bez e-maila i hasła, sesja zostaje w tej przeglądarce.{" "}
+        Nick zobaczą inni gracze przy Twoich prognozach i komentarzach. Dostajesz 1000 punktów na prognozy.{" "}
         <b>Punktów nie da się kupić ani wymienić.</b>
       </p>
       <FormularzNicku />
@@ -444,7 +444,7 @@ function ModalJakToDziala() {
           Jasne
         </button>
       ) : (
-        <button type="button" className="przycisk" onClick={() => otworzModal("nick")}>
+        <button type="button" className="przycisk" onClick={() => otworzModal("konto", "rejestracja")}>
           Zacznij grać
         </button>
       )}
@@ -456,7 +456,7 @@ function ModalJakToDziala() {
 /** Rejestracja i logowanie e-mailem (jak na giełdach prognoz). Sesja anonimowa z nickiem
  *  jest podnoszona do stałego konta, więc punkty zostają. */
 function ModalKonta() {
-  const { zamknijModal, otworzModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
+  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
   const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(opcjaModalu === "logowanie" ? "logowanie" : "rejestracja");
   const [email, setEmail] = useState("");
   const [haslo, setHaslo] = useState("");
@@ -503,10 +503,10 @@ function ModalKonta() {
     <Modal tytul={tryb === "logowanie" ? "Zaloguj się" : "Witaj w Zdążą?"} onClose={zamknijModal}>
       <p className="pod">
         {tryb === "logowanie"
-          ? "Konto e-mail działa na każdym urządzeniu."
+          ? "Zaloguj się e-mailem i hasłem, które podałeś przy rejestracji."
           : gracz && konto?.anonimowy
             ? "Twoje punkty i prognozy zostaną przy koncie, a zalogujesz się na innym telefonie."
-            : "Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
+            : "Załóż konto: nick, e-mail i hasło. Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
       </p>
       <div className="modal-zakladki" role="tablist">
         <button type="button" role="tab" className={tryb === "rejestracja" ? "aktywna" : ""} onClick={() => setTryb("rejestracja")}>
@@ -554,15 +554,25 @@ function ModalKonta() {
           </button>
         </form>
       )}
-      {!gracz ? (
-        <>
-          <div className="lub">lub</div>
-          <button type="button" className="przycisk przycisk-drugi" onClick={() => otworzModal("nick")}>
-            Graj bez konta, tylko z nickiem
-          </button>
-        </>
-      ) : null}
-      <p className="zastrzezenie">Gra o punkty, bez pieniędzy. Zapisujemy tylko nick i e-mail.</p>
+      <p className="zastrzezenie">
+        {tryb === "logowanie" ? (
+          <>
+            Nie masz konta?{" "}
+            <button type="button" className="przycisk-tekst niebieski" style={{ padding: 0 }} onClick={() => setTryb("rejestracja")}>
+              Zarejestruj się
+            </button>
+          </>
+        ) : (
+          <>
+            Masz już konto?{" "}
+            <button type="button" className="przycisk-tekst niebieski" style={{ padding: 0 }} onClick={() => setTryb("logowanie")}>
+              Zaloguj się
+            </button>
+          </>
+        )}
+        <br />
+        Gra o punkty, bez pieniędzy. Zapisujemy tylko nick i e-mail.
+      </p>
     </Modal>
   );
 }
