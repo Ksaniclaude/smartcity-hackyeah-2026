@@ -40,7 +40,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
   (do tego czasu widać kurs otwarcia ustawiony przez admina).
 - Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Unieważnienie zwraca wydane punkty. Udziały można sprzedać
   przed terminem po bieżącym kursie.
-- Naraz otwarte są najwyżej 3 rynki „miasto” i 5 „na luzie”. Rynki „miasto” startują od odsetka umów wykonanych
+- Liczba otwartych rynków nie jest ograniczona. Rynki „miasto” startują od odsetka umów wykonanych
   w terminie (z Biuletynu Zamówień Publicznych), „na luzie” od 50%.
 - Każdy rynek musi mieć: treść, kategorię, odpowiedzi, kryterium rozstrzygnięcia, link do publicznego źródła i termin.
   Tematy wykluczone: wyniki sportowe, wybory i kandydaci, konkretne osoby prywatne, wypadki i zgony.
@@ -50,7 +50,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 Nic nie jest wymyślone. [`data/pytania_startowe.csv`](data/pytania_startowe.csv) zawiera 22 pytania o realne
 krakowskie inwestycje i decyzje z terminami z komunikatów pod podanymi linkami (ZDMK, ZIM, ZIS, MCOO, krakow.pl,
-budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych (limity gry), reszta czeka jako propozycje
+budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych, reszta czeka jako propozycje
 w `/admin`. Szczegóły i zastrzeżenie o weryfikacji: [`data/PYTANIA_STARTOWE_UWAGA.md`](data/PYTANIA_STARTOWE_UWAGA.md).
 Przed demem otwórz każdy link i porównaj datę; termin zmienisz w `/admin`.
 

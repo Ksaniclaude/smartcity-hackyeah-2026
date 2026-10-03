@@ -198,7 +198,7 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
       <PoleKursu kategoria={kategoria} proc={proc} onChange={setProc} />
       <label className="pole" style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input type="checkbox" checked={otworz} onChange={(e) => setOtworz(e.target.checked)} />
-        <span>otwórz od razu (limit: 3 „miasto”, 5 „na luzie”)</span>
+        <span>otwórz od razu</span>
       </label>
       <Komunikat typ="ostrz">
         Tematy wykluczone: {TEMATY_WYKLUCZONE.join(", ")}. Bez kryterium, linku i daty pytania nie da się otworzyć.
@@ -479,7 +479,7 @@ function PanelAdmina() {
     <main className="ekran">
       <h1>Panel admina</h1>
       <p className="mala">
-        Otwarte naraz: najwyżej 3 pytania „miasto” i 5 „na luzie”. Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
+        Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
       </p>
       <FormularzDodawania poDodaniu={odswiez} />
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
