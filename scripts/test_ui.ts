@@ -387,7 +387,7 @@ async function main() {
     await page.getByRole("button", { name: /Załóż konto, żeby postawić/ }).click();
     await oczekuj(page, "Witaj w Zdążą?");
     await zrzut(page, "modal_konta", false);
-    await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
+    await page.getByPlaceholder("np. sokole_oko").fill("krowodrza_42");
     await page.getByPlaceholder("ty@przyklad.pl").fill("krowodrza@przyklad.pl");
     await page.getByLabel(/Hasło/).fill("haslo123");
     await page.locator(".modal").getByRole("button", { name: "Załóż konto", exact: true }).click();

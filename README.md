@@ -1,10 +1,10 @@
 # Zdążą?
 
-Rynek prognoz o Krakowie, w stylu giełd prognoz (Polymarket), ale o punkty. Mieszkańcy stawiają punkty na to,
+Rynek prognoz o terminach w polskich miastach, w stylu giełd prognoz (Polymarket), ale o punkty. Mieszkańcy stawiają punkty na to,
 czy miasto dotrzyma terminu, a kurs pokazuje, ile w to wierzą. Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
 - **Demo:** https://zdaza.vercel.app
-- **Widok dla miasta (bez logowania):** https://zdaza.vercel.app/miasto
+- **Widok dla miast (bez logowania):** https://zdaza.vercel.app/miasto
 - **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
 - **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
 
@@ -49,10 +49,11 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 ## Pytania startowe
 
-Nic nie jest wymyślone. [`data/pytania_startowe.csv`](data/pytania_startowe.csv) zawiera 22 pytania o realne
-krakowskie inwestycje i decyzje z terminami z komunikatów pod podanymi linkami (ZDMK, ZIM, ZIS, MCOO, krakow.pl,
-budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych, reszta czeka jako propozycje
-w `/admin`. Szczegóły i zastrzeżenie o weryfikacji: [`data/PYTANIA_STARTOWE_UWAGA.md`](data/PYTANIA_STARTOWE_UWAGA.md).
+Nic nie jest wymyślone. Rynek może dotyczyć dowolnego miasta w Polsce; pierwsze pytania są o Krakowie i Warszawie.
+[`data/pytania_startowe.csv`](data/pytania_startowe.csv) zawiera 22 pytania o realne krakowskie inwestycje i decyzje
+z terminami z komunikatów pod podanymi linkami (ZDMK, ZIM, ZIS, MCOO, krakow.pl, budzet.krakow.pl i lokalne media).
+W żywej bazie jest 8 z nich otwartych, reszta czeka jako propozycje w `/admin`. Szczegóły i zastrzeżenie
+o weryfikacji: [`data/PYTANIA_STARTOWE_UWAGA.md`](data/PYTANIA_STARTOWE_UWAGA.md).
 Przed demem otwórz każdy link i porównaj datę; termin zmienisz w `/admin`.
 
 W kolejce `/admin` czeka też 11 propozycji o Warszawie (id 26–36) z [`data/pytania_warszawa.csv`](data/pytania_warszawa.csv):

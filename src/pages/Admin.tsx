@@ -529,7 +529,7 @@ function PanelAdmina() {
     <main className="ekran">
       <h1>Panel admina</h1>
       <p className="mala">
-        Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
+        Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miast</Link>
       </p>
       <FormularzDodawania poDodaniu={odswiez} />
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}

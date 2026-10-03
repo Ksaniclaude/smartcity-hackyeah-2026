@@ -367,12 +367,12 @@ export default function Lista() {
               <div className="czolowka-haslo">
                 <h1>Czy miasto zdąży?</h1>
                 <p>
-                  Rynek prognoz dla Krakowa: mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w
-                  to wierzą.
+                  Rynek prognoz dla polskich miast: mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs
+                  pokazuje, ile w to wierzą.
                 </p>
                 {odsetek != null ? (
                   <p className="czolowka-liczba">
-                    <b className="cyfry">{Math.round(odsetek * 100)}%</b> umów miejskich wykonano w terminie (BZP)
+                    <b className="cyfry">{Math.round(odsetek * 100)}%</b> umów miejskich z próby wykonano w terminie (BZP)
                   </p>
                 ) : null}
                 <div className="akcje">

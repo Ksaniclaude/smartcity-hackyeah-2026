@@ -202,7 +202,7 @@ export function Naglowek() {
             Rynki
           </NavLink>
           <NavLink to="/miasto" className={klasa}>
-            Dla miasta
+            Dla miast
           </NavLink>
           <NavLink to="/aktywnosc" className={klasa}>
             Aktywność
@@ -294,7 +294,7 @@ export function StopkaStrony() {
   return (
     <footer className="stopka-strony">
       <div className="stopka-wnetrze">
-        <Link to="/miasto">Widok dla miasta</Link>
+        <Link to="/miasto">Widok dla miast</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
@@ -357,7 +357,7 @@ export function FormularzNicku({ etykietaPrzycisku = "Zaczynam" }: { etykietaPrz
           type="text"
           value={nick}
           onChange={(e) => setNick(e.target.value)}
-          placeholder="np. krowodrza_42"
+          placeholder="np. sokole_oko"
           minLength={2}
           maxLength={24}
           autoComplete="nickname"
@@ -402,7 +402,7 @@ function ModalJakToDziala() {
   const { zamknijModal, otworzModal, gracz, konto } = useSesja();
   return (
     <Modal tytul="Jak to działa" onClose={zamknijModal}>
-      <p className="pod">Zdążą? to rynek prognoz o Krakowie. Zamiast pieniędzy są punkty, zamiast sondażu kurs.</p>
+      <p className="pod">Zdążą? to rynek prognoz o terminach w polskich miastach. Zamiast pieniędzy są punkty, zamiast sondażu kurs.</p>
       <div className="kroki">
         <div className="krok">
           <b>1</b>
@@ -523,7 +523,7 @@ function ModalKonta() {
           {!gracz ? (
             <label className="pole">
               <span className="etykieta">Nick</span>
-              <input type="text" value={nick} onChange={(e) => setNick(e.target.value)} placeholder="np. krowodrza_42" minLength={2} maxLength={24} autoComplete="nickname" required />
+              <input type="text" value={nick} onChange={(e) => setNick(e.target.value)} placeholder="np. sokole_oko" minLength={2} maxLength={24} autoComplete="nickname" required />
             </label>
           ) : null}
           <label className="pole">
@@ -630,7 +630,7 @@ function ModalWiecej() {
         <li>
           <Link to="/miasto" onClick={zamknijModal}>
             <IkMiasto />
-            Widok dla miasta
+            Widok dla miast
           </Link>
         </li>
         <li>

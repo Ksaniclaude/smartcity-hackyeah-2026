@@ -35,7 +35,7 @@ function wiara(p: Pytanie): number | null {
   return p.kursy ? p.kursy[0] : null;
 }
 
-/** Tabela dla miasta: terminy, w które mieszkańcy nie wierzą. Bez logowania. */
+/** Tabela dla miast: terminy, w które mieszkańcy nie wierzą. Bez logowania. */
 export default function Miasto() {
   const { dane, blad, laduje } = usePolling(pobierzWszystko, 5000);
   const pytania = dane?.pytania ?? [];
@@ -48,7 +48,7 @@ export default function Miasto() {
 
   return (
     <main className="kontener">
-      <h1>Zdążą? Widok dla miasta</h1>
+      <h1>Zdążą? Widok dla miast</h1>
       <p className="mala">
         Mieszkańcy stawiają punkty na to, czy miejskie terminy zostaną dotrzymane. Poniżej: terminy oficjalne,
         wiara mieszkańców i powody, dla których w termin nie wierzą. Winnego nie wskazujemy, robi to rozkład
@@ -56,12 +56,12 @@ export default function Miasto() {
       </p>
       {t.ogolem.odsetek != null ? (
         <Komunikat typ="info">
-          <b>{Math.round(t.ogolem.odsetek * 100)}%</b> umów krakowskich jednostek miejskich wykonano w pierwotnym
-          terminie
+          <b>{Math.round(t.ogolem.odsetek * 100)}%</b> umów jednostek miejskich z próby wykonano w pierwotnym terminie
           {t.roboty_budowlane.odsetek != null
             ? `, w robotach budowlanych ${Math.round(t.roboty_budowlane.odsetek * 100)}%`
             : ""}{" "}
-          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy).
+          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy
+          {t.zamawiajacy.length > 0 ? `, ${odmien(t.zamawiajacy.length, "zamawiający", "zamawiających", "zamawiających")}` : ""}).
         </Komunikat>
       ) : null}
 

@@ -13,7 +13,7 @@ export default function Start() {
     <main className="ekran">
       <h1 className="start-tytul">Czy miasto zdąży?</h1>
       <p className="mala">
-        Rynek prognoz dla Krakowa. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
+        Rynek prognoz dla polskich miast. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
         wierzą.
       </p>
       <div className="karta">
