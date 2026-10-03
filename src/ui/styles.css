@@ -236,7 +236,16 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .rynek-strona { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 @media (min-width: 1000px) {
   .rynek-strona { grid-template-columns: minmax(0, 1fr) 360px; gap: 36px; align-items: start; }
-  .panel-kolumna { position: sticky; top: calc(var(--naglowek-h) + 16px); }
+  /* Panel przewija się niezależnie od strony: po zakupie dochodzi komunikat i panel bywa wyższy niż ekran. */
+  .panel-kolumna {
+    position: sticky;
+    top: calc(var(--naglowek-h) + 16px);
+    max-height: calc(100vh - var(--naglowek-h) - 32px);
+    max-height: calc(100dvh - var(--naglowek-h) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
 }
 .okruszki { font-size: 0.82rem; color: var(--mute); margin: 10px 0 6px; display: flex; gap: 6px; align-items: center; }
 .okruszki a { color: var(--mute); text-decoration: none; }
