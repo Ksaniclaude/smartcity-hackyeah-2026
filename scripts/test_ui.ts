@@ -227,6 +227,9 @@ async function main() {
     const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 900 }, locale: "pl-PL" });
     await ctx2.route(`${SUPABASE}/**`, mock);
     const page2 = await ctx2.newPage();
+    await page2.goto(`${ADRES}/`);
+    await oczekuj(page2, "41%");
+    await zrzut(page2, "rynki_desktop");
     await page2.goto(`${ADRES}/miasto`);
     await oczekuj(page2, "Termin oficjalny");
     await oczekuj(page2, "Trwa procedura odbiorowa");

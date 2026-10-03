@@ -35,6 +35,20 @@ export function Naglowek({ nick, saldo }: { nick?: string; saldo?: number }) {
       <Link to="/" className="logo">
         Zdążą<span>?</span>
       </Link>
+      <nav className="naglowek-nav">
+        <NavLink to="/" end className={({ isActive }) => (isActive ? "aktywny" : "")}>
+          Rynki
+        </NavLink>
+        <NavLink to="/miasto" className={({ isActive }) => (isActive ? "aktywny" : "")}>
+          Widok dla miasta
+        </NavLink>
+        <NavLink to="/liczba" className={({ isActive }) => (isActive ? "aktywny" : "")}>
+          Liczba
+        </NavLink>
+        <NavLink to="/profil" className={({ isActive }) => (isActive ? "aktywny" : "")}>
+          Profil
+        </NavLink>
+      </nav>
       {nick ? (
         <Link to="/profil" className="saldo">
           {nick} <b>{Math.floor(saldo ?? 0)} pkt</b>

@@ -115,7 +115,7 @@ export default function Lista() {
   const pokazZakonczone = filtr === "wszystkie" || filtr === "rozstrzygniete";
 
   return (
-    <main className="ekran">
+    <main className="ekran ekran-rynki">
       <div className="filtry">
         {FILTRY.map((f) => (
           <button type="button" key={f.klucz} className={filtr === f.klucz ? "wybrany" : ""} onClick={() => setFiltr(f.klucz)}>
@@ -136,9 +136,11 @@ export default function Lista() {
         <>
           <h2>Miasto · czy termin zostanie dotrzymany</h2>
           {miasto.length === 0 && dane ? <p className="pusto">Na razie brak otwartych pytań.</p> : null}
-          {miasto.map((p) => (
-            <Rynek key={p.id} p={p} />
-          ))}
+          <div className="siatka">
+            {miasto.map((p) => (
+              <Rynek key={p.id} p={p} />
+            ))}
+          </div>
         </>
       ) : null}
 
@@ -146,9 +148,11 @@ export default function Lista() {
         <>
           <h2>Na luzie · szybkie pytania o miasto</h2>
           {luz.length === 0 && dane ? <p className="pusto">Na razie brak otwartych pytań.</p> : null}
-          {luz.map((p) => (
-            <Rynek key={p.id} p={p} />
-          ))}
+          <div className="siatka">
+            {luz.map((p) => (
+              <Rynek key={p.id} p={p} />
+            ))}
+          </div>
         </>
       ) : null}
 
@@ -156,9 +160,11 @@ export default function Lista() {
         <>
           <h2>Rozstrzygnięte · trafność prognoz</h2>
           {zakonczone.length === 0 ? <p className="pusto">Jeszcze nic nie rozstrzygnięto.</p> : null}
-          {zakonczone.map((p) => (
-            <Rozstrzygniete key={p.id} p={p} />
-          ))}
+          <div className="siatka">
+            {zakonczone.map((p) => (
+              <Rozstrzygniete key={p.id} p={p} />
+            ))}
+          </div>
         </>
       ) : null}
 

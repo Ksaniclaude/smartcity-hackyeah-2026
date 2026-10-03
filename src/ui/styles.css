@@ -222,3 +222,25 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; color: var(
 .przycisk-odp.przycisk-zle { background: var(--nie-tlo); color: var(--nie); border-color: #fecaca; }
 .przycisk-odp.przycisk-trzeci { background: var(--trzeci-tlo); color: var(--trzeci); border-color: #fde68a; }
 .przycisk-odp:hover { filter: brightness(0.97); }
+
+/* Nawigacja w nagłówku (duży ekran) i siatka rynków */
+.naglowek-nav { display: none; gap: 4px; margin-left: 16px; }
+.naglowek-nav a { font-size: 0.9rem; font-weight: 600; color: var(--mute); padding: 6px 10px; border-radius: 8px; }
+.naglowek-nav a.aktywny { color: var(--tekst); background: #f1f3f6; }
+.siatka { display: grid; grid-template-columns: 1fr; gap: 0; }
+@media (min-width: 900px) {
+  .naglowek { height: 60px; padding: 0 24px; }
+  .naglowek-nav { display: flex; }
+  .dol-nav { display: none; }
+  .ekran { padding-bottom: 32px; }
+  .ekran-rynki { max-width: 1160px; }
+  .siatka { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .siatka .karta { margin: 0; display: flex; flex-direction: column; }
+  .siatka .rynek-karta .meta { margin-top: auto; padding-top: 10px; }
+  .filtry { padding-top: 8px; }
+}
+@media (min-width: 640px) and (max-width: 899px) {
+  .ekran-rynki { max-width: 900px; }
+  .siatka { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .siatka .karta { margin: 0; }
+}
