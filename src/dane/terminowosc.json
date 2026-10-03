@@ -1,0 +1,10 @@
+{
+  "wygenerowano": null,
+  "zrodlo": "Biuletyn Zamówień Publicznych, ogłoszenia o wykonaniu umowy (https://ezamowienia.gov.pl/mo-client-board/bzp/list)",
+  "zakres": null,
+  "zamawiajacy": [],
+  "ogolem": { "liczba": 0, "w_terminie": 0, "odsetek": null },
+  "roboty_budowlane": { "liczba": 0, "w_terminie": 0, "odsetek": null },
+  "wykonawcy": [],
+  "uwagi": ["Brak danych: uruchom `npm run zamowienia` (API) albo `npm run terminowosc` (plik CSV)."]
+}
