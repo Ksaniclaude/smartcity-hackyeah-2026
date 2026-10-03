@@ -24,11 +24,11 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 | Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia, nowy punkt dorysowuje się z animacją), tabela odpowiedzi, zmiana kursu od godziny, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez; przy nicku odznaka „stawia 120 na tak” i miejsce w rankingu), najwięksi gracze, moje pozycje z zyskiem/stratą, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
-| Buy / Sell | Kup: szybkie stawki 20 / 50 / 100 / 200, podgląd udziałów, kursu po transakcji i „Jeśli trafisz: +X pkt (×Y)” (LMSR). Po transakcji: „Przesunąłeś kurs 48% → 53%”, własny nick od razu w aktywności i wśród największych graczy, komunikat o awansie w rankingu, karta do udostępnienia „Daję 70% na to, że …” (obrazek PNG, systemowe udostępnianie, kopiowanie tekstu z linkiem). Jedna strona rynku na gracza: zakład na inną odpowiedź najpierw sprzedaje dotychczasowe udziały. Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
-| Portfolio | Portfel na żywo w nagłówku (wartość + zysk/strata) i w /profil: wartość portfela, zysk/strata otwartych pozycji wobec kosztu, każda pozycja z zyskiem/stratą (zielone/czerwone), trafność, historia transakcji, ustawienia (nick, konto, motyw). Po rozstrzygnięciu rynku, na którym gracz miał pozycję, jednorazowy ekran „Rynek rozstrzygnięty”: wynik odsłania się po ok. 1 s, licznik wypłaty bije do góry, „byłeś lepszy niż N% graczy”. |
+| Buy / Sell | Kup: szybkie stawki 20 / 50 / 100 / 200, podgląd udziałów, kursu po transakcji i „Jeśli trafisz: +X pkt (×Y)” (LMSR). Po transakcji: „Twój ruch przesunął kurs 48% → 53%”, własny nick od razu w aktywności i wśród największych graczy, komunikat o awansie w rankingu, karta do udostępnienia „Daję 70% na to, że …” (obrazek PNG, systemowe udostępnianie, kopiowanie tekstu z linkiem). Jedna strona rynku na gracza: zakład na inną odpowiedź najpierw sprzedaje dotychczasowe udziały. Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
+| Portfolio | Portfel na żywo w nagłówku (wartość + zysk/strata) i w /profil: wartość portfela, zysk/strata otwartych pozycji wobec kosztu, każda pozycja z zyskiem/stratą (zielone/czerwone), trafność, historia transakcji, ustawienia (nick, konto, motyw). Po rozstrzygnięciu rynku, na którym gracz miał pozycję, jednorazowy ekran „Rynek rozstrzygnięty”: wynik odsłania się po ok. 1 s, licznik wypłaty bije do góry, „Twój typ był lepszy niż N% graczy”. |
 | Profile pages | /u/:nick – publiczny profil: miejsce w rankingu, wartość pozycji, największa wygrana, prognozy, aktywność. |
 | Leaderboard | /ranking – miejsce, portfel, zysk, trafność, obrót; numer miejsca pokazywany też przy nickach w komentarzach i aktywności. |
-| Live activity | Strona główna: ticker „Świeże ruchy” (ostatnie 5 prognoz, licznik prognoz z ostatnich 10 minut); karty rynków migoczą na zielono/czerwono przy zmianie kursu między odpytaniami i pokazują zmianę w pp od ostatniej godziny. |
+| Live activity | Strona główna: taśma „Na żywo” (ostatnie 5 ruchów i licznik prognoz z ostatnich 10 minut); karty rynków migoczą na zielono/czerwono przy zmianie kursu między odpytaniami i pokazują zmianę w pp od ostatniej godziny. |
 | Activity | /aktywnosc – ostatnie prognozy wszystkich graczy. |
 | How it works, dark mode | Modal „Jak to działa”, ciemny motyw domyślnie, jasny do wyboru. |
 | Deposit, rewards, limit orders | Nie ma: gra o punkty. |
@@ -41,8 +41,9 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
   (do tego czasu widać kurs otwarcia ustawiony przez admina). Domyślny próg można zmienić w `/admin` (na demo: 1),
   a admin może nadpisać próg per rynek.
 - Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Unieważnienie zwraca wydane punkty. Udziały można sprzedać
-  przed terminem po bieżącym kursie.
-- Naraz otwarte są najwyżej 3 rynki „miasto” i 5 „na luzie”. Rynki „miasto” startują od odsetka umów wykonanych
+  przed terminem po bieżącym kursie. Gracz trzyma udziały tylko jednej odpowiedzi na rynek: zmiana zdania to
+  sprzedaż starej strony i zakup nowej w jednej transakcji.
+- Liczba otwartych rynków nie jest ograniczona. Rynki „miasto” startują od odsetka umów wykonanych
   w terminie (z Biuletynu Zamówień Publicznych), „na luzie” od 50%.
 - Każdy rynek musi mieć: treść, kategorię, odpowiedzi, kryterium rozstrzygnięcia, link do publicznego źródła i termin.
   Tematy wykluczone: wyniki sportowe, wybory i kandydaci, konkretne osoby prywatne, wypadki i zgony.
@@ -52,9 +53,12 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 Nic nie jest wymyślone. [`data/pytania_startowe.csv`](data/pytania_startowe.csv) zawiera 22 pytania o realne
 krakowskie inwestycje i decyzje z terminami z komunikatów pod podanymi linkami (ZDMK, ZIM, ZIS, MCOO, krakow.pl,
-budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych (limity gry), reszta czeka jako propozycje
+budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych, reszta czeka jako propozycje
 w `/admin`. Szczegóły i zastrzeżenie o weryfikacji: [`data/PYTANIA_STARTOWE_UWAGA.md`](data/PYTANIA_STARTOWE_UWAGA.md).
 Przed demem otwórz każdy link i porównaj datę; termin zmienisz w `/admin`.
+
+W kolejce `/admin` czeka też 11 propozycji o Warszawie (id 26–36) z [`data/pytania_warszawa.csv`](data/pytania_warszawa.csv):
+odpowiedniki krakowskich rynków, z tym samym zastrzeżeniem o weryfikacji. Opis: [`data/WARSZAWA_PODOBNE.md`](data/WARSZAWA_PODOBNE.md).
 
 Wgranie CSV do pustej bazy (przez te same RPC, których używa panel):
 
@@ -125,6 +129,7 @@ to 34/33/33.
 ```bash
 npm run test:db                     # lokalny Postgres: schemat, dostęp ról, symulacja 100 graczy, 8 równoległych procesów, sprzedaż
 npm run build && npm run test:ui    # Chromium: ścieżka gracza na zamockowanym Supabase (bez sieci), zrzuty ekranu
+npm run zrzuty -- --watch           # podgląd: dev server + Chromium na mockach, zrzuty w data/zrzuty_dev odnawiane po każdej zmianie w src/
 ```
 
 `db/test/symulacja.sql` sprawdza po każdym z 600 losowych zakładów (rynek z 2 i z 3 odpowiedziami), że kursy sumują
@@ -132,6 +137,8 @@ się do 1, żadne saldo nie spada poniżej zera, koszt zakładu równa się ró�
 wypłaty zgadzają się z udziałami (strata animatora nie przekracza b·ln n). Test równoległy puszcza 8 procesów `psql`
 po 40 zakładów na jeden rynek i sprawdza, że suma stawek równa się kosztowi LMSR od stanu otwarcia. Test sprzedaży
 sprawdza, że zwrot równa się C(q) − C(q′), saldo rośnie dokładnie o zwrot, kurs spada, a kursy dalej sumują się do 1.
+Test zmiany strony sprawdza, że zakup innej odpowiedzi sprzedaje stare udziały w tej samej transakcji i że żaden
+gracz nie ma udziałów na dwóch odpowiedziach naraz (symulacja liczy też takie automatyczne sprzedaże).
 Test ról sprawdza, że `anon` i `authenticated` mają dostęp do widoków i funkcji odczytu (to ten błąd, który
 wcześniej zepsuł produkcję).
 

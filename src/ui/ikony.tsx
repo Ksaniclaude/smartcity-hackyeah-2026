@@ -78,6 +78,12 @@ export const IkKalendarz = (p: P) => (
     <path d="M3 10h18M8 3v4M16 3v4" />
   </svg>
 );
+export const IkZegar = (p: P) => (
+  <svg {...baza} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
 export const IkStrzalka = (p: P) => (
   <svg {...baza} {...p}>
     <path d="M5 12h14M13 6l6 6-6 6" />
@@ -92,5 +98,74 @@ export const IkInfo = (p: P) => (
 export const IkPlus = (p: P) => (
   <svg {...baza} {...p}>
     <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+export const IkPtaszek = (p: P) => (
+  <svg {...baza} strokeWidth={2.4} {...p}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </svg>
+);
+/** Trójkąt kierunku zmiany kursu (pełny, bez obrysu). */
+export const IkGora = (p: P) => (
+  <svg viewBox="0 0 10 8" fill="currentColor" aria-hidden="true" {...p}>
+    <path d="M5 0.5 9.5 7.5h-9z" />
+  </svg>
+);
+export const IkDol = (p: P) => (
+  <svg viewBox="0 0 10 8" fill="currentColor" aria-hidden="true" {...p}>
+    <path d="M5 7.5 0.5 0.5h9z" />
+  </svg>
+);
+export const IkGwiazdka = ({ pelna = false, ...p }: P & { pelna?: boolean }) => (
+  <svg {...baza} {...p} fill={pelna ? "currentColor" : "none"}>
+    <path d="m12 3 2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.4l-5.7 3.1 1.2-6.4L2.8 9.7l6.4-.8L12 3z" />
+  </svg>
+);
+
+/* ---------- piktogramy tematów (kafelek rynku dobierany po słowach z pytania) ---------- */
+
+export const IkTramwaj = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M8 3h8M12 3v3M7 6h10a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a2 2 0 0 1 2-2zM5 12h14M9 15.5h.01M15 15.5h.01M8.5 19 7 21.5M15.5 19l1.5 2.5" />
+  </svg>
+);
+export const IkMost = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M2 17h20M4 17c1.5-9 14.5-9 16 0M8 11.300V17M12 10.200V17M16 11.300V17M4 17v3M20 17v3" />
+  </svg>
+);
+export const IkDroga = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M9 3 5 21M15 3l4 18M12 4v2.500M12 10.500V13M12 17v3" />
+  </svg>
+);
+export const IkBudzet = (p: P) => (
+  <svg {...baza} {...p}>
+    <ellipse cx="12" cy="7" rx="7" ry="3" />
+    <path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
+  </svg>
+);
+export const IkDokument = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6" />
+  </svg>
+);
+export const IkGmach = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M3 21h18M4 10h16M12 3l8 4.500V10H4V7.500zM6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8M4.5 18h15" />
+  </svg>
+);
+export const IkDrzewo = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M12 21v-7M12 14c-4 0-6-2.5-6-5.500C6 5 8.5 3 12 3s6 2 6 5.500c0 3-2 5.5-6 5.500zM9 21h6" />
+  </svg>
+);
+
+/** Znak logo: zegar „za pięć dwunasta” na żółtym kafelku (kolory z arkusza: .logo-znak). */
+export const IkZnak = (p: P) => (
+  <svg viewBox="0 0 30 30" aria-hidden="true" {...p}>
+    <rect className="znak-tlo" width="30" height="30" rx="8" />
+    <circle className="znak-kreska" cx="15" cy="15" r="7.6" fill="none" strokeWidth="2.2" />
+    <path className="znak-kreska" d="M15 15V10.600M15 15l-3.1-5" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );

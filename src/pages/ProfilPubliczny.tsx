@@ -59,7 +59,7 @@ export default function ProfilPubliczny() {
                 {p.nick} <OdznakaMiejsca miejsce={p.miejsce} duza />
               </h1>
               <div className="pod">
-                {p.miejsce != null ? `${p.miejsce}. miejsce w rankingu · ` : ""}Dołączył {formatujDate(p.utworzono)}
+                {p.miejsce != null ? `${p.miejsce}. miejsce w rankingu · ` : ""}Gra od {formatujDate(p.utworzono)}
                 {toJa ? (
                   <>
                     {" · "}
@@ -88,19 +88,21 @@ export default function ProfilPubliczny() {
             </div>
             <div className="stat">
               <div className="etykieta">Trafność</div>
-              <div className="wartosc">
-                {p.trafione} z {p.rozstrzygniete}
+              <div className="wartosc">{p.rozstrzygniete > 0 ? `${p.trafione} z ${p.rozstrzygniete}` : "–"}</div>
+              <div className="pod">
+                {p.rozstrzygniete > 0
+                  ? odmien(p.rozstrzygniete, "rozstrzygnięty rynek", "rozstrzygnięte rynki", "rozstrzygniętych rynków")
+                  : "brak rozstrzygniętych rynków"}
               </div>
-              <div className="pod">{odmien(p.rozstrzygniete, "rozstrzygnięty rynek", "rozstrzygnięte rynki", "rozstrzygniętych rynków")}</div>
             </div>
           </div>
 
           <div className="zakladki" role="tablist">
             <button type="button" role="tab" aria-selected={tab === "pozycje"} className={tab === "pozycje" ? "aktywna" : ""} onClick={() => ustawTab("pozycje")}>
-              Pozycje<span className="licznik">{p.pozycje.length}</span>
+              Pozycje{p.pozycje.length > 0 ? <span className="licznik">{p.pozycje.length}</span> : null}
             </button>
             <button type="button" role="tab" aria-selected={tab === "aktywnosc"} className={tab === "aktywnosc" ? "aktywna" : ""} onClick={() => ustawTab("aktywnosc")}>
-              Aktywność<span className="licznik">{p.aktywnosc.length}</span>
+              Aktywność{p.aktywnosc.length > 0 ? <span className="licznik">{p.aktywnosc.length}</span> : null}
             </button>
           </div>
 
@@ -108,48 +110,50 @@ export default function ProfilPubliczny() {
             p.pozycje.length === 0 ? (
               <p className="pusto">Ten gracz nie ma jeszcze żadnej pozycji.</p>
             ) : (
-              <div className="tabela-owijka">
-                <table className="tabela">
-                  <thead>
-                    <tr>
-                      <th>Rynek</th>
-                      <th>Typ</th>
-                      <th className="liczba">Udziały</th>
-                      <th className="liczba">Kurs</th>
-                      <th className="liczba">Wartość</th>
-                      <th className="liczba">Zysk/strata</th>
+              <table className="tabela tabela-pozycje">
+                <thead>
+                  <tr>
+                    <th>Rynek</th>
+                    <th>Typ</th>
+                    <th className="liczba">Udziały</th>
+                    <th className="liczba">Kurs</th>
+                    <th className="liczba">Wartość</th>
+                    <th className="liczba">Zysk/strata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.pozycje.map((z) => (
+                    <tr key={`${z.pytanie}-${z.odpowiedz}`}>
+                      <td className="kol-rynek">
+                        <Link to={`/pytanie/${z.pytanie}`}>{z.tresc}</Link>
+                        <div className="pomoc">
+                          <Odznaka kategoria={z.kategoria} /> <OdznakaStatusu status={z.status} />
+                        </div>
+                      </td>
+                      <td data-etykieta="Typ">
+                        <span className={klasaTypu(z.odpowiedz - 1)}>{z.odpowiedzi[z.odpowiedz - 1]}</span>
+                      </td>
+                      <td className="liczba" data-etykieta="Udziały">
+                        {liczba(z.udzialy, 1)}
+                      </td>
+                      <td className="liczba" data-etykieta="Kurs">
+                        <KursPozycji p={z} />
+                      </td>
+                      <td className="liczba" data-etykieta="Wartość">
+                        {liczba(z.wartosc, 1)} pkt
+                      </td>
+                      <td className="liczba" data-etykieta="Zysk/strata">
+                        {z.status === "uniewaznione" ? <span className="mala">zwrot</span> : <ZyskStrata wartosc={z.wartosc - z.wydane} miejsca={1} />}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {p.pozycje.map((z) => (
-                      <tr key={`${z.pytanie}-${z.odpowiedz}`}>
-                        <td>
-                          <Link to={`/pytanie/${z.pytanie}`}>{z.tresc}</Link>
-                          <div className="pomoc">
-                            <Odznaka kategoria={z.kategoria} /> <OdznakaStatusu status={z.status} />
-                          </div>
-                        </td>
-                        <td>
-                          <span className={klasaTypu(z.odpowiedz - 1)}>{z.odpowiedzi[z.odpowiedz - 1]}</span>
-                        </td>
-                        <td className="liczba">{liczba(z.udzialy, 1)}</td>
-                        <td className="liczba">
-                          <KursPozycji p={z} />
-                        </td>
-                        <td className="liczba">{liczba(z.wartosc, 1)} pkt</td>
-                        <td className="liczba">
-                          <ZyskStrata wartosc={z.wartosc - z.wydane} miejsca={1} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             )
           ) : p.aktywnosc.length === 0 ? (
             <p className="pusto">Ten gracz nie postawił jeszcze punktów.</p>
           ) : (
-            <div className="waska" style={{ maxWidth: 820 }}>
+            <div className="waska">
               {p.aktywnosc.map((a) => (
                 <WpisAktywnosci key={a.id} wpis={a} />
               ))}

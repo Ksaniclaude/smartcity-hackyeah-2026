@@ -1,4 +1,4 @@
--- Delta (2026-10-03, 7): rzeczy pod demo na żywo.
+-- Delta (2026-10-03, 9): rzeczy pod demo na żywo.
 --
 -- * Próg ukrycia kursu: domyślnie 2 prognozy (zamiast 10). Domyślną wartość można zmienić
 --   w ustawieniach (klucz prog_widocznosci_kursu, np. 1 na demo), a admin może nadpisać próg
@@ -8,7 +8,7 @@
 -- * Ranking z numerem miejsca (ranking_graczy, miejsce_w_rankingu; ranking() zwraca wiersze w kolejności
 --   miejsc); postaw_prognoze i sprzedaj_udzialy zwracają miejsce_przed / miejsce_po; profil_publiczny zwraca miejsce.
 --
--- Wymaga wcześniejszej delty 2026-10-03_jedna_strona_rynku_bez_pylu.sql.
+-- Wymaga wcześniejszych delt 6–8 (jedna strona rynku, sprzedaż bez pyłu, bez limitu otwartych).
 
 -- ---------------------------------------------------------------------------
 -- Próg widoczności kursu

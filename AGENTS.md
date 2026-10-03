@@ -10,7 +10,8 @@
   uruchom `npm run test:db` (lokalny Postgres) — symulacja i test równoległy muszą przejść.
 - Interfejs po polsku, najpierw telefon. Odświeżanie przez odpytywanie co 5 s, bez realtime.
 - Design: `src/ui/styles.css` (tokeny, ciemny motyw domyślnie, jasny po wyborze), wspólne komponenty w
-  `src/ui/komponenty.tsx`. Wzorzec: giełdy prognoz (Polymarket). Bez emoji i ozdobnych gradientów.
+  `src/ui/komponenty.tsx`, karta i elementy rynku w `src/ui/rynek.tsx`, żywe liczby w `src/ui/zywe.tsx`.
+  Wzorzec: giełdy prognoz (Polymarket). Bez emoji i ozdobnych gradientów.
 - Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Stare sesje
   anonimowe są podnoszone do konta przy rejestracji (updateUser).
 - Nie wymyślaj pytań, terminów, źródeł ani liczb z zamówień publicznych. Puste dane mają być widoczne jako puste.

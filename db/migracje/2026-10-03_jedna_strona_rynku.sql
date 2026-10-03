@@ -1,13 +1,4 @@
--- Delta (2026-10-03, 6) zastosowana na żywej bazie bezpośrednio z MCP Supabase
--- (migracje „jedna_strona_rynku_na_gracza” i „sprzedaz_bez_pylu”); plik odtwarza ją
--- w repo, żeby schema.sql i baza były zgodne.
---
--- * Jedna strona rynku na gracza (jak na giełdach prognoz): zakład na odpowiedź X najpierw
---   sprzedaje po bieżącym kursie udziały gracza na pozostałych odpowiedziach (w tej samej
---   transakcji), a wynik zwraca listę `sprzedano` i `zwrot_ze_sprzedazy`.
--- * Sprzedaż bez pyłu: resztka poniżej 0,05 udziału jest sprzedawana razem z całością, a
---   pozycja warta mniej niż 0,0001 pkt jest zerowana bez zwrotu i bez wpisu w transakcjach.
-
+-- Delta (2026-10-03, 6): jedna strona rynku na gracza (zakup innej odpowiedzi sprzedaje posiadane udziały), resztki przy sprzedaży.
 create or replace function public.sprzedaj_udzialy(p_pytanie bigint, p_odpowiedz integer, p_udzialy double precision)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -42,8 +33,7 @@ begin
   if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
   v_udzialy := least(coalesce(p_udzialy, 0), z.udzialy);
   if v_udzialy <= 0 then raise exception 'Podaj liczbę udziałów'; end if;
-  -- resztka poniżej 0,05 udziału nie ma sensu (suwak i pole liczą co 0,1): sprzedajemy wszystko
-  if z.udzialy - v_udzialy < 0.05 then v_udzialy := z.udzialy; end if;
+  if z.udzialy - v_udzialy < 1e-6 then v_udzialy := z.udzialy; end if;
   v_wszystko := (v_udzialy = z.udzialy);
   if not v_wszystko and v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
   select saldo into v_saldo from public.gracze where id = v_gracz for update;

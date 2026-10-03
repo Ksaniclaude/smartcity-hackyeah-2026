@@ -107,12 +107,11 @@ function PoleKursu({
                 n[i] = Number(e.target.value);
                 onChange(n);
               }}
-              style={{ width: "100%", font: "inherit", padding: 8, borderRadius: 8, border: "1px solid #c9d1d9" }}
             />
           </label>
         ))}
       </div>
-      <div className="pomoc" style={{ color: Math.abs(suma - 100) > 0.11 ? "var(--zle)" : undefined }}>
+      <div className={`pomoc ${Math.abs(suma - 100) > 0.11 ? "chybione" : ""}`}>
         suma: {suma}% {Math.abs(suma - 100) > 0.11 ? "(musi być 100%)" : ""}
         {kategoria === "miasto" && terminowosc.ogolem.odsetek != null
           ? ` · „w terminie” z zamówień publicznych: ${Math.round(terminowosc.ogolem.odsetek * 100)}%`
@@ -200,7 +199,7 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
       <PoleKursu kategoria={kategoria} proc={proc} onChange={setProc} />
       <label className="pole" style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input type="checkbox" checked={otworz} onChange={(e) => setOtworz(e.target.checked)} />
-        <span>otwórz od razu (limit: 3 „miasto”, 5 „na luzie”)</span>
+        <span>otwórz od razu</span>
       </label>
       <Komunikat typ="ostrz">
         Tematy wykluczone: {TEMATY_WYKLUCZONE.join(", ")}. Bez kryterium, linku i daty pytania nie da się otworzyć.
@@ -505,7 +504,7 @@ function ProgDomyslny() {
         if (n != null) setOk(`Domyślny próg: kurs tłumu widoczny od ${n} ${n === 1 ? "prognozy" : "prognoz"}.`);
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Próg ukrycia kursu</h2>
+      <h2 className="karta-tytul">Próg ukrycia kursu</h2>
       <p className="mala">
         Kurs tłumu jest ukryty, dopóki rynek ma mniej prognoz niż próg (domyślnie 2; na demo 1). Próg per rynek ustawia się w karcie
         pytania.
@@ -538,7 +537,7 @@ function PanelAdmina() {
     <main className="ekran">
       <h1>Panel admina</h1>
       <p className="mala">
-        Otwarte naraz: najwyżej 3 pytania „miasto” i 5 „na luzie”. Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
+        Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
       </p>
       <FormularzDodawania poDodaniu={odswiez} />
       <ProgDomyslny />

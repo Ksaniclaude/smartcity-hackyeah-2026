@@ -102,25 +102,25 @@ declare v_pyt bigint; v_suma double precision; v_koszt double precision; v_wydan
 begin
   select wartosc::bigint into v_pyt from public.ustawienia where klucz = 'test_pytanie';
   select q, b, liczba_prognoz into v_q, v_b, v_liczba from public.pytania where id = v_pyt;
+  select count(*) into v_tr from public.transakcje where pytanie = v_pyt;
   select sum(x) into v_suma from unnest(public.kursy(v_q, v_b)) as x;
   -- koszt od stanu otwarcia (q0 = b*ln(p)) do stanu końcowego = suma stawek
   v_koszt := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q) as x))
            - v_b * ln((select sum(exp(x / v_b)) from unnest(public.q_z_kursu(array[0.4, 0.4, 0.2], v_b)) as x));
-  -- jedna strona rynku: zakład na inną odpowiedź najpierw sprzedaje udziały, więc wpływ animatora to kupno minus sprzedaż
+  -- wpływy netto = zakupy - zwroty ze sprzedaży (przy zmianie strony udziały są sprzedawane automatycznie)
   select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_wydane from public.transakcje where pytanie = v_pyt;
   select count(*) into v_tr from public.transakcje where pytanie = v_pyt and typ = 'kupno';
   select sum(saldo) into v_sald from public.gracze where nick like 'rown_%' and not czy_admin;
   if abs(v_suma - 1) > 1e-9 then raise exception 'kursy nie sumują się do 1: %', v_suma; end if;
-  if v_liczba <> v_tr then raise exception 'licznik prognoz % <> transakcji kupna %', v_liczba, v_tr; end if;
-  -- zwroty ze sprzedaży są zaokrąglane w dół do 0,0001 pkt, a resztki warte mniej niż 0,0001 pkt są zerowane bez wpisu
-  if abs(v_koszt - v_wydane) > 0.0002 * (select count(*) from public.transakcje where pytanie = v_pyt) + 0.01 then
-    raise exception 'koszt % <> wpływy % (zgubiony zakład przy równoległości)', v_koszt, v_wydane;
+  if v_liczba <> v_tr then raise exception 'licznik prognoz % <> zakupów %', v_liczba, v_tr; end if;
+  if abs(v_koszt - v_wydane) > 1e-6 + 1.5e-4 * (select count(*) from public.transakcje where pytanie = v_pyt and typ = 'sprzedaz') then
+    raise exception 'koszt % <> wpływy netto % (zgubiony zakład przy równoległości)', v_koszt, v_wydane;
   end if;
   if abs((8 * 1000 - v_sald) - v_wydane) > 1e-6 then raise exception 'salda % nie zgadzają się z wpływami %', v_sald, v_wydane; end if;
-  if exists (select 1 from public.pozycje z group by z.gracz, z.pytanie having count(*) filter (where z.udzialy > 0) > 1) then
-    raise exception 'ktoś ma udziały po obu stronach rynku';
+  if exists (select 1 from public.pozycje where pytanie = v_pyt group by gracz having count(*) filter (where udzialy > 0) > 1) then
+    raise exception 'gracz ma udziały na dwóch odpowiedziach naraz';
   end if;
-  raise notice 'RÓWNOLEGLE OK: % zakładów, wpływy %, suma kursów %, stan spójny', v_tr, v_wydane, v_suma;
+  raise notice 'RÓWNOLEGLE OK: % zakupów, wpływy netto %, suma kursów %, jedna strona na gracza, stan spójny', v_tr, v_wydane, v_suma;
 end $$;
 SQL
 
@@ -173,6 +173,32 @@ begin
     if sqlerrm not like 'Nie masz udziałów%' then raise; end if;
   end;
   raise notice 'SPRZEDAŻ OK: % sprzedaży zgodnych z funkcją kosztu', v_n;
+end $$;
+SQL
+
+echo "zmiana strony: zakup innej odpowiedzi najpierw sprzedaje posiadane udziały"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare r record; v_pyt bigint; v_w jsonb; v_saldo1 numeric; v_saldo2 numeric; v_inna int; v_po double precision;
+begin
+  select wartosc::bigint into v_pyt from public.ustawienia where klucz = 'test_pytanie';
+  select z.gracz, z.odpowiedz, z.udzialy into r from public.pozycje z where z.pytanie = v_pyt and z.udzialy > 0.5 limit 1;
+  if r.gracz is null then raise exception 'Brak pozycji do testu zmiany strony'; end if;
+  v_inna := case when r.odpowiedz = 1 then 2 else 1 end;
+  perform set_config('request.jwt.claims', json_build_object('sub', r.gracz, 'role', 'authenticated')::text, true);
+  select saldo into v_saldo1 from public.gracze where id = r.gracz;
+  v_w := public.postaw_prognoze(v_pyt, v_inna, 2, 'inne', null);
+  select saldo into v_saldo2 from public.gracze where id = r.gracz;
+  if jsonb_array_length(v_w -> 'sprzedano') < 1 then raise exception 'Brak informacji o sprzedaży: %', v_w; end if;
+  select udzialy into v_po from public.pozycje where gracz = r.gracz and pytanie = v_pyt and odpowiedz = r.odpowiedz;
+  if v_po <> 0 then raise exception 'Stara strona nie została sprzedana: %', v_po; end if;
+  if v_saldo2 - v_saldo1 <> (v_w ->> 'zwrot_ze_sprzedazy')::numeric - 2 then
+    raise exception 'Saldo zmieniło się o % zamiast o zwrot % minus stawka 2', v_saldo2 - v_saldo1, v_w ->> 'zwrot_ze_sprzedazy';
+  end if;
+  if (select count(*) from public.pozycje where gracz = r.gracz and pytanie = v_pyt and udzialy > 0) <> 1 then
+    raise exception 'Gracz ma udziały na więcej niż jednej odpowiedzi';
+  end if;
+  raise notice 'ZMIANA STRONY OK: sprzedano % i postawiono na odpowiedź %', v_w -> 'sprzedano', v_inna;
 end $$;
 SQL
 

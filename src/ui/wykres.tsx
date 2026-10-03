@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { PunktHistorii } from "@/api/types";
 
-const KOLORY = ["var(--tak)", "var(--nie)", "var(--trzeci)"];
+const KLASY = ["tak", "nie", "trzeci"];
+const GODZINA = 60 * 60 * 1000;
 
 interface Props {
   historia: PunktHistorii[];
@@ -9,34 +10,59 @@ interface Props {
   /** Które serie rysować (indeksy odpowiedzi); domyślnie: tylko pierwsza dla 2 odpowiedzi, wszystkie dla 3. */
   serie?: number[];
   wysokosc?: number;
+  /** Rynek otwarty: linia dochodzi do „teraz”, a jej koniec pulsuje. */
+  zywy?: boolean;
+  /** Bez wiersza z odczytem i bez dat pod osią (wyróżniony rynek na stronie głównej). */
+  kompakt?: boolean;
+  /** Kurs otwarcia: przy braku historii rysowany przerywaną linią zamiast pustego pola. */
+  otwarcie?: number[] | null;
 }
 
-function formatujCzas(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("pl-PL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+function formatujCzas(t: number): string {
+  return new Date(t).toLocaleString("pl-PL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatujDzien(t: number): string {
+  return new Date(t).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
+}
+
+/** Zakres osi Y w procentach: przycięty do okolic kursów (krok 10 albo 20), a przy dużym rozrzucie pełne 0–100. */
+function zakresOsi(wartosci: number[]): { od: number; do: number; krok: number } {
+  if (wartosci.length === 0) return { od: 0, do: 100, krok: 25 };
+  let od = Math.max(0, Math.floor((Math.min(...wartosci) * 100 - 6) / 10) * 10);
+  let ku = Math.min(100, Math.ceil((Math.max(...wartosci) * 100 + 6) / 10) * 10);
+  while (ku - od < 30) {
+    if (od > 0) od -= 10;
+    if (ku - od < 30 && ku < 100) ku += 10;
+  }
+  if (ku - od <= 50) return { od, do: ku, krok: 10 };
+  od = Math.floor(od / 20) * 20;
+  ku = Math.ceil(ku / 20) * 20;
+  if (ku - od <= 80) return { od, do: ku, krok: 20 };
+  return { od: 0, do: 100, krok: 25 };
 }
 
 /**
- * Wykres kursu w czasie (SVG, bez bibliotek). Linie schodkowe jak na giełdzie
- * prognoz: kurs zmienia się tylko w chwili zakładu. Oś Y: 0–100 %.
+ * Wykres kursu w czasie (SVG, bez bibliotek). Linie schodkowe jak na giełdzie prognoz: kurs zmienia się
+ * tylko w chwili zakładu. Pojedyncza seria ma wypełnione pole pod linią; kolory serii są w arkuszu.
  */
-export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
+export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = false, kompakt = false, otwarcie = null }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const [szer, setSzer] = useState(720);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ustaw = () => setSzer(Math.max(280, Math.round(el.clientWidth)));
+    const ustaw = () => setSzer(Math.max(240, Math.round(el.clientWidth)));
     ustaw();
     const ro = new ResizeObserver(ustaw);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const pad = { l: 8, r: 44, t: 12, b: 24 };
+  const pad = { l: 2, r: 40, t: 10, b: kompakt ? 8 : 24 };
   const wybrane = serie ?? (odpowiedzi.length === 2 ? [0] : odpowiedzi.map((_, i) => i));
 
-  // Nowy punkt (po własnej prognozie albo odpytaniu): ostatni odcinek rysuje się animacją, punkt pulsuje.
+  // Nowy punkt (po własnej prognozie albo odpytaniu): ostatni odcinek dorysowuje się animacją.
   const liczbaRef = useRef(0);
   const [animacja, setAnimacja] = useState(0);
   useEffect(() => {
@@ -51,44 +77,72 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
     if (pkt.length === 0) return { punkty: pkt, t0: 0, t1: 1 };
     const a = pkt[0].t;
     let b = pkt[pkt.length - 1].t;
-    if (b - a < 60 * 60 * 1000) b = a + 60 * 60 * 1000;
+    if (zywy) b = Math.max(b, Date.now());
+    if (b - a < GODZINA) b = a + GODZINA;
     return { punkty: pkt, t0: a, t1: b };
-  }, [historia]);
+  }, [historia, zywy]);
 
-  if (punkty.length === 0) {
+  const brakHistorii = punkty.length === 0;
+  const wartosci = brakHistorii
+    ? wybrane.map((i) => otwarcie?.[i]).filter((k): k is number => k != null)
+    : punkty.flatMap((p) => wybrane.map((i) => p.kursy[i] ?? 0));
+  const os = zakresOsi(wartosci);
+  const podzialki: number[] = [];
+  for (let k = os.od; k <= os.do; k += os.krok) podzialki.push(k);
+
+  const x = (t: number) => pad.l + ((t - t0) / (t1 - t0)) * (szer - pad.l - pad.r);
+  const y = (k: number) => pad.t + (1 - (Math.max(os.od, Math.min(os.do, k * 100)) - os.od) / (os.do - os.od)) * (wysokosc - pad.t - pad.b);
+  const prawy = szer - pad.r;
+  const dol = wysokosc - pad.b;
+
+  const siatka = podzialki.map((k) => (
+    <g key={k}>
+      <line x1={pad.l} x2={prawy} y1={y(k / 100)} y2={y(k / 100)} className="wykres-siatka" />
+      <text x={prawy + 8} y={y(k / 100) + 4} className="wykres-os">
+        {k}%
+      </text>
+    </g>
+  ));
+
+  if (brakHistorii) {
     return (
-      <div className="wykres" ref={ref}>
-        <div className="wykres-pusty">Kurs jest ukryty, dopóki rynek ma za mało prognoz.</div>
+      <div className="wykres wykres-bez-historii" ref={ref}>
+        <svg viewBox={`0 0 ${szer} ${wysokosc}`} width={szer} height={wysokosc} role="img" aria-label="Wykres kursu: brak historii">
+          {siatka}
+          {otwarcie
+            ? wybrane.map((i) =>
+                otwarcie[i] != null ? (
+                  <line key={i} x1={pad.l} x2={prawy} y1={y(otwarcie[i])} y2={y(otwarcie[i])} className="wykres-otwarcie" />
+                ) : null,
+              )
+            : null}
+        </svg>
+        <p className="wykres-uwaga">Kurs jest ukryty, dopóki rynek ma za mało prognoz. Wykres ruszy po odsłonięciu.</p>
       </div>
     );
   }
 
-  const x = (t: number) => pad.l + ((t - t0) / (t1 - t0)) * (szer - pad.l - pad.r);
-  const y = (k: number) => pad.t + (1 - Math.max(0, Math.min(1, k))) * (wysokosc - pad.t - pad.b);
-
   const sciezka = (i: number) => {
     let d = "";
     for (let j = 0; j < punkty.length; j++) {
-      const p = punkty[j];
-      const px = x(p.t);
-      const py = y(p.kursy[i] ?? 0);
-      if (j === 0) d += `M${px.toFixed(1)},${py.toFixed(1)}`;
-      else d += ` H${px.toFixed(1)} V${py.toFixed(1)}`;
+      const px = x(punkty[j].t).toFixed(1);
+      const py = y(punkty[j].kursy[i] ?? 0).toFixed(1);
+      d += j === 0 ? `M${px},${py}` : ` H${px} V${py}`;
     }
-    d += ` H${(szer - pad.r).toFixed(1)}`;
-    return d;
+    return `${d} H${prawy.toFixed(1)}`;
   };
 
   const ostatni = punkty[punkty.length - 1];
   const akt = hover != null ? punkty[hover] : ostatni;
+  const xAkt = hover != null ? x(akt.t) : prawy;
   const ostatniOdcinek = (i: number) => {
     if (punkty.length < 2) return "";
     const a = punkty[punkty.length - 2];
     const b = punkty[punkty.length - 1];
-    return `M${x(a.t).toFixed(1)},${y(a.kursy[i] ?? 0).toFixed(1)} H${x(b.t).toFixed(1)} V${y(b.kursy[i] ?? 0).toFixed(1)} H${(szer - pad.r).toFixed(1)}`;
+    return `M${x(a.t).toFixed(1)},${y(a.kursy[i] ?? 0).toFixed(1)} H${x(b.t).toFixed(1)} V${y(b.kursy[i] ?? 0).toFixed(1)} H${prawy.toFixed(1)}`;
   };
 
-  const naRuch = (e: MouseEvent<SVGSVGElement>) => {
+  const naRuch = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * szer;
     let najblizszy = 0;
@@ -99,66 +153,55 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 220 }: Props) {
   };
 
   return (
-    <div className="wykres" ref={ref}>
-      <div className="wykres-tooltip">
-        <span className="wykres-czas">{formatujCzas(new Date(akt.t).toISOString())}</span>
-        {wybrane.map((i) => (
-          <span key={i} style={{ color: KOLORY[i] }}>
-            {odpowiedzi[i]} <b>{Math.round((akt.kursy[i] ?? 0) * 100)}%</b>
-          </span>
-        ))}
-      </div>
+    <div className={`wykres ${kompakt ? "wykres-kompakt" : ""}`} ref={ref}>
+      {!kompakt ? (
+        <div className="wykres-odczyt">
+          <span className="wykres-czas">{hover != null ? formatujCzas(akt.t) : "teraz"}</span>
+          {wybrane.map((i) => (
+            <span key={i} className={`typ-${KLASY[i] ?? "trzeci"}`}>
+              {odpowiedzi[i]} <b className="cyfry">{Math.round((akt.kursy[i] ?? 0) * 100)}%</b>
+            </span>
+          ))}
+        </div>
+      ) : null}
       <svg
         viewBox={`0 0 ${szer} ${wysokosc}`}
         width={szer}
         height={wysokosc}
         role="img"
         aria-label="Wykres kursu w czasie"
-        onMouseMove={naRuch}
-        onMouseLeave={() => setHover(null)}
+        onPointerMove={naRuch}
+        onPointerLeave={() => setHover(null)}
       >
-        {[0, 0.25, 0.5, 0.75, 1].map((k) => (
-          <g key={k}>
-            <line x1={pad.l} x2={szer - pad.r} y1={y(k)} y2={y(k)} className="wykres-siatka" />
-            <text x={szer - pad.r + 8} y={y(k) + 4} className="wykres-os">
-              {Math.round(k * 100)}%
-            </text>
-          </g>
-        ))}
+        {siatka}
+        {wybrane.length === 1 ? (
+          <path d={`${sciezka(wybrane[0])} V${dol} H${pad.l} Z`} className={`wykres-pole seria-${KLASY[wybrane[0]] ?? "trzeci"}`} />
+        ) : null}
         {wybrane.map((i) => (
-          <path key={i} d={sciezka(i)} fill="none" stroke={KOLORY[i]} strokeWidth={2.2} strokeLinejoin="round" />
+          <path key={i} d={sciezka(i)} className={`wykres-linia seria-${KLASY[i] ?? "trzeci"}`} />
         ))}
         {animacja > 0 && punkty.length >= 2
           ? wybrane.map((i) => (
-              <path
-                key={`n${animacja}-${i}`}
-                d={ostatniOdcinek(i)}
-                pathLength={1}
-                className="wykres-odcinek-nowy"
-                fill="none"
-                stroke={KOLORY[i]}
-                strokeWidth={3.2}
-                strokeLinejoin="round"
-              />
+              <path key={`n${animacja}-${i}`} d={ostatniOdcinek(i)} pathLength={1} className={`wykres-linia wykres-odcinek-nowy seria-${KLASY[i] ?? "trzeci"}`} />
             ))
           : null}
-        {hover != null ? (
-          <line x1={x(akt.t)} x2={x(akt.t)} y1={pad.t} y2={wysokosc - pad.b} className="wykres-kursor" />
-        ) : null}
+        {hover != null ? <line x1={xAkt} x2={xAkt} y1={pad.t} y2={dol} className="wykres-kursor" /> : null}
         {wybrane.map((i) => (
-          <circle key={i} cx={x(akt.t)} cy={y(akt.kursy[i] ?? 0)} r={4} fill={KOLORY[i]} />
+          <g key={i} className={`wykres-punkt seria-${KLASY[i] ?? "trzeci"}`}>
+            {zywy && hover == null ? <circle cx={xAkt} cy={y(akt.kursy[i] ?? 0)} r={5} className="wykres-puls" /> : null}
+            <circle cx={xAkt} cy={y(akt.kursy[i] ?? 0)} r={4} />
+          </g>
         ))}
-        {animacja > 0 && hover == null
-          ? wybrane.map((i) => (
-              <circle key={`p${animacja}-${i}`} cx={x(ostatni.t)} cy={y(ostatni.kursy[i] ?? 0)} r={4} fill="none" stroke={KOLORY[i]} strokeWidth={2} className="wykres-punkt-nowy" />
-            ))
-          : null}
-        <text x={pad.l} y={wysokosc - 6} className="wykres-os">
-          {new Date(t0).toLocaleDateString("pl-PL", { day: "numeric", month: "short" })}
-        </text>
-        <text x={szer - pad.r} y={wysokosc - 6} className="wykres-os" textAnchor="end">
-          {new Date(t1).toLocaleDateString("pl-PL", { day: "numeric", month: "short" })}
-        </text>
+        {!kompakt ? (
+          <>
+            <text x={pad.l} y={wysokosc - 6} className="wykres-os">
+              {formatujDzien(t0)}
+            </text>
+            <text x={prawy} y={wysokosc - 6} className="wykres-os" textAnchor="end">
+              {zywy ? "teraz" : formatujDzien(t1)}
+            </text>
+          </>
+        ) : null}
       </svg>
     </div>
   );

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { Kategoria, Status } from "@/api/types";
+import type { Kategoria, Pytanie, Status } from "@/api/types";
 import { ETYKIETY_STATUSU } from "@/api/types";
-import { procent } from "@/api/lmsr";
 import { pobierzGracza, zalogujEmailem, zarejestruj } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import { useAkcja } from "@/ui/hooks";
-import { inicjaly, liczba } from "@/ui/tekst";
+import { inicjaly, kolorAwatara, liczba, odmien } from "@/ui/tekst";
+import { LiczbaZywa } from "@/ui/zywe";
 import {
   IkAktywnosc,
   IkInfo,
@@ -22,6 +22,7 @@ import {
   IkStrzalka,
   IkSzukaj,
   IkZamknij,
+  IkZnak,
 } from "@/ui/ikony";
 
 /* ---------- drobne ---------- */
@@ -71,58 +72,18 @@ export function formatujDateKrotko(iso: string | null | undefined): string {
   return d.toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 }
 
-/** Kafelek kategorii (zamiast obrazka rynku). */
-export function KafelekKategorii({ kategoria, duzy = false }: { kategoria: Kategoria; duzy?: boolean }) {
-  return (
-    <span className={`ikona ikona-${kategoria} ${duzy ? "ikona-duza" : ""}`} aria-hidden="true">
-      {kategoria === "miasto" ? <IkMiasto /> : <IkLuz />}
-    </span>
-  );
-}
-
-/** Łuk 200° jak na kartach giełd prognoz: kolor zależy od wartości (<30% czerwony, <50% bursztynowy, dalej zielony),
- *  albo narzucony przez `kolor` (mute = kurs otwarcia / ukryty). */
-export function Wskaznik({
-  kurs,
-  etykieta = "szansa",
-  kolor = "auto",
-}: {
-  kurs: number | null;
-  etykieta?: string;
-  kolor?: "auto" | "tak" | "nie" | "trzeci" | "mute";
-}) {
-  const r = 29;
-  const dl = r * (200 * Math.PI) / 180;
-  const k = kurs == null ? 0 : Math.max(0, Math.min(1, kurs));
-  const luk = "M-28.56 5.04 A29 29 0 1 1 28.56 5.04";
-  const klasa =
-    kolor === "auto" ? (kurs == null ? "mute" : k < 0.3 ? "nie" : k < 0.5 ? "trzeci" : "tak") : kolor;
-  const krycie = kolor === "mute" || kurs == null ? 0.5 : (Math.abs(k - 0.5) / 0.5) * 0.45 + 0.55;
-  return (
-    <div className={`wskaznik ${kurs == null ? "ukryty" : ""}`}>
-      <svg viewBox="-29 -29 58 34.04" aria-hidden="true">
-        <path d={luk} className="tor" fill="none" strokeWidth="4.5" strokeLinecap="round" />
-        <path
-          d={luk}
-          className={`postep ${klasa}`}
-          fill="none"
-          strokeWidth="4.5"
-          strokeLinecap="round"
-          strokeOpacity={krycie}
-          strokeDasharray={`${(dl * k).toFixed(1)} ${(dl + 2).toFixed(1)}`}
-        />
-      </svg>
-      <b>{kurs == null ? "–" : procent(kurs)}</b>
-      <span>{kurs == null ? "kurs ukryty" : etykieta}</span>
-    </div>
-  );
+/** Stopka karty rynku: „bez prognoz”, „3/10 prognoz” (kurs jeszcze ukryty) albo „12 prognoz”. Krótko, bez zer. */
+export function opisPrognoz(p: Pick<Pytanie, "liczba_prognoz" | "prog_widocznosci" | "status" | "kursy">): string {
+  if (p.liczba_prognoz === 0) return "bez prognoz";
+  if (p.status === "otwarte" && p.kursy == null) return `${p.liczba_prognoz}/${p.prog_widocznosci} prognoz`;
+  return odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz");
 }
 
 /** Numer miejsca w rankingu przy nicku: „#3”. Nic, gdy gracz nie jest w rankingu. */
 export function OdznakaMiejsca({ miejsce, duza = false }: { miejsce: number | null | undefined; duza?: boolean }) {
   if (miejsce == null) return null;
   return (
-    <span className={`miejsce-odznaka ${miejsce <= 3 ? "top" : ""} ${duza ? "duza" : ""}`} title={`${miejsce}. miejsce w rankingu`}>
+    <span className={`miejsce-odznaka cyfry ${miejsce <= 3 ? "top" : ""} ${duza ? "duza" : ""}`} title={`${miejsce}. miejsce w rankingu`}>
       #{miejsce}
     </span>
   );
@@ -141,15 +102,22 @@ export function ZyskStrata({ wartosc, miejsca = 0, sufiks = " pkt" }: { wartosc:
   );
 }
 
+/** Inicjały gracza na kole w kolorze wyliczonym z nicku. */
 export function Awatar({ nick, duzy = false }: { nick: string; duzy?: boolean }) {
   return (
-    <span className={`awatar ${duzy ? "awatar-duzy" : ""}`} aria-hidden="true">
+    <span className={`awatar awatar-k${kolorAwatara(nick)} ${duzy ? "awatar-duzy" : ""}`} aria-hidden="true">
       {inicjaly(nick)}
     </span>
   );
 }
 
 /* ---------- motyw ---------- */
+
+/** Kolor paska przeglądarki = tło strony w bieżącym motywie (token --tlo). */
+function ustawKolorPaska() {
+  const tlo = getComputedStyle(document.documentElement).getPropertyValue("--tlo").trim();
+  if (tlo) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", tlo);
+}
 
 export function useMotyw(): [string, () => void] {
   const [motyw, setMotyw] = useState<string>(() => {
@@ -159,6 +127,7 @@ export function useMotyw(): [string, () => void] {
     setMotyw((m) => {
       const n = m === "ciemny" ? "jasny" : "ciemny";
       document.documentElement.dataset.motyw = n;
+      ustawKolorPaska();
       try {
         localStorage.setItem("motyw", n);
       } catch {
@@ -227,32 +196,28 @@ export function Naglowek() {
     <header className="naglowek">
       <div className="naglowek-wnetrze">
         <Link to="/" className="logo" aria-label="Zdążą? strona główna">
-          <span className="logo-znak">Z</span>
-          Zdążą<em>?</em>
+          <IkZnak className="logo-znak" />
+          <span>Zdążą?</span>
         </Link>
-        <div className="szukaj-naglowek" style={{ flex: "1 1 auto", maxWidth: 460, minWidth: 0 }}>
+        <div className="szukaj-naglowek">
           <Szukajka />
         </div>
         <nav className="naglowek-nav" aria-label="Główna">
           <NavLink to="/" end className={klasa}>
-            <IkRynki />
             Rynki
           </NavLink>
           <NavLink to="/miasto" className={klasa}>
-            <IkMiasto />
-            Miasto
+            Dla miasta
           </NavLink>
           <NavLink to="/aktywnosc" className={klasa}>
-            <IkAktywnosc />
             Aktywność
           </NavLink>
           <NavLink to="/ranking" className={klasa}>
-            <IkRanking />
             Ranking
           </NavLink>
         </nav>
         <div className="naglowek-akcje">
-          <button type="button" className="przycisk-tekst niebieski ukryj-mobil" onClick={() => otworzModal("jak")}>
+          <button type="button" className="przycisk-tekst ukryj-mobil" onClick={() => otworzModal("jak")}>
             <IkInfo />
             Jak to działa
           </button>
@@ -266,14 +231,12 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Profil: portfel na żywo">
-              <div>
-                <span className="etykieta">Portfel</span>
-                <span className="wartosc">
-                  {portfel ? liczba(Math.round(portfel.wartosc)) : liczba(Math.floor(gracz.saldo))}
-                  {portfel ? <ZyskStrata wartosc={Math.round(portfel.zysk)} sufiks="" /> : null}
-                </span>
-              </div>
+            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + udziały po kursie, zysk wobec 1000 na start">
+              <span className="portfel-saldo">
+                <LiczbaZywa className="cyfry" wartosc={portfel ? Math.round(portfel.wartosc) : Math.floor(gracz.saldo)} format={(n) => liczba(Math.round(n))} />
+                <small>pkt</small>
+                {portfel ? <ZyskStrata wartosc={Math.round(portfel.zysk)} sufiks="" /> : null}
+              </span>
               <Awatar nick={gracz.nick} />
             </Link>
           ) : stan === "laduje" ? (
@@ -534,7 +497,7 @@ function ModalKonta() {
   if (tryb === "nick") {
     return (
       <Modal tytul="Jeszcze nick" onClose={zamknijModal}>
-        <p className="pod">Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
+        <p className="pod">Zalogowano. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
         {rejestracja.blad ? <Komunikat typ="blad">{rejestracja.blad}</Komunikat> : null}
         <FormularzNicku />
       </Modal>
@@ -597,14 +560,14 @@ function ModalKonta() {
         {tryb === "logowanie" ? (
           <>
             Nie masz konta?{" "}
-            <button type="button" className="przycisk-tekst niebieski" style={{ padding: 0 }} onClick={() => setTryb("rejestracja")}>
+            <button type="button" className="lacze" onClick={() => setTryb("rejestracja")}>
               Zarejestruj się
             </button>
           </>
         ) : (
           <>
             Masz już konto?{" "}
-            <button type="button" className="przycisk-tekst niebieski" style={{ padding: 0 }} onClick={() => setTryb("logowanie")}>
+            <button type="button" className="lacze" onClick={() => setTryb("logowanie")}>
               Zaloguj się
             </button>
           </>
@@ -736,56 +699,4 @@ export function Modale() {
   if (modal === "szukaj") return <ModalSzukaj />;
   if (modal === "wiecej") return <ModalWiecej />;
   return null;
-}
-
-/* ---------- starsze komponenty (nadal używane w kilku ekranach) ---------- */
-
-/** Pasek podziału kursów (tak / nie / trzecia odpowiedź) z legendą. */
-export function PasekRynku({ odpowiedzi, kursy }: { odpowiedzi: string[]; kursy: number[] | null }) {
-  const klasy = ["tak", "nie", "trzeci"];
-  if (!kursy) {
-    return (
-      <div className="pasek-rynku">
-        <i style={{ width: "100%" }} />
-      </div>
-    );
-  }
-  return (
-    <>
-      <div className="pasek-rynku">
-        {kursy.map((k, i) => (
-          <i key={i} className={klasy[i] ?? "trzeci"} style={{ width: `${Math.max(0, k * 100)}%` }} />
-        ))}
-      </div>
-      <div className="legenda">
-        {odpowiedzi.map((o, i) => (
-          <span key={i} className={klasy[i] ?? "trzeci"}>
-            <i />
-            {o} {procent(kursy[i])}
-          </span>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** Lista odpowiedzi z paskami kursów (tylko do odczytu). */
-export function Kursy({ odpowiedzi, kursy, wynik }: { odpowiedzi: string[]; kursy: number[] | null; wynik?: number | null }) {
-  return (
-    <div className="odpowiedzi">
-      {odpowiedzi.map((o, i) => {
-        const k = kursy ? kursy[i] : null;
-        return (
-          <div key={i} className={`odpowiedz o-${i + 1} ${wynik === i + 1 ? "trafiona" : ""}`}>
-            {k != null ? <span className="pasek" style={{ width: `${Math.round(k * 100)}%` }} /> : null}
-            <span className="nazwa">
-              {o}
-              {wynik === i + 1 ? " — wynik" : ""}
-            </span>
-            <span className="kurs">{procent(k)}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
 }

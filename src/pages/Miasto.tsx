@@ -100,12 +100,14 @@ export default function Miasto() {
                       <div className="pomoc">zmieniany {odmien(p.liczba_zmian_terminu, "raz", "razy", "razy")}</div>
                     ) : null}
                   </td>
-                  <td className="liczba">{p.kursy ? procent(p.kursy[0]) : `ukryty (${p.liczba_prognoz}/${p.prog_widocznosci})`}</td>
+                  <td className="liczba">
+                    {p.kursy ? procent(p.kursy[0]) : p.liczba_prognoz === 0 ? "bez prognoz" : `ukryty (${p.liczba_prognoz}/${p.prog_widocznosci})`}
+                  </td>
                   <td className="liczba">
                     {p.kursy ? `${procent(p.kursy[1])} / ${procent(p.kursy[2])}` : "–"}
                   </td>
-                  <td className="liczba">{p.liczba_prognoz}</td>
-                  <td style={{ minWidth: 220 }}>
+                  <td className="liczba">{p.liczba_prognoz > 0 ? p.liczba_prognoz : "–"}</td>
+                  <td className="szeroka">
                     <Powody rozklad={powody.filter((r) => r.pytanie === p.id)} />
                   </td>
                   <td>{p.komentarz_urzedu ?? <span className="mala">brak</span>}</td>
@@ -159,7 +161,7 @@ export default function Miasto() {
                     <td className="liczba">
                       {p.wynik && p.kursy ? `${procent(p.kursy[p.wynik - 1])} na ten wynik` : "–"}
                     </td>
-                    <td style={{ minWidth: 220 }}>
+                    <td className="szeroka">
                       <Powody rozklad={powody.filter((r) => r.pytanie === p.id)} />
                     </td>
                     <td>{p.komentarz_urzedu ?? <span className="mala">brak</span>}</td>

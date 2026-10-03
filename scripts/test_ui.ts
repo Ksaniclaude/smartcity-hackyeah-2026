@@ -221,6 +221,18 @@ async function mock(route: Route) {
     if (!stan.gracz) return json(route, { message: "Najpierw podaj nick" }, 400);
     if (body.p_pytanie === 1 && !body.p_powod) return json(route, { message: "Podaj powód" }, 400);
     stan.prognozy++;
+    // jedna strona rynku na gracza: inne odpowiedzi są sprzedawane przed zakupem
+    const sprzedano: { odpowiedz: number; odpowiedz_tekst: string; udzialy: number; zwrot: number }[] = [];
+    const pyt = pytania.find((x) => x.id === body.p_pytanie)!;
+    for (const z of stan.pozycje.values()) {
+      if (z.pytanie === body.p_pytanie && z.odpowiedz !== body.p_odpowiedz && z.udzialy > 0) {
+        const zwrot = Math.round(z.udzialy * 0.42 * 10000) / 10000;
+        sprzedano.push({ odpowiedz: z.odpowiedz, odpowiedz_tekst: pyt.odpowiedzi[z.odpowiedz - 1], udzialy: z.udzialy, zwrot });
+        stan.gracz.saldo += zwrot;
+        z.udzialy = 0;
+        z.wydane = 0;
+      }
+    }
     stan.gracz.saldo -= body.p_stawka;
     const klucz = `${body.p_pytanie}-${body.p_odpowiedz}`;
     const z = stan.pozycje.get(klucz) ?? { pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, udzialy: 0, wydane: 0 };
@@ -233,7 +245,8 @@ async function mock(route: Route) {
     return json(route, {
       pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, stawka: body.p_stawka, udzialy: 23.7,
       kurs_przed: 0.41, kurs_po: 0.44, kursy: q.odpowiedzi.length === 2 ? [0.44, 0.56] : [0.41, 0.47, 0.12], saldo: stan.gracz.saldo, liczba_prognoz: 12, obrot: q.obrot + body.p_stawka,
-      sprzedano: [], zwrot_ze_sprzedazy: 0, miejsce_przed: stan.prognozy === 1 ? null : 3, miejsce_po: stan.prognozy === 1 ? 3 : 2, graczy_w_rankingu: 4,
+      sprzedano, zwrot_ze_sprzedazy: sprzedano.reduce((s, x) => s + x.zwrot, 0),
+      miejsce_przed: stan.prognozy === 1 ? null : 3, miejsce_po: stan.prognozy === 1 ? 3 : 2, graczy_w_rankingu: 4,
     });
   }
   if (p === "/rest/v1/rpc/sprzedaj_udzialy") {
@@ -347,11 +360,11 @@ async function main() {
     await page.goto(`${ADRES}/`);
     await oczekuj(page, "Czy miasto zdąży?");
     await oczekuj(page, "41%");
-    await oczekuj(page, "pkt obrotu");
+    await oczekuj(page, "12 prognoz");
+    await oczekuj(page, "3/10 prognoz");
     await oczekuj(page, "tłum się pomylił");
-    await oczekuj(page, "Świeże ruchy");
-    await oczekuj(page, /prognoz[ya]? w ostatnich 10 minutach/);
-    await oczekuj(page, "▼ 2 pp / 1 godz.");
+    await oczekuj(page, "w 10 min");
+    await oczekuj(page, "2 pp / 1 h");
     await zrzut(page, "rynki_gosc");
 
     console.log("2. Klik „Tak” na karcie → rynek → rejestracja (nick, e-mail, hasło) → prognoza");
@@ -367,10 +380,11 @@ async function main() {
     await page.getByRole("button", { name: /^Postaw/ }).first().waitFor({ timeout: 8000 });
     await page.getByRole("group", { name: "Szybka stawka" }).getByRole("button", { name: "50", exact: true }).click();
     await oczekuj(page, "Jeśli trafisz");
+    await oczekuj(page, "(×");
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
-    await oczekuj(page, "Przesunąłeś kurs 41% → 44%");
-    await oczekuj(page, "Jesteś w rankingu: miejsce 3 z 4");
+    await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
     await page.getByRole("button", { name: "Udostępnij kartę" }).first().click();
     await oczekuj(page, "Udostępnij prognozę");
@@ -379,6 +393,13 @@ async function main() {
     await zrzut(page, "karta_udostepniania", false);
     await page.getByRole("button", { name: "Zamknij" }).click();
 
+    console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
+    await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
+    await oczekuj(page, "Rynek ma jedną stronę na gracza");
+    await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
+    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await zrzut(page, "zmiana_strony");
+
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
     await page.goto(`${ADRES}/pytanie/1?odp=2`);
     await oczekuj(page, "Kryterium rozstrzygnięcia");
@@ -386,7 +407,7 @@ async function main() {
     await page.getByRole("button", { name: "wykonawca", exact: true }).click();
     await page.getByPlaceholder("Jedno zdanie komentarza (opcjonalnie)").fill("Wykonawca już raz prosił o aneks");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
-    await oczekuj(page, "Przesunąłeś kurs 41% → 44%");
+    await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
     await oczekuj(page, "Awans w rankingu: 3 → 2");
     await oczekuj(page, "Wykonawca już raz prosił o aneks");
     await oczekuj(page, /stawia 20 na po terminie/);
@@ -406,10 +427,10 @@ async function main() {
     await oczekuj(page, /Sprzedano/);
     await zrzut(page, "sprzedaz");
 
-    console.log("6. Profil: ekran „Rynek rozstrzygnięty”, portfel na żywo; ranking, aktywność, profil publiczny");
+    console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
     await page.goto(`${ADRES}/profil`);
     await oczekuj(page, "Rynek rozstrzygnięty");
-    await oczekuj(page, "Byłeś lepszy niż 75% graczy", 6000);
+    await oczekuj(page, "Twój typ był lepszy niż 75% graczy", 6000);
     await zrzut(page, "rozstrzygniecie", false);
     await page.getByRole("button", { name: "Jasne" }).click();
     await oczekuj(page, "Wartość portfela");

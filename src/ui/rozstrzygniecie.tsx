@@ -54,7 +54,7 @@ interface Props {
 
 /**
  * Ekran „Rynek rozstrzygnięty” dla gracza z pozycją: wynik odsłania się po ok. 1 s, licznik
- * wypłaty bije do góry, linijka „byłeś lepszy niż N% graczy” (odsetek graczy z pozycją, którzy chybili).
+ * wypłaty bije do góry, linijka „Twój typ był lepszy niż N% graczy” (odsetek graczy z pozycją, którzy chybili).
  */
 export function EkranRozstrzygniecia({ moja, pytanie, onClose }: Props) {
   const [p, setP] = useState<Pytanie | null>(pytanie ?? null);
@@ -83,8 +83,8 @@ export function EkranRozstrzygniecia({ moja, pytanie, onClose }: Props) {
   const g = p?.gracze_rynku ?? null;
   let porownanie: string | null = null;
   if (g && g.graczy > 0) {
-    if (g.graczy === 1) porownanie = "Byłeś jedynym graczem na tym rynku.";
-    else if (trafione) porownanie = `Byłeś lepszy niż ${Math.round(((g.graczy - g.trafilo) / g.graczy) * 100)}% graczy na tym rynku.`;
+    if (g.graczy === 1) porownanie = "Jedyny gracz na tym rynku.";
+    else if (trafione) porownanie = `Twój typ był lepszy niż ${Math.round(((g.graczy - g.trafilo) / g.graczy) * 100)}% graczy na tym rynku.`;
     else porownanie = `Trafiło ${Math.round((g.trafilo / g.graczy) * 100)}% graczy na tym rynku (${odmien(g.trafilo, "gracz", "graczy", "graczy")} z ${g.graczy}).`;
   }
 
@@ -106,7 +106,7 @@ export function EkranRozstrzygniecia({ moja, pytanie, onClose }: Props) {
           )}
           <span className="pod">
             {trafione
-              ? `Trafione: ${liczba(moja.udzialy_glowne, 1)} udziałów po 1 punkcie`
+              ? `Twój ruch trafił: ${liczba(moja.udzialy_glowne, 1)} udziałów po 1 punkcie`
               : wyplata > 0
                 ? `Chybione, ale udziały na „${wynikTekst}” wypłaciły +${liczba(wyplata, 1)} pkt`
                 : `Chybione: ${liczba(moja.wydane)} pkt poszło do tych, którzy trafili`}

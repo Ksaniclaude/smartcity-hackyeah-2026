@@ -44,7 +44,22 @@ function lamanie(ctx: CanvasRenderingContext2D, tekst: string, maks: number): st
   return linie;
 }
 
-const KOLORY = ["#3db468", "#d35454", "#f2b53d"];
+/** Kolory karty z tokenów arkusza (ciemny motyw karty niezależnie od motywu strony: wartości zapasowe, gdy tokeny nie są dostępne). */
+function kolory() {
+  const st = typeof window !== "undefined" ? getComputedStyle(document.documentElement) : null;
+  const t = (nazwa: string, zapas: string) => st?.getPropertyValue(nazwa).trim() || zapas;
+  return {
+    tlo: "#0c1324",
+    tekst: "#f3f6fc",
+    tekst2: "#c5cee0",
+    mute: "#8794b0",
+    akcent: t("--akcent", "#ffd21f"),
+    naAkcencie: t("--na-akcencie", "#1a1500"),
+    odpowiedzi: [t("--tak-tekst", "#45e597"), t("--nie-tekst", "#ff7377"), t("--trzeci-tekst", "#b7a2ff")],
+    wyswietlana: t("--wyswietlana", "system-ui, sans-serif"),
+    tekstowa: t("--tekstowa", "system-ui, sans-serif"),
+  };
+}
 
 /** Rysuje kartę 1200×630 (format podglądu linku) na canvasie; zwraca data URL PNG. */
 export function rysujKarte(d: DaneKarty): string | null {
@@ -53,55 +68,54 @@ export function rysujKarte(d: DaneKarty): string | null {
   c.height = 630;
   const ctx = c.getContext("2d");
   if (!ctx) return null;
-  const czcionka = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillStyle = "#15191d";
+  const k = kolory();
+  const kolorOdp = k.odpowiedzi[d.indeks] ?? k.odpowiedzi[2];
+  ctx.fillStyle = k.tlo;
   ctx.fillRect(0, 0, 1200, 630);
-  ctx.fillStyle = KOLORY[d.indeks] ?? KOLORY[2];
+  ctx.fillStyle = kolorOdp;
   ctx.fillRect(0, 0, 14, 630);
 
   // logo
-  ctx.fillStyle = "#0093fd";
+  ctx.fillStyle = k.akcent;
   ctx.beginPath();
   ctx.roundRect(64, 56, 52, 52, 12);
   ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.font = `800 30px ${czcionka}`;
+  ctx.fillStyle = k.naAkcencie;
+  ctx.font = `800 30px ${k.wyswietlana}`;
   ctx.textBaseline = "middle";
   ctx.fillText("Z", 80, 83);
-  ctx.fillStyle = "#dee3e7";
-  ctx.font = `800 34px ${czcionka}`;
-  ctx.fillText("Zdążą", 132, 82);
-  ctx.fillStyle = "#0093fd";
-  ctx.fillText("?", 132 + ctx.measureText("Zdążą").width, 82);
-  ctx.fillStyle = "#7b8996";
-  ctx.font = `600 22px ${czcionka}`;
-  ctx.fillText("rynek prognoz o Krakowie", 132 + ctx.measureText("Zdążą? ").width + 50, 84);
+  ctx.fillStyle = k.tekst;
+  ctx.font = `800 34px ${k.wyswietlana}`;
+  ctx.fillText("Zdążą?", 132, 82);
+  ctx.fillStyle = k.mute;
+  ctx.font = `600 22px ${k.tekstowa}`;
+  ctx.fillText("rynek prognoz o Krakowie", 132 + ctx.measureText("Zdążą?").width + 50, 84);
 
   // „Daję X%”
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#bbc4cd";
-  ctx.font = `600 40px ${czcionka}`;
+  ctx.fillStyle = k.tekst2;
+  ctx.font = `600 40px ${k.tekstowa}`;
   ctx.fillText("Daję", 64, 215);
-  ctx.fillStyle = KOLORY[d.indeks] ?? KOLORY[2];
-  ctx.font = `800 150px ${czcionka}`;
+  ctx.fillStyle = kolorOdp;
+  ctx.font = `800 150px ${k.wyswietlana}`;
   const proc = procent(d.kurs);
   ctx.fillText(proc, 64, 340);
   const szerProc = ctx.measureText(proc).width;
-  ctx.fillStyle = "#bbc4cd";
-  ctx.font = `600 40px ${czcionka}`;
+  ctx.fillStyle = k.tekst2;
+  ctx.font = `600 40px ${k.tekstowa}`;
   ctx.fillText(d.indeks === 0 ? "na to, że" : `na „${d.odpowiedz}”`, 64 + szerProc + 28, 340);
 
   // zdanie
-  ctx.fillStyle = "#dee3e7";
-  ctx.font = `700 44px ${czcionka}`;
+  ctx.fillStyle = k.tekst;
+  ctx.font = `700 44px ${k.wyswietlana}`;
   const zdanie = d.indeks === 0 ? zdanieZPytania(d.tresc) : d.tresc;
   const linie = lamanie(ctx, zdanie, 1060).slice(0, 3);
   if (linie.length === 3 && lamanie(ctx, zdanie, 1060).length > 3) linie[2] = `${linie[2].replace(/[.,;:]?$/, "")}…`;
   linie.forEach((l, i) => ctx.fillText(l, 64, 420 + i * 54));
 
   // stopka: nick i adres
-  ctx.fillStyle = "#7b8996";
-  ctx.font = `600 26px ${czcionka}`;
+  ctx.fillStyle = k.mute;
+  ctx.font = `600 26px ${k.tekstowa}`;
   const kto = d.nick ? `— ${d.nick}` : "";
   ctx.fillText(kto, 64, 592);
   ctx.textAlign = "right";
@@ -167,9 +181,7 @@ export function KartaUdostepniania({ dane, onClose }: { dane: DaneKarty; onClose
   return (
     <Modal tytul="Udostępnij prognozę" onClose={onClose}>
       {obrazek ? <img src={obrazek} alt={tekst} className="karta-udostepniania" /> : <div className="karta-udostepniania szkielet" />}
-      <p className="pod" style={{ marginTop: 10 }}>
-        {tekst}
-      </p>
+      <p className="pod karta-tekst">{tekst}</p>
       {udostepnij.blad ? <Komunikat typ="ostrz">{udostepnij.blad}</Komunikat> : null}
       {kopiuj.blad ? <Komunikat typ="blad">{kopiuj.blad}</Komunikat> : null}
       {info ? <Komunikat typ="ok">{info}</Komunikat> : null}
