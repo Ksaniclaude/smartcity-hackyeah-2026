@@ -24,7 +24,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 | Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
-| Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
+| Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. Jedna strona rynku na gracza: kupno innej odpowiedzi najpierw sprzedaje posiadane udziały (w tej samej transakcji, z zapowiedzią w panelu), więc nie da się trzymać „tak” i „nie” naraz. |
 | Portfolio | /profil: wartość portfela (punkty + udziały po kursie), zysk/strata, trafność, pozycje, historia transakcji, ustawienia (nick, konto, motyw). |
 | Profile pages | /u/:nick – publiczny profil: wartość pozycji, największa wygrana, prognozy, aktywność. |
 | Leaderboard | /ranking – portfel, zysk, trafność, obrót. |
@@ -39,7 +39,8 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 - Na jeden rynek można wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki rynek ma mniej niż 10 prognoz
   (do tego czasu widać kurs otwarcia ustawiony przez admina).
 - Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Unieważnienie zwraca wydane punkty. Udziały można sprzedać
-  przed terminem po bieżącym kursie.
+  przed terminem po bieżącym kursie. Gracz trzyma udziały tylko jednej odpowiedzi na rynek: zmiana zdania to
+  sprzedaż starej strony i zakup nowej w jednej transakcji.
 - Naraz otwarte są najwyżej 3 rynki „miasto” i 5 „na luzie”. Rynki „miasto” startują od odsetka umów wykonanych
   w terminie (z Biuletynu Zamówień Publicznych), „na luzie” od 50%.
 - Każdy rynek musi mieć: treść, kategorię, odpowiedzi, kryterium rozstrzygnięcia, link do publicznego źródła i termin.
@@ -134,6 +135,8 @@ się do 1, żadne saldo nie spada poniżej zera, koszt zakładu równa się ró�
 wypłaty zgadzają się z udziałami (strata animatora nie przekracza b·ln n). Test równoległy puszcza 8 procesów `psql`
 po 40 zakładów na jeden rynek i sprawdza, że suma stawek równa się kosztowi LMSR od stanu otwarcia. Test sprzedaży
 sprawdza, że zwrot równa się C(q) − C(q′), saldo rośnie dokładnie o zwrot, kurs spada, a kursy dalej sumują się do 1.
+Test zmiany strony sprawdza, że zakup innej odpowiedzi sprzedaje stare udziały w tej samej transakcji i że żaden
+gracz nie ma udziałów na dwóch odpowiedziach naraz (symulacja liczy też takie automatyczne sprzedaże).
 Test ról sprawdza, że `anon` i `authenticated` mają dostęp do widoków i funkcji odczytu (to ten błąd, który
 wcześniej zepsuł produkcję).
 

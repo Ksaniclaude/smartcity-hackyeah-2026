@@ -297,7 +297,7 @@ export default function Lista() {
   const czolowka = filtr === "wszystkie" && !q;
   const wyrozniony = czolowka ? wybierzWyrozniony(aktywne) : null;
 
-  const typy = new Map((moje ?? []).filter((m) => m.udzialy_glowne > 0.005).map((m) => [m.pytanie, m.odpowiedz_glowna]));
+  const typy = new Map((moje ?? []).filter((m) => m.udzialy_glowne >= 0.05).map((m) => [m.pytanie, m.odpowiedz_glowna]));
   const listaProps = { obserwowane, przelaczObserwowanie, typy };
   let zawartosc: ReactNode = null;
   if (dane) {

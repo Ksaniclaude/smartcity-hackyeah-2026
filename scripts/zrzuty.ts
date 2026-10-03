@@ -208,6 +208,7 @@ async function mock(route: Route) {
       pytanie: body.p_pytanie, odpowiedz: i + 1, stawka, udzialy: 1000 * Math.log((e - 1 + kurs) / kurs),
       kurs_przed: kurs, kurs_po: kursPo, kursy: q?.kursy ?? null, saldo: gracz.saldo - stawka,
       liczba_prognoz: (q?.liczba_prognoz ?? 0) + 1, obrot: (q?.obrot ?? 0) + stawka,
+      sprzedano: [], zwrot_ze_sprzedazy: 0,
     });
   }
   if (p === "/rest/v1/rpc/profil_publiczny") return json(route, { nick: "podgorze_7", saldo: 950, prognozy: 4, trafione: 2, rozstrzygniete: 2, zysk: 46.4, od: iso(60 * 24 * 9) });

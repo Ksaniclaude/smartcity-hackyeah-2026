@@ -272,13 +272,28 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
   const miasto = p.kategoria === "miasto";
   const gotowy = stan === "gotowy";
   const saldo = Math.floor(gracz?.saldo ?? 0);
+  // poniżej 0,05 udziału pozycja jest pusta (baza sprzedaje taką resztkę razem z całością)
+  const posiadane = udzialyMoje.filter((z) => z.udzialy >= 0.05);
+  // Jedna strona rynku na gracza (jak na giełdach prognoz): kupno innej odpowiedzi najpierw sprzedaje te udziały.
+  const inne = odp != null ? posiadane.filter((z) => z.odpowiedz !== odp) : [];
+  const zwrotInne = inne.reduce(
+    (suma, z) => suma + (p.kursy ? podgladSprzedazy(p.kursy[z.odpowiedz - 1], z.udzialy).zwrot : 0),
+    0,
+  );
+  const wydaneTej = odp != null ? (udzialyMoje.find((z) => z.odpowiedz === odp)?.wydane ?? 0) : wydaneRazem;
   // Gość liczy podgląd tak, jakby miał już punkty na start; postawić może dopiero po założeniu konta.
-  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneRazem), gotowy ? saldo : PUNKTY_NA_START));
+  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneTej), (gotowy ? saldo : PUNKTY_NA_START) + Math.floor(zwrotInne)));
   const stawkaOk = Math.max(1, Math.min(Math.round(stawka) || 1, Math.max(1, maks)));
-  const kursWybranej = odp != null && p.kursy ? p.kursy[odp - 1] : null;
+  // kurs wybranej odpowiedzi po ewentualnej sprzedaży drugiej strony (dokładnie dla 2 odpowiedzi, w przybliżeniu dla 3)
+  const kursWybranej = (() => {
+    if (odp == null || !p.kursy) return null;
+    if (inne.length === 1 && p.odpowiedzi.length === 2) {
+      return 1 - podgladSprzedazy(p.kursy[inne[0].odpowiedz - 1], inne[0].udzialy).kursPo;
+    }
+    return p.kursy[odp - 1];
+  })();
   const podglad = kursWybranej != null ? podgladZakladu(kursWybranej, stawkaOk) : null;
   const brakPowodu = miasto && !powod;
-  const posiadane = udzialyMoje.filter((z) => z.udzialy > 0.005);
   const pozycjaSprzedaz = posiadane.find((z) => z.odpowiedz === odpSprzedaz) ?? posiadane[0] ?? null;
   const kursSprzedazy = pozycjaSprzedaz && p.kursy ? p.kursy[pozycjaSprzedaz.odpowiedz - 1] : null;
   const uSprzedaz = pozycjaSprzedaz ? Math.max(0, Math.min(udzialySprzedaz, pozycjaSprzedaz.udzialy)) : 0;
@@ -385,6 +400,12 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             <IkStrzalka />
             <KursPoZmianie przed={wynik.kurs_przed} po={wynik.kurs_po} />
           </div>
+          {wynik.sprzedano.length > 0 ? (
+            <p>
+              Sprzedano {wynik.sprzedano.map((z) => `${liczba(z.udzialy, 1)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
+              {liczba(wynik.zwrot_ze_sprzedazy, 1)} pkt.
+            </p>
+          ) : null}
           <p>
             Twoja prognoza przesunęła kurs z {procent(wynik.kurs_przed)} na {procent(wynik.kurs_po)}.
           </p>
@@ -428,7 +449,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             <Komunikat typ="ostrz">
               {saldo < 1
                 ? "Nie masz już punktów. Poczekaj na rozstrzygnięcia albo sprzedaj udziały."
-                : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneRazem)}.`}
+                : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneTej)}.`}
             </Komunikat>
           ) : (
             <div className="stawka-pole">
@@ -487,6 +508,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             </div>
           ) : null}
 
+          {odp != null && inne.length > 0 && gotowy ? (
+            <div className="panel-info">
+              Rynek ma jedną stronę na gracza. Masz{" "}
+              {inne.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
+              {p.odpowiedzi[odp - 1]}” najpierw je sprzeda
+              {p.kursy ? ` (≈ ${liczba(zwrotInne, 1)} pkt wraca na saldo)` : ""}.
+            </div>
+          ) : null}
           {odp != null && stan !== "blad" && maks >= 1 ? (
             <div className="wygrana">
               {podglad ? (
@@ -543,7 +572,9 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   ? "Wybierz odpowiedź"
                   : brakPowodu
                     ? "Wybierz powód"
-                    : `Postaw ${liczba(stawkaOk)} pkt: ${p.odpowiedzi[odp - 1]}`}
+                    : inne.length > 0
+                      ? `Sprzedaj „${inne.map((z) => p.odpowiedzi[z.odpowiedz - 1]).join("”, „")}” i postaw ${odp === 3 ? ": " : ""}${p.odpowiedzi[odp - 1]}`
+                      : `Postaw ${liczba(stawkaOk)} pkt: ${p.odpowiedzi[odp - 1]}`}
             </button>
           ) : stan === "brak_nicku" ? (
             <button
@@ -593,7 +624,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   min={0.1}
                   step={0.1}
                   max={pozycjaSprzedaz.udzialy}
-                  value={uSprzedaz}
+                  value={Math.round(uSprzedaz * 10) / 10}
                   aria-label="Liczba udziałów do sprzedania"
                   onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
                 />
@@ -601,7 +632,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               </div>
               <div className="stawka-chipy">
                 {[25, 50, 75].map((proc) => (
-                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * proc) / 100)}>
+                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(((pozycjaSprzedaz.udzialy * proc) / 100) * 10) / 10)}>
                     {proc}%
                   </button>
                 ))}
@@ -609,7 +640,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   Wszystko
                 </button>
               </div>
-              <Suwak min={0.1} max={pozycjaSprzedaz.udzialy} step={0.1} wartosc={uSprzedaz} etykieta="Suwak udziałów" naZmiane={setUdzialySprzedaz} />
+              <Suwak
+                min={0.1}
+                max={pozycjaSprzedaz.udzialy}
+                step={0.1}
+                wartosc={Math.min(uSprzedaz, pozycjaSprzedaz.udzialy)}
+                etykieta="Suwak udziałów"
+                naZmiane={setUdzialySprzedaz}
+              />
             </div>
           ) : null}
           <div className="wygrana">
@@ -830,7 +868,7 @@ export default function Pytanie() {
                 <div className="nazwa">
                   {o}
                   {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
-                  {mojeU && mojeU.udzialy > 0.005 ? <small>Twój typ: {liczba(mojeU.udzialy, 1)} udz.</small> : null}
+                  {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {liczba(mojeU.udzialy, 1)} udz.</small> : null}
                   {k == null && ko != null ? <small>kurs otwarcia</small> : null}
                 </div>
               );
@@ -952,7 +990,7 @@ export default function Pytanie() {
                   </thead>
                   <tbody>
                     {(udzialyMoje ?? [])
-                      .filter((z) => z.udzialy > 0.005 || z.wydane > 0)
+                      .filter((z) => z.udzialy >= 0.05 || z.wydane > 0)
                       .map((z) => (
                         <tr key={z.odpowiedz}>
                           <td className={klasaTypu(z.odpowiedz - 1)}>{p.odpowiedzi[z.odpowiedz - 1]}</td>
