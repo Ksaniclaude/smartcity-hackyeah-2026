@@ -413,9 +413,17 @@ async function main() {
     await page.getByRole("group", { name: "Szybka stawka" }).getByRole("button", { name: "50", exact: true }).click();
     await oczekuj(page, "Jeśli trafisz");
     await oczekuj(page, "(×");
+    // punkty i udziały przy kupnie w pełnych liczbach (mnożnik ×1,95 może mieć ułamek)
+    const zUlamkiem = (t: string) => /\d,\d+\s*(pkt|udz)|[≈+]\s?\d+,\d/.test(t);
+    const podgladKupna = await page.locator(".wygrana").first().innerText();
+    if (zUlamkiem(podgladKupna)) throw new Error(`Podgląd kupna z ułamkami: ${podgladKupna}`);
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
     await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await page.waitForTimeout(1000); // licznik „Do wygrania” dobiega do końca
+    const kuponKupna = await page.locator(".kupon").first().innerText();
+    if (zUlamkiem(kuponKupna)) throw new Error(`Kupon z ułamkami: ${kuponKupna}`);
+    console.log("  ✓ podgląd i kupon w pełnych punktach i udziałach");
     await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
     // udostępnianie: pasek na kuponie (relacja, komunikatory, link) i arkusz z planszą 9:16 pod „Więcej”
@@ -439,7 +447,7 @@ async function main() {
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
     await oczekuj(page, "Rynek ma jedną stronę na gracza");
     await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
-    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await oczekuj(page, /Sprzedano 23 udz. „tak”/);
     await zrzut(page, "zmiana_strony");
 
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
@@ -463,16 +471,16 @@ async function main() {
     await oczekuj(page, "Trzymam kciuki za ZDMK");
 
     console.log("5. Sprzedaż udziałów");
-    // pozycja z końcówką, która zaokrąglona do 0,1 wychodzi w górę (np. 23,7624 → 23,8, więcej niż jest)
+    // pozycja z ułamkiem, który zaokrąglony normalnie wychodzi w górę (np. 23,7624 → 24, więcej niż jest)
     const naRynku = Number(new URL(page.url()).pathname.split("/").pop());
     const poz = [...stan.pozycje.values()].find((z) => z.pytanie === naRynku && z.udzialy > 1);
     if (!poz) throw new Error("Brak pozycji do testu sprzedaży");
     poz.udzialy = Math.floor(poz.udzialy) + 0.7624;
     const pelna = poz.udzialy;
-    const wDol = (x: number) => Math.floor(x * 10 + 1e-9) / 10;
+    const wDol = (x: number) => Math.floor(x + 1e-9);
     await page.reload();
     await page.getByRole("tab", { name: "Sprzedaj", exact: true }).first().click();
-    await oczekuj(page, `masz ${wDol(pelna).toLocaleString("pl-PL", { minimumFractionDigits: 1 })}`);
+    await oczekuj(page, `masz ${wDol(pelna)}`);
     const poleSprzedazy = page.getByLabel("Liczba udziałów do sprzedania");
     await page.getByRole("button", { name: "50%", exact: true }).click();
     if (Number(await poleSprzedazy.inputValue()) !== wDol(pelna / 2)) throw new Error(`50%: ${await poleSprzedazy.inputValue()} zamiast ${wDol(pelna / 2)}`);
@@ -486,7 +494,7 @@ async function main() {
     await page.getByRole("button", { name: /^Sprzedaj /i }).first().click();
     await oczekuj(page, /Sprzedano/);
     if (stan.ostatniaSprzedaz !== pelna || poz.udzialy !== 0) throw new Error(`Sprzedano ${stan.ostatniaSprzedaz} z ${pelna}, zostało ${poz.udzialy}`);
-    console.log("  ✓ „Wszystko” sprzedało całą pozycję razem z resztką poniżej 0,1");
+    console.log("  ✓ „Wszystko” sprzedało całą pozycję razem z ułamkiem");
     await zrzut(page, "sprzedaz");
 
     console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
