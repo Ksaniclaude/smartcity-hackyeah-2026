@@ -339,7 +339,8 @@ async function main() {
     await page.goto(`${ADRES}/`);
     await oczekuj(page, "Czy miasto zdąży?");
     await oczekuj(page, "41%");
-    await oczekuj(page, "pkt obrotu");
+    await oczekuj(page, "12 prognoz");
+    await oczekuj(page, "3/10 prognoz");
     await oczekuj(page, "tłum się pomylił");
     await zrzut(page, "rynki_gosc");
 

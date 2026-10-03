@@ -23,6 +23,7 @@ import {
   IkStrzalka,
   IkSzukaj,
   IkZamknij,
+  IkZnak,
 } from "@/ui/ikony";
 
 /* ---------- drobne ---------- */
@@ -129,6 +130,12 @@ export function Awatar({ nick, duzy = false }: { nick: string; duzy?: boolean })
 
 /* ---------- motyw ---------- */
 
+const KOLOR_PASKA = { ciemny: "#15191d", jasny: "#ffffff" } as const;
+
+function ustawKolorPaska(motyw: string) {
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", motyw === "jasny" ? KOLOR_PASKA.jasny : KOLOR_PASKA.ciemny);
+}
+
 export function useMotyw(): [string, () => void] {
   const [motyw, setMotyw] = useState<string>(() => {
     return document.documentElement.dataset.motyw ?? "ciemny";
@@ -137,6 +144,7 @@ export function useMotyw(): [string, () => void] {
     setMotyw((m) => {
       const n = m === "ciemny" ? "jasny" : "ciemny";
       document.documentElement.dataset.motyw = n;
+      ustawKolorPaska(n);
       try {
         localStorage.setItem("motyw", n);
       } catch {
@@ -205,10 +213,12 @@ export function Naglowek() {
     <header className="naglowek">
       <div className="naglowek-wnetrze">
         <Link to="/" className="logo" aria-label="Zdążą? strona główna">
-          <span className="logo-znak">Z</span>
-          Zdążą<em>?</em>
+          <IkZnak className="logo-znak" />
+          <span>
+            Zdążą<em>?</em>
+          </span>
         </Link>
-        <div className="szukaj-naglowek" style={{ flex: "1 1 auto", maxWidth: 460, minWidth: 0 }}>
+        <div className="szukaj-naglowek">
           <Szukajka />
         </div>
         <nav className="naglowek-nav" aria-label="Główna">
@@ -218,7 +228,7 @@ export function Naglowek() {
           </NavLink>
           <NavLink to="/miasto" className={klasa}>
             <IkMiasto />
-            Miasto
+            Dla miasta
           </NavLink>
           <NavLink to="/aktywnosc" className={klasa}>
             <IkAktywnosc />

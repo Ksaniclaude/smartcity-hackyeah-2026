@@ -94,3 +94,16 @@ export const IkPlus = (p: P) => (
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
+export const IkGwiazdka = ({ pelna = false, ...p }: P & { pelna?: boolean }) => (
+  <svg {...baza} {...p} fill={pelna ? "currentColor" : "none"}>
+    <path d="m12 3 2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.4l-5.7 3.1 1.2-6.4L2.8 9.7l6.4-.8L12 3z" />
+  </svg>
+);
+/** Znak logo: zegar w kafelku (zdążą = na czas). */
+export const IkZnak = (p: P) => (
+  <svg viewBox="0 0 30 30" aria-hidden="true" {...p}>
+    <rect width="30" height="30" rx="8" fill="currentColor" />
+    <circle cx="15" cy="15" r="7.5" fill="none" stroke="#fff" strokeWidth="2" />
+    <path d="M15 10.5V15l3.2 2.2" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);

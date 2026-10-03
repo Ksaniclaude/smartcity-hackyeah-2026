@@ -82,7 +82,7 @@ a { color: var(--akcent); }
 h1, h2, h3, h4 { line-height: 1.25; margin: 0 0 8px; letter-spacing: -0.01em; }
 h1 { font-size: 1.5rem; font-weight: 700; }
 h2 { font-size: 1.15rem; font-weight: 700; }
-h3 { font-size: 1rem; font-weight: 650; }
+h3 { font-size: 1rem; font-weight: 600; }
 p { margin: 0 0 10px; }
 button { font-family: inherit; }
 code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radius: 4px; }
@@ -101,15 +101,15 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .naglowek { position: sticky; top: 0; z-index: 30; background: var(--karta); border-bottom: 1px solid var(--linia); }
 .naglowek-wnetrze { max-width: 1350px; margin: 0 auto; padding: 0 16px; height: var(--naglowek-h); display: flex; align-items: center; gap: 12px; }
 @media (min-width: 900px) { .naglowek-wnetrze { padding: 0 24px; gap: 18px; } }
-.logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--tekst); text-decoration: none; white-space: nowrap; }
-.logo-znak { width: 30px; height: 30px; border-radius: 8px; background: var(--akcent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; }
+.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--tekst); text-decoration: none; white-space: nowrap; }
+.logo-znak { width: 30px; height: 30px; flex: none; color: var(--akcent); }
 .logo em { font-style: normal; color: var(--akcent); }
 .szukaj { position: relative; flex: 1 1 auto; max-width: 460px; min-width: 0; }
 .szukaj input { width: 100%; height: 40px; border-radius: 9px; border: 1px solid transparent; background: var(--tlo-2); padding: 0 12px 0 38px; font: inherit; color: var(--tekst); outline: none; }
 .szukaj input:focus { border-color: var(--akcent); background: var(--karta); box-shadow: 0 0 0 3px var(--akcent-tlo); }
 .szukaj input::placeholder { color: var(--slaby); }
 .szukaj > svg { position: absolute; left: 12px; top: 11px; width: 18px; height: 18px; color: var(--mute); pointer-events: none; }
-.szukaj-naglowek { display: none; }
+.szukaj-naglowek { display: none; flex: 1 1 auto; max-width: 460px; min-width: 0; }
 @media (min-width: 900px) { .szukaj-naglowek { display: block; } }
 .naglowek-nav { display: none; align-items: center; gap: 2px; }
 @media (min-width: 900px) { .naglowek-nav { display: flex; } }
@@ -172,7 +172,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 
 /* ---------- karta rynku ---------- */
 .rynek { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--r); padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 10px; min-height: 180px; box-shadow: var(--cien-2); transition: box-shadow 0.15s, border-color 0.15s; position: relative; }
-.rynek:hover { border-color: var(--linia-2); transform: translateY(-1px); }
+.rynek:hover { border-color: var(--linia-2); }
 .rynek-gora { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: start; text-decoration: none; color: inherit; }
 .rynek-gora.bez-wskaznika { grid-template-columns: 40px minmax(0, 1fr); }
 .ikona { width: 40px; height: 40px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
@@ -181,7 +181,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .ikona-luz { background: var(--trzeci-tlo); color: var(--trzeci-tekst); }
 .ikona-duza { width: 56px; height: 56px; border-radius: 12px; }
 .ikona-duza svg { width: 28px; height: 28px; }
-.rynek-tytul { margin: 0; font-size: 14px; font-weight: 600; line-height: 20px; letter-spacing: -0.09px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--tekst); }
+.rynek-tytul { margin: 0; font-size: 14px; font-weight: 600; line-height: 20px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--tekst); }
 .rynek-gora:hover .rynek-tytul { text-decoration: underline; text-decoration-color: var(--slaby); text-underline-offset: 3px; }
 .wskaznik { width: 58px; text-align: center; line-height: 1; flex: none; }
 .wskaznik svg { width: 58px; height: 34px; display: block; overflow: visible; }
@@ -189,7 +189,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .wskaznik .postep { stroke: var(--tak-tekst); transition: stroke-dasharray 0.4s; }
 .wskaznik .postep.tak { stroke: var(--tak-tekst); }
 .wskaznik .postep.nie { stroke: var(--nie-tekst); }
-.wskaznik .postep.trzeci { stroke: #f59e0b; }
+.wskaznik .postep.trzeci { stroke: var(--trzeci-tekst); }
 .wskaznik .postep.mute { stroke: var(--slaby); }
 .wskaznik b { display: block; font-size: 16px; font-weight: 600; margin-top: -19px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .wskaznik span { display: block; font-size: 11px; color: var(--mute); font-weight: 600; margin-top: 3px; white-space: nowrap; }
@@ -203,17 +203,23 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .kup-nie:hover { background: var(--nie); color: #fff; }
 .kup-trzeci { background: var(--trzeci-tlo); color: var(--trzeci-tekst); }
 .kup-trzeci:hover { background: var(--trzeci); color: #fff; }
-.kup-mini { height: 27px; min-width: 40px; padding: 0 10px; font-size: 13px; border-radius: 5px; }
 .kup:disabled { opacity: 0.5; cursor: default; }
-.wyniki { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.wynik { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; font-size: 0.88rem; }
-.wynik .nazwa { color: var(--tekst-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* kilka odpowiedzi: wiersz = odpowiedź z kursem, pasek kursu w tle, cały wiersz prowadzi do panelu prognozy */
+.wyniki { display: flex; flex-direction: column; gap: 4px; }
+.wyniki-podpis { font-size: 11px; font-weight: 600; color: var(--mute); text-transform: uppercase; letter-spacing: 0.05em; text-align: right; margin-bottom: 2px; }
+.wynik { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 32px; padding: 0 8px; border: 0; border-radius: var(--r-s); background: none; color: var(--tekst); font: inherit; font-size: 13px; text-align: left; overflow: hidden; }
+.wynik .pasek { position: absolute; left: 0; top: 0; bottom: 0; background: var(--akcent-tlo); pointer-events: none; }
+.wynik > span { position: relative; }
+.wynik .nazwa { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wynik .nazwa::first-letter { text-transform: uppercase; }
-.wynik .kurs { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
-.wynik .kurs.ukryty { color: var(--slaby); font-weight: 500; }
-.rynek-dol { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--slaby); margin-top: auto; font-weight: 500; }
-.rynek-dol { flex-wrap: wrap; }
-.rynek-dol .prawy { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+.wynik .kurs { font-weight: 700; font-variant-numeric: tabular-nums; }
+.wynik.ukryty .kurs { color: var(--mute); font-weight: 600; }
+button.wynik { cursor: pointer; transition: background 0.12s; }
+button.wynik:hover { background: var(--tlo-3); }
+.rynek-dol { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--mute); margin-top: auto; font-weight: 500; white-space: nowrap; }
+.rynek-dol > span:not(.prawy) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rynek-dol .prawy { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex: none; }
+.rynek-dol .odznaka { flex: none; }
 .rynek-dol svg { width: 14px; height: 14px; vertical-align: -2px; }
 .rynek-dol .przycisk-ikona, .meta .przycisk-ikona { width: 28px; height: 28px; margin: -6px 0; }
 .rynek-dol .przycisk-ikona svg, .meta .przycisk-ikona svg { width: 16px; height: 16px; }
@@ -229,7 +235,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .odznaka-miasto { background: var(--akcent-tlo); color: var(--akcent); }
 .odznaka-luz { background: var(--trzeci-tlo); color: var(--trzeci-tekst); }
 .odznaka-status { background: var(--tlo-2); color: var(--mute); text-transform: none; letter-spacing: 0; }
-.odznaka-nowe { background: var(--tak-tlo); color: var(--tak-tekst); }
+.odznaka-nowe { background: var(--tak-tlo); color: var(--tak-tekst); font-size: 0.64rem; }
 .odznaka-zamkniete { background: var(--ostrz-tlo); color: var(--ostrz); }
 
 /* ---------- strona rynku ---------- */

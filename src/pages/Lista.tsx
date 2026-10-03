@@ -7,7 +7,8 @@ import type { Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
 import { KafelekKategorii, Komunikat, OdznakaStatusu, Szkielet, Szukajka, Wskaznik, formatujDateKrotko } from "@/ui/komponenty";
-import { odmien, pkt } from "@/ui/tekst";
+import { IkGwiazdka } from "@/ui/ikony";
+import { odmien } from "@/ui/tekst";
 
 /* ---------- filtry i sortowanie (stan trzymany w adresie: ?f= ?s= ?q=) ---------- */
 
@@ -106,29 +107,25 @@ function porownanieZakonczonych(s: Sortowanie): (a: Pytanie, b: Pytanie) => numb
   return (a, b) => czasRozstrzygniecia(b) - czasRozstrzygniecia(a) || b.id - a.id;
 }
 
-function IkGwiazdka({ pelna }: { pelna: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={pelna ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ width: 16, height: 16 }}
-    >
-      <path d="m12 3 2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.4l-5.7 3.1 1.2-6.4L2.8 9.7l6.4-.8L12 3z" />
-    </svg>
-  );
-}
-
 /* ---------- karta rynku ---------- */
 
 interface PropsKarty {
   p: Pytanie;
   obserwowany: boolean;
   przelaczObserwowanie: (id: number) => void;
+}
+
+/** Stopka karty (lewa strona): liczba prognoz, a gdy kurs jeszcze ukryty, ile brakuje do odsłonięcia. Krótko, bez zer. */
+function Meta({ p, otwarte, kursUkryty }: { p: Pytanie; otwarte: boolean; kursUkryty: boolean }) {
+  if (p.liczba_prognoz === 0) return <span>bez prognoz</span>;
+  if (otwarte && kursUkryty) {
+    return (
+      <span title={`Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach`}>
+        {p.liczba_prognoz}/{p.prog_widocznosci} prognoz
+      </span>
+    );
+  }
+  return <span>{odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz")}</span>;
 }
 
 /** Karta jak na giełdzie prognoz: kafelek, tytuł, wskaźnik kursu, przyciski Tak/Nie albo lista odpowiedzi, stopka. */
@@ -189,24 +186,28 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
       );
     }
   } else {
+    // Kilka odpowiedzi: każdy wiersz to jedna odpowiedź z kursem (pasek w tle) i prowadzi do panelu prognozy.
+    const pokazane = kursy ?? kursyOtwarcia;
+    const ukryty = kursy == null;
     tresc = (
-      <ul className="wyniki">
-        {p.odpowiedzi.map((o, i) => (
-          <li className="wynik" key={i}>
-            <span className="nazwa">{o}</span>
-            {kursy ? (
-              <span className="kurs">{procent(kursy[i])}</span>
-            ) : (
-              <span className="kurs ukryty">{kursyOtwarcia ? procent(kursyOtwarcia[i]) : "–"}</span>
-            )}
-            {otwarte ? (
-              <button type="button" className="kup kup-tak kup-mini" onClick={() => navigate(`/pytanie/${p.id}?odp=${i + 1}`)}>
-                Tak
-              </button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <div className="wyniki">
+        {ukryty && pokazane ? <span className="wyniki-podpis">kurs otwarcia</span> : null}
+        {p.odpowiedzi.map((o, i) => {
+          const k = pokazane ? pokazane[i] : null;
+          const Wiersz = otwarte ? "button" : "div";
+          return (
+            <Wiersz
+              key={i}
+              className={`wynik ${ukryty ? "ukryty" : ""}`}
+              {...(otwarte ? { type: "button" as const, onClick: () => navigate(`/pytanie/${p.id}?odp=${i + 1}`) } : {})}
+            >
+              {k != null && !ukryty ? <span className="pasek" style={{ width: `${Math.round(k * 100)}%` }} /> : null}
+              <span className="nazwa">{o}</span>
+              <span className="kurs">{procent(k)}</span>
+            </Wiersz>
+          );
+        })}
+      </div>
     );
   }
 
@@ -214,15 +215,10 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
     <article className="rynek">
       <Link to={`/pytanie/${p.id}`} className={`rynek-gora ${wskaznik ? "" : "bez-wskaznika"}`}>
         <KafelekKategorii kategoria={p.kategoria} />
-        <h3 className="rynek-tytul">
+        <h3 className="rynek-tytul" title={p.tresc}>
           {p.status === "zamkniete" ? (
             <>
               <OdznakaStatusu status={p.status} />{" "}
-            </>
-          ) : null}
-          {nowy ? (
-            <>
-              <span className="odznaka odznaka-nowe">Nowe</span>{" "}
             </>
           ) : null}
           {p.tresc}
@@ -230,16 +226,9 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
         {wskaznik}
       </Link>
       {tresc}
-      <div className="rynek-dol" style={{ flexWrap: "wrap" }}>
-        <span>{pkt(p.obrot)} obrotu</span>
-        <span aria-hidden="true">·</span>
-        {otwarte && kursy == null ? (
-          <span>
-            kurs po {p.prog_widocznosci} prognozach ({p.liczba_prognoz}/{p.prog_widocznosci})
-          </span>
-        ) : (
-          <span>{odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz")}</span>
-        )}
+      <div className="rynek-dol">
+        {nowy ? <span className="odznaka odznaka-nowe">Nowe</span> : null}
+        <Meta p={p} otwarte={otwarte} kursUkryty={kursy == null} />
         <span className="prawy">
           <button
             type="button"
@@ -247,12 +236,7 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
             aria-label="Obserwuj"
             aria-pressed={obserwowany}
             title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-            style={{ width: 28, height: 28, margin: "-6px 0", color: obserwowany ? "var(--akcent)" : undefined }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              przelaczObserwowanie(p.id);
-            }}
+            onClick={() => przelaczObserwowanie(p.id)}
           >
             <IkGwiazdka pelna={obserwowany} />
           </button>
@@ -441,7 +425,11 @@ export default function Lista() {
               <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
                 Zacznij grać
               </button>
-              <button type="button" className="przycisk przycisk-glowny przycisk-drugi" onClick={() => otworzModal("jak")}>
+              <button
+                type="button"
+                className="przycisk przycisk-glowny przycisk-drugi ukryj-desktop"
+                onClick={() => otworzModal("jak")}
+              >
                 Jak to działa
               </button>
             </div>
