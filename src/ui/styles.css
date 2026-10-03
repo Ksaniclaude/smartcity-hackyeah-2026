@@ -181,8 +181,9 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 
 /* ---------- układ ---------- */
 .aplikacja { min-height: 100dvh; display: flex; flex-direction: column; }
-.kontener { width: 100%; max-width: 1320px; margin: 0 auto; padding: 16px 16px 112px; flex: 1; }
-.ekran { width: 100%; max-width: 720px; margin: 0 auto; padding: 20px 16px 112px; flex: 1; }
+/* miejsce na dolną nawigację zostawia stopka strony (leży pod treścią), nie kontener: inaczej nad stopką zostaje pusta dziura */
+.kontener { width: 100%; max-width: 1320px; margin: 0 auto; padding: 16px 16px 32px; flex: 1; }
+.ekran { width: 100%; max-width: 720px; margin: 0 auto; padding: 20px 16px 32px; flex: 1; }
 /* aktywność: na szerokim ekranie lista w głównej kolumnie, obok przyklejone zestawienie */
 .aktywnosc-uklad { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
 .aktywnosc-bok { display: none; }
@@ -322,9 +323,10 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .wyrozniony .kurs-naglowek { margin: 0; }
 .wyrozniony .rynek-dol { min-height: 0; }
 .wyrozniony-wykres { min-width: 0; }
-.tasma { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; min-width: 0; }
+/* gdy obok etykiety zostaje mniej niż 420 px (telefon), wpisy schodzą do własnego wiersza na całą szerokość */
+.tasma { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; min-width: 0; }
 .tasma-etykieta { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; flex: none; }
-.tasma-wpisy { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; min-width: 0; padding: 2px 0; -webkit-mask-image: linear-gradient(90deg, black calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, black calc(100% - 32px), transparent); }
+.tasma-wpisy { display: flex; flex: 1 1 420px; gap: 8px; overflow-x: auto; scrollbar-width: none; min-width: 0; padding: 2px 0; -webkit-mask-image: linear-gradient(90deg, black calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, black calc(100% - 32px), transparent); }
 .tasma-wpisy::-webkit-scrollbar { display: none; }
 .tasma-wpis { display: inline-flex; align-items: center; gap: 8px; flex: none; height: 36px; padding: 0 12px 0 4px; border-radius: 18px; background: var(--tlo-2); font-size: 13px; color: var(--tekst-2); text-decoration: none; white-space: nowrap; transition: background var(--szybko); animation: wjazd 0.4s ease-out; }
 .tasma-wpis:hover { background: var(--tlo-3); }
@@ -909,10 +911,12 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 
 /* ---------- stopka i dolna nawigacja ---------- */
 .stopka-strony { border-top: 1px solid var(--linia); color: var(--mute); font-size: 13px; }
-.stopka-wnetrze { max-width: 1320px; margin: 0 auto; padding: 16px 16px calc(var(--dol-nav-h) + 76px); display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+/* na telefonie link i zastrzeżenie stoją jedno pod drugim od lewej; na szerokim ekranie rozchodzą się na boki */
+.stopka-wnetrze { max-width: 1320px; margin: 0 auto; padding: 16px 16px calc(var(--dol-nav-h) + 20px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; align-items: center; }
+/* na stronie rynku nad nawigacją leży jeszcze pasek szybkiej prognozy */
+@media (max-width: 999px) { body:has(.szybki-pasek) .stopka-wnetrze { padding-bottom: calc(var(--dol-nav-h) + 84px + env(safe-area-inset-bottom)); } }
 .stopka-wnetrze a { color: var(--mute); text-decoration: none; font-weight: 500; }
 .stopka-wnetrze a:hover { color: var(--tekst); }
-.stopka-wnetrze .prawy { margin-left: auto; }
 @media (min-width: 900px) { .stopka-wnetrze { padding: 18px 24px; } }
 .dol-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; background: var(--tlo); border-top: 1px solid var(--linia); display: flex; justify-content: space-around; padding: 0 0 env(safe-area-inset-bottom); }
 .dol-nav a, .dol-nav button { flex: 1; height: var(--dol-nav-h); text-align: center; text-decoration: none; color: var(--mute); font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: 0; font-family: inherit; cursor: pointer; position: relative; transition: color var(--szybko); }

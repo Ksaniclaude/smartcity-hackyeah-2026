@@ -551,7 +551,7 @@ function ModalJakToDziala() {
           <b>1</b>
           <div>
             <strong>Wybierz pytanie</strong>
-            <span>Od miejskich inwestycji po celebrytów. Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
+            <span>Od miejskich inwestycji po życie celebrytów. Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
           </div>
         </div>
         <div className="krok">

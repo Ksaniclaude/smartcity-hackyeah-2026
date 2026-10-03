@@ -13,7 +13,7 @@ export default function Start() {
     <main className="ekran">
       <h1 className="start-tytul">Polski rynek prognoz</h1>
       <p className="mala">
-        Bez złotówek: stawiasz punkty na to, co wydarzy się w Polsce, a kurs pokazuje, ile ludzie w to wierzą.
+        Stawiasz punkty zamiast złotówek na to, co wydarzy się w Polsce. Kurs pokazuje, jak bardzo ludzie w to wierzą.
       </p>
       <div className="karta">
         <h3>{konto ? "Jeszcze nick" : "Ten ekran wymaga konta"}</h3>

@@ -529,8 +529,8 @@ export default function Lista() {
               <div className="czolowka-haslo">
                 <h1>Polski rynek prognoz</h1>
                 <p>
-                  Bez złotówek: stawiasz punkty na to, co wydarzy się w Polsce, od miejskich inwestycji po celebrytów,
-                  a kurs pokazuje, ile ludzie w to wierzą.
+                  Stawiasz punkty zamiast złotówek na to, co wydarzy się w Polsce: od miejskich inwestycji po życie
+                  celebrytów. Kurs pokazuje, jak bardzo ludzie w to wierzą.
                 </p>
                 {odsetek != null ? (
                   <p className="czolowka-liczba">
