@@ -374,7 +374,9 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .profil-naglowek .pod { color: var(--mute); font-size: 0.85rem; }
 
 /* ---------- tabele ---------- */
-.tabela-owijka { overflow-x: auto; border: 1px solid var(--linia); border-radius: var(--r); margin: 10px 0; background: var(--karta); }
+.tabela-owijka { overflow-x: auto; border: 1px solid var(--linia); border-radius: var(--r); margin: 10px 0; background: var(--karta); -webkit-overflow-scrolling: touch; }
+.tabela-owijka .tabela { min-width: 640px; }
+.tabela td:first-child { min-width: 200px; }
 .tabela { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--karta); }
 .tabela th, .tabela td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--linia); vertical-align: top; }
 .tabela tr:last-child td { border-bottom: 0; }
