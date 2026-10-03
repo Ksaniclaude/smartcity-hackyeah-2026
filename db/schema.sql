@@ -51,6 +51,9 @@ create table public.pytania (
   zaproponowal          uuid references public.gracze (id) on delete set null,
   utworzono             timestamptz not null default now(),
   rozstrzygnieto        timestamptz,
+  obrot                 numeric(14, 4) not null default 0 check (obrot >= 0),
+  kursy_otwarcia        double precision[],
+  otwarto               timestamptz,
   constraint odpowiedzi_2_3 check (array_length(odpowiedzi, 1) between 2 and 3),
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
   constraint wynik_zakres check (wynik is null or wynik between 1 and array_length(odpowiedzi, 1)),
@@ -80,6 +83,8 @@ create table public.transakcje (
   kurs_po     double precision not null,
   powod       public.powod,
   komentarz   text,
+  kursy_rynku double precision[],
+  typ         text not null default 'kupno' check (typ in ('kupno', 'sprzedaz')),
   czas        timestamptz not null default now()
 );
 create index transakcje_pytanie on public.transakcje (pytanie, czas);
@@ -93,6 +98,16 @@ create table public.zmiany_terminow (
   link          text not null,
   czas          timestamptz not null default now()
 );
+
+-- Komentarze bez zakładu (komentarz przy zakładzie siedzi w transakcje.komentarz).
+create table public.komentarze (
+  id       bigint generated always as identity primary key,
+  pytanie  bigint not null references public.pytania (id) on delete cascade,
+  gracz    uuid not null references public.gracze (id) on delete cascade,
+  tresc    text not null check (char_length(tresc) between 1 and 500),
+  czas     timestamptz not null default now()
+);
+create index komentarze_pytanie on public.komentarze (pytanie, czas);
 
 -- Ustawienia (np. hasło admina jako hash bcrypt). Niedostępne z API.
 create table public.ustawienia (
@@ -309,7 +324,7 @@ begin
 
   -- 4. zapis
   update public.pytania
-     set q = v_q, liczba_prognoz = liczba_prognoz + 1
+     set q = v_q, liczba_prognoz = liczba_prognoz + 1, obrot = obrot + p_stawka
    where id = p_pytanie;
   update public.gracze set saldo = saldo - p_stawka where id = v_gracz;
   insert into public.pozycje (gracz, pytanie, odpowiedz, udzialy, wydane_punkty)
@@ -318,9 +333,9 @@ begin
     set udzialy = public.pozycje.udzialy + excluded.udzialy,
         wydane_punkty = public.pozycje.wydane_punkty + excluded.wydane_punkty;
   insert into public.transakcje
-    (gracz, pytanie, odpowiedz, stawka, udzialy, kurs_przed, kurs_po, powod, komentarz)
+    (gracz, pytanie, odpowiedz, stawka, udzialy, kurs_przed, kurs_po, powod, komentarz, kursy_rynku)
   values
-    (v_gracz, p_pytanie, p_odpowiedz, p_stawka, v_udzialy, v_kurs_przed, v_kurs_po, p_powod, v_komentarz);
+    (v_gracz, p_pytanie, p_odpowiedz, p_stawka, v_udzialy, v_kurs_przed, v_kurs_po, p_powod, v_komentarz, v_kursy);
 
   -- 5. nowe kursy
   return jsonb_build_object(
@@ -332,7 +347,86 @@ begin
     'kurs_po', v_kurs_po,
     'kursy', to_jsonb(v_kursy),
     'saldo', v_saldo - p_stawka,
-    'liczba_prognoz', p.liczba_prognoz + 1
+    'liczba_prognoz', p.liczba_prognoz + 1,
+    'obrot', p.obrot + p_stawka
+  );
+end $$;
+
+-- Sprzedaż udziałów (jak „Sell” na giełdach prognoz). LMSR: zwrot = C(q) - C(q'),
+-- gdzie q'_i = q_i - u. Zwrot zaokrąglany w dół do 0,0001 pkt, więc rynek nigdy nie dopłaca.
+-- Koszt pozycji (wydane_punkty) maleje proporcjonalnie do sprzedanych udziałów.
+create or replace function public.sprzedaj_udzialy(p_pytanie bigint, p_odpowiedz integer, p_udzialy double precision)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_gracz uuid := public.biezacy_gracz();
+  p public.pytania;
+  z public.pozycje;
+  n integer;
+  m double precision;
+  m2 double precision;
+  s double precision;
+  s2 double precision;
+  v_q double precision[];
+  v_udzialy double precision;
+  v_zwrot_d double precision;
+  v_zwrot numeric;
+  v_kurs_przed double precision;
+  v_kurs_po double precision;
+  v_kursy double precision[];
+  v_saldo numeric;
+  v_wydane_po numeric;
+begin
+  select * into p from public.pytania where id = p_pytanie for update;
+  if not found then raise exception 'Nie ma takiego pytania'; end if;
+  if p.status <> 'otwarte' then raise exception 'Pytanie nie jest otwarte'; end if;
+  if p.termin < current_date then raise exception 'Termin pytania minął'; end if;
+  n := array_length(p.odpowiedzi, 1);
+  if p_odpowiedz is null or p_odpowiedz < 1 or p_odpowiedz > n then raise exception 'Nie ma takiej odpowiedzi'; end if;
+  select * into z from public.pozycje
+   where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz for update;
+  if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
+  v_udzialy := least(coalesce(p_udzialy, 0), z.udzialy);
+  if v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
+  if z.udzialy - v_udzialy < 1e-6 then v_udzialy := z.udzialy; end if;
+  select saldo into v_saldo from public.gracze where id = v_gracz for update;
+
+  -- C(q) i C(q') przez log-sum-exp
+  m := (select max(x / p.b) from unnest(p.q) as x);
+  s := (select sum(exp(x / p.b - m)) from unnest(p.q) as x);
+  v_kurs_przed := exp(p.q[p_odpowiedz] / p.b - m) / s;
+  v_q := p.q;
+  v_q[p_odpowiedz] := v_q[p_odpowiedz] - v_udzialy;
+  m2 := (select max(x / p.b) from unnest(v_q) as x);
+  s2 := (select sum(exp(x / p.b - m2)) from unnest(v_q) as x);
+  v_zwrot_d := p.b * ((m + ln(s)) - (m2 + ln(s2)));
+  if v_zwrot_d is null or v_zwrot_d <= 0 then raise exception 'Błąd liczenia zwrotu'; end if;
+  v_zwrot := floor(v_zwrot_d * 10000)::numeric / 10000;
+  if v_zwrot <= 0 then raise exception 'Za mało udziałów, żeby coś odzyskać'; end if;
+  v_kursy := public.kursy(v_q, p.b);
+  v_kurs_po := v_kursy[p_odpowiedz];
+  v_wydane_po := case when z.udzialy - v_udzialy <= 0 then 0
+                      else round(z.wydane_punkty * ((z.udzialy - v_udzialy) / z.udzialy)::numeric, 4) end;
+
+  update public.pytania set q = v_q, obrot = obrot + v_zwrot where id = p_pytanie;
+  update public.gracze set saldo = saldo + v_zwrot where id = v_gracz;
+  update public.pozycje set udzialy = z.udzialy - v_udzialy, wydane_punkty = v_wydane_po
+   where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz;
+  insert into public.transakcje
+    (gracz, pytanie, odpowiedz, stawka, udzialy, kurs_przed, kurs_po, kursy_rynku, typ)
+  values
+    (v_gracz, p_pytanie, p_odpowiedz, v_zwrot, v_udzialy, v_kurs_przed, v_kurs_po, v_kursy, 'sprzedaz');
+
+  return jsonb_build_object(
+    'pytanie', p_pytanie,
+    'odpowiedz', p_odpowiedz,
+    'udzialy', v_udzialy,
+    'zwrot', v_zwrot,
+    'kurs_przed', v_kurs_przed,
+    'kurs_po', v_kurs_po,
+    'kursy', to_jsonb(v_kursy),
+    'saldo', v_saldo + v_zwrot,
+    'udzialy_pozostale', z.udzialy - v_udzialy
   );
 end $$;
 
@@ -516,7 +610,9 @@ begin
     end if;
     update public.pytania set q = public.q_z_kursu(p_kurs_otwarcia, b) where id = p_pytanie;
   end if;
-  update public.pytania set status = 'otwarte' where id = p_pytanie;
+  update public.pytania
+     set status = 'otwarte', otwarto = now(), kursy_otwarcia = public.kursy(q, b)
+   where id = p_pytanie;
 end $$;
 
 create or replace function public.admin_zamknij(p_pytanie bigint)
@@ -658,7 +754,8 @@ select
      or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')) as kurs_widoczny,
   public.kursy_pytania(p.id) as kursy,
   public.prog_widocznosci_kursu() as prog_widocznosci,
-  (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu
+  (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu,
+  p.obrot, p.otwarto, p.kursy_otwarcia
 from public.pytania p
 where p.status <> 'propozycja';
 
@@ -686,12 +783,236 @@ language sql stable security definer set search_path = public, pg_temp as $$
   limit greatest(1, least(coalesce(p_limit, 20), 100))
 $$;
 
+-- Historia kursów do wykresu: punkt otwarcia i stan po każdej prognozie.
+-- Pusta, dopóki kurs jest ukryty (ten sam próg co kursy_pytania).
+create or replace function public.historia_kursu(p_pytanie bigint)
+returns table (czas timestamptz, kursy double precision[])
+language sql stable security definer set search_path = public, pg_temp as $$
+  with p as (
+    select * from public.pytania
+    where id = p_pytanie and status <> 'propozycja'
+      and (liczba_prognoz >= public.prog_widocznosci_kursu()
+           or status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
+  )
+  select h.czas, h.kursy from (
+    select coalesce(p.otwarto, p.utworzono) as czas, p.kursy_otwarcia as kursy from p
+    union all
+    select t.czas,
+           coalesce(t.kursy_rynku,
+                    case when array_length(p.odpowiedzi, 1) = 2 then
+                      case when t.odpowiedz = 1 then array[t.kurs_po, 1 - t.kurs_po]
+                           else array[1 - t.kurs_po, t.kurs_po] end
+                    end)
+    from public.transakcje t join p on p.id = t.pytanie
+  ) h
+  where h.kursy is not null
+  order by h.czas
+$$;
+
+-- Aktywność: ostatnie prognozy (jednego pytania albo wszystkich), z nickiem.
+-- Kurs po zakładzie tylko, gdy kurs pytania jest widoczny. Sprzedaż: udziały ujemne, stawka = zwrot.
+create or replace function public.aktywnosc(p_pytanie bigint default null, p_limit integer default 30)
+returns table (id bigint, pytanie bigint, tresc text, kategoria public.kategoria, nick text,
+               odpowiedz smallint, odpowiedz_tekst text, stawka numeric, udzialy double precision,
+               kurs_po double precision, powod public.powod, komentarz text, czas timestamptz)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select t.id, t.pytanie, p.tresc, p.kategoria, g.nick, t.odpowiedz, p.odpowiedzi[t.odpowiedz],
+         t.stawka, case when t.typ = 'sprzedaz' then -t.udzialy else t.udzialy end,
+         case when p.liczba_prognoz >= public.prog_widocznosci_kursu()
+                or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')
+              then t.kurs_po end,
+         t.powod, t.komentarz, t.czas
+  from public.transakcje t
+  join public.pytania p on p.id = t.pytanie
+  join public.gracze g on g.id = t.gracz
+  where p.status <> 'propozycja' and (p_pytanie is null or t.pytanie = p_pytanie)
+  order by t.czas desc, t.id desc
+  limit greatest(1, least(coalesce(p_limit, 30), 100))
+$$;
+
+-- Komentarze przy pytaniu: z zakładów (transakcje.komentarz) i samodzielne (komentarze),
+-- z nickiem i głównym typem autora na tym pytaniu. Ujemne id = komentarz samodzielny.
+create or replace function public.komentarze_rynku(p_pytanie bigint, p_limit integer default 30)
+returns table (id bigint, nick text, odpowiedz smallint, odpowiedz_tekst text, powod public.powod,
+               komentarz text, stawka numeric, czas timestamptz)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with p as (
+    select * from public.pytania where id = p_pytanie and status <> 'propozycja'
+  ),
+  poz as (
+    select z.gracz,
+           (array_agg(z.odpowiedz order by z.wydane_punkty desc, z.odpowiedz))[1] as odpowiedz,
+           sum(z.wydane_punkty) as wydane
+    from public.pozycje z where z.pytanie = p_pytanie group by z.gracz
+  )
+  select u.id, u.nick, u.odpowiedz, u.odpowiedz_tekst, u.powod, u.komentarz, u.stawka, u.czas from (
+    select t.id, g.nick, t.odpowiedz, p.odpowiedzi[t.odpowiedz] as odpowiedz_tekst, t.powod, t.komentarz, t.stawka, t.czas
+    from public.transakcje t join p on p.id = t.pytanie join public.gracze g on g.id = t.gracz
+    where t.komentarz is not null
+    union all
+    select -k.id, g.nick, poz.odpowiedz,
+           case when poz.odpowiedz is not null then p.odpowiedzi[poz.odpowiedz] end,
+           null::public.powod, k.tresc, coalesce(poz.wydane, 0), k.czas
+    from public.komentarze k join p on p.id = k.pytanie join public.gracze g on g.id = k.gracz
+    left join poz on poz.gracz = k.gracz
+  ) u
+  order by u.czas desc
+  limit greatest(1, least(coalesce(p_limit, 30), 100))
+$$;
+
+-- Komentarz bez zakładu. Wymaga nicku; prosty limit tempa.
+create or replace function public.dodaj_komentarz(p_pytanie bigint, p_tresc text)
+returns bigint
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_gracz uuid := public.biezacy_gracz();
+  v_tresc text := btrim(coalesce(p_tresc, ''));
+  v_id bigint;
+  v_ostatni timestamptz;
+begin
+  if not exists (select 1 from public.pytania where id = p_pytanie and status <> 'propozycja') then
+    raise exception 'Nie ma takiego pytania';
+  end if;
+  if char_length(v_tresc) < 1 then raise exception 'Komentarz jest pusty'; end if;
+  if char_length(v_tresc) > 500 then raise exception 'Komentarz: najwyżej 500 znaków'; end if;
+  select max(czas) into v_ostatni from public.komentarze where gracz = v_gracz;
+  if v_ostatni is not null and v_ostatni > now() - interval '10 seconds' then
+    raise exception 'Za szybko, odczekaj chwilę';
+  end if;
+  insert into public.komentarze (pytanie, gracz, tresc) values (p_pytanie, v_gracz, v_tresc) returning id into v_id;
+  return v_id;
+end $$;
+
+-- Najwięksi gracze na pytaniu (najwięcej udziałów), do zakładki „Najwięksi gracze”.
+create or replace function public.najwieksi_gracze(p_pytanie bigint, p_limit integer default 30)
+returns table (nick text, odpowiedz smallint, odpowiedz_tekst text, udzialy double precision, wydane numeric)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select g.nick, z.odpowiedz, p.odpowiedzi[z.odpowiedz], z.udzialy, z.wydane_punkty
+  from public.pozycje z
+  join public.pytania p on p.id = z.pytanie
+  join public.gracze g on g.id = z.gracz
+  where z.pytanie = p_pytanie and p.status <> 'propozycja' and z.udzialy > 0
+  order by z.udzialy desc, g.nick
+  limit greatest(1, least(coalesce(p_limit, 30), 100))
+$$;
+
+-- Ranking graczy (tylko ci, którzy coś postawili). Portfel = saldo + wartość
+-- udziałów w otwartych pytaniach (po bieżącym kursie; po koszcie, dopóki kurs
+-- ukryty). Trafność liczona jak w profilu: główny typ vs wynik.
+create or replace function public.ranking(p_limit integer default 50)
+returns table (nick text, saldo numeric, wartosc_pozycji double precision, portfel double precision,
+               zysk double precision, prognozy integer, obrot numeric, trafione integer, rozstrzygniete integer)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with poz as (
+    select z.gracz,
+           sum(case
+                 when p.status not in ('otwarte', 'zamkniete') then 0
+                 when p.liczba_prognoz >= public.prog_widocznosci_kursu() or p.status = 'zamkniete'
+                   then z.udzialy * (public.kursy(p.q, p.b))[z.odpowiedz]
+                 else z.wydane_punkty::double precision
+               end) as wartosc
+    from public.pozycje z join public.pytania p on p.id = z.pytanie
+    group by z.gracz
+  ),
+  tr as (
+    select t.gracz, count(*) filter (where t.typ = 'kupno')::integer as prognozy, sum(t.stawka) as obrot
+    from public.transakcje t group by t.gracz
+  ),
+  wyn as (
+    select w.gracz,
+           count(*) filter (where w.odpowiedz_glowna = p.wynik)::integer as trafione,
+           count(*)::integer as rozstrzygniete
+    from (
+      select z.gracz, z.pytanie,
+             (array_agg(z.odpowiedz order by z.wydane_punkty desc, z.odpowiedz))[1] as odpowiedz_glowna
+      from public.pozycje z group by z.gracz, z.pytanie
+    ) w
+    join public.pytania p on p.id = w.pytanie and p.status = 'rozstrzygniete'
+    group by w.gracz
+  )
+  select g.nick, g.saldo, coalesce(poz.wartosc, 0),
+         g.saldo::double precision + coalesce(poz.wartosc, 0),
+         g.saldo::double precision + coalesce(poz.wartosc, 0) - 1000,
+         tr.prognozy, tr.obrot, coalesce(wyn.trafione, 0), coalesce(wyn.rozstrzygniete, 0)
+  from public.gracze g
+  join tr on tr.gracz = g.id
+  left join poz on poz.gracz = g.id
+  left join wyn on wyn.gracz = g.id
+  order by 4 desc, g.nick
+  limit greatest(1, least(coalesce(p_limit, 50), 200))
+$$;
+
+-- Publiczny profil gracza po nicku: statystyki, pozycje (wartość po kursie, po koszcie
+-- gdy kurs ukryty), ostatnia aktywność. Null, gdy nie ma takiego nicku.
+create or replace function public.profil_publiczny(p_nick text)
+returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  with g as (
+    select * from public.gracze where lower(nick) = lower(btrim(coalesce(p_nick, ''))) limit 1
+  ),
+  poz as (
+    select z.pytanie, p.tresc, p.kategoria, p.odpowiedzi, p.status, p.wynik, p.termin,
+           z.odpowiedz, z.udzialy, z.wydane_punkty as wydane,
+           (public.kursy_pytania(p.id))[z.odpowiedz] as kurs,
+           case
+             when p.status = 'rozstrzygniete' then case when p.wynik = z.odpowiedz then z.udzialy else 0 end
+             when p.status = 'uniewaznione' then 0
+             when public.kursy_pytania(p.id) is null then z.wydane_punkty::double precision
+             else z.udzialy * (public.kursy_pytania(p.id))[z.odpowiedz]
+           end as wartosc
+    from public.pozycje z
+    join g on g.id = z.gracz
+    join public.pytania p on p.id = z.pytanie
+    where p.status <> 'propozycja' and (z.udzialy > 0 or z.wydane_punkty > 0)
+  ),
+  tr as (
+    select count(*) filter (where t.typ = 'kupno')::integer as prognozy, coalesce(sum(t.stawka), 0) as obrot
+    from public.transakcje t join g on g.id = t.gracz
+  ),
+  wyn as (
+    select count(*) filter (where w.odpowiedz_glowna = p.wynik)::integer as trafione, count(*)::integer as rozstrzygniete
+    from (
+      select z.pytanie, (array_agg(z.odpowiedz order by z.wydane_punkty desc, z.odpowiedz))[1] as odpowiedz_glowna
+      from public.pozycje z join g on g.id = z.gracz group by z.pytanie
+    ) w
+    join public.pytania p on p.id = w.pytanie and p.status = 'rozstrzygniete'
+  ),
+  wygrana as (
+    select coalesce(max(z.udzialy), 0) as najwieksza
+    from public.pozycje z join g on g.id = z.gracz
+    join public.pytania p on p.id = z.pytanie and p.status = 'rozstrzygniete' and p.wynik = z.odpowiedz
+  ),
+  akt as (
+    select t.id, t.pytanie, p.tresc, p.kategoria, g.nick, t.odpowiedz, p.odpowiedzi[t.odpowiedz] as odpowiedz_tekst,
+           t.stawka, case when t.typ = 'sprzedaz' then -t.udzialy else t.udzialy end as udzialy,
+           case when p.liczba_prognoz >= public.prog_widocznosci_kursu()
+                  or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione') then t.kurs_po end as kurs_po,
+           t.powod, t.komentarz, t.czas
+    from public.transakcje t join g on g.id = t.gracz join public.pytania p on p.id = t.pytanie
+    where p.status <> 'propozycja'
+    order by t.czas desc, t.id desc
+    limit 30
+  )
+  select case when not exists (select 1 from g) then null else jsonb_build_object(
+    'nick', (select nick from g),
+    'utworzono', (select utworzono from g),
+    'prognozy', (select prognozy from tr),
+    'obrot', (select obrot from tr),
+    'wartosc_pozycji', coalesce((select sum(wartosc) from poz where status in ('otwarte', 'zamkniete')), 0),
+    'najwieksza_wygrana', (select najwieksza from wygrana),
+    'trafione', coalesce((select trafione from wyn), 0),
+    'rozstrzygniete', coalesce((select rozstrzygniete from wyn), 0),
+    'pozycje', coalesce((select jsonb_agg(to_jsonb(poz) order by poz.termin desc, poz.pytanie desc) from poz), '[]'::jsonb),
+    'aktywnosc', coalesce((select jsonb_agg(to_jsonb(akt) order by akt.czas desc) from akt), '[]'::jsonb)
+  ) end
+$$;
+
 -- Moje pozycje i wyniki: RLS na pozycje ogranicza do własnych wierszy.
 create view public.v_moje_pozycje with (security_invoker = true) as
 with moje as (
   select z.pytanie, z.odpowiedz, z.udzialy, z.wydane_punkty
   from public.pozycje z
-  where z.gracz = auth.uid()
+  where z.gracz = auth.uid() and (z.udzialy > 0 or z.wydane_punkty > 0)
 ),
 wybor as (
   select pytanie,
@@ -704,7 +1025,15 @@ select
   w.odpowiedz_glowna, w.wydane,
   coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = p.wynik), 0) as wyplata,
   case when p.status = 'rozstrzygniete' then (w.odpowiedz_glowna = p.wynik) end as trafione,
-  public.kursy_pytania(p.id) as kursy
+  public.kursy_pytania(p.id) as kursy,
+  coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = w.odpowiedz_glowna), 0) as udzialy_glowne,
+  -- wartość: udziały po bieżącym kursie; po koszcie, dopóki kurs ukryty; wypłata po rozstrzygnięciu
+  case
+    when p.status = 'rozstrzygniete' then coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = p.wynik), 0)
+    when p.status = 'uniewaznione' then 0
+    when public.kursy_pytania(p.id) is null then w.wydane::double precision
+    else (select sum(m.udzialy * (public.kursy_pytania(p.id))[m.odpowiedz]) from moje m where m.pytanie = p.id)
+  end as wartosc
 from wybor w
 join public.pytania p on p.id = w.pytanie;
 
@@ -717,6 +1046,7 @@ alter table public.pozycje enable row level security;
 alter table public.transakcje enable row level security;
 alter table public.zmiany_terminow enable row level security;
 alter table public.ustawienia enable row level security;
+alter table public.komentarze enable row level security;
 
 -- Supabase domyślnie daje anon/authenticated pełne prawa do nowych tabel: cofamy.
 revoke all on all tables in schema public from anon, authenticated;
@@ -734,7 +1064,8 @@ create policy zmiany_publiczne on public.zmiany_terminow for select to anon, aut
 -- Pytania: publiczne poza propozycjami, ale bez kolumny q (stan rynku) —
 -- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
 grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
-              wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto)
+              wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto, obrot, otwarto,
+              kursy_otwarcia)
   on public.pytania to anon, authenticated;
 create policy pytania_publiczne on public.pytania for select to anon, authenticated
   using (status <> 'propozycja');
@@ -743,12 +1074,23 @@ create policy pytania_publiczne on public.pytania for select to anon, authentica
 grant select on public.v_pytania to anon, authenticated;
 grant select on public.v_moje_pozycje to authenticated;
 grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
+grant execute on function public.prog_widocznosci_kursu() to anon, authenticated;
+grant execute on function public.limit_na_pytanie() to anon, authenticated;
+grant execute on function public.limit_otwartych(public.kategoria) to anon, authenticated;
 grant execute on function public.rozklad_powodow() to anon, authenticated;
 grant execute on function public.komentarze_pytania(bigint, integer) to anon, authenticated;
+grant execute on function public.historia_kursu(bigint) to anon, authenticated;
+grant execute on function public.aktywnosc(bigint, integer) to anon, authenticated;
+grant execute on function public.komentarze_rynku(bigint, integer) to anon, authenticated;
+grant execute on function public.dodaj_komentarz(bigint, text) to authenticated;
+grant execute on function public.najwieksi_gracze(bigint, integer) to anon, authenticated;
+grant execute on function public.ranking(integer) to anon, authenticated;
+grant execute on function public.profil_publiczny(text) to anon, authenticated;
 
 -- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated).
 grant execute on function public.ustaw_nick(text) to authenticated;
 grant execute on function public.postaw_prognoze(bigint, integer, integer, public.powod, text) to authenticated;
+grant execute on function public.sprzedaj_udzialy(bigint, integer, double precision) to authenticated;
 grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date, text) to authenticated;
 grant execute on function public.admin_zaloguj(text) to authenticated;
 grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean) to authenticated;
