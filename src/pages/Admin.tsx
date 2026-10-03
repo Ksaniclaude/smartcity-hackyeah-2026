@@ -14,7 +14,7 @@ import {
 } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja } from "@/api/sesja";
-import { ETYKIETY_STATUSU, TEMATY_WYKLUCZONE, type Kategoria, type PytanieAdmin } from "@/api/types";
+import { ETYKIETY_STATUSU, ZASADY_PYTANIA, type Kategoria, type PytanieAdmin } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { useAkcja, usePolling } from "@/ui/hooks";
 import { Komunikat, Ladowanie, Odznaka, formatujDate } from "@/ui/komponenty";
@@ -201,7 +201,7 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
         <span>otwórz od razu (limit: 3 „miasto”, 5 „na luzie”)</span>
       </label>
       <Komunikat typ="ostrz">
-        Tematy wykluczone: {TEMATY_WYKLUCZONE.join(", ")}. Bez kryterium, linku i daty pytania nie da się otworzyć.
+        Każdy temat jest dozwolony. Zasady: {ZASADY_PYTANIA.join("; ")}. Bez kryterium, linku i daty pytania nie da się otworzyć.
       </Komunikat>
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {ok ? <Komunikat typ="ok">{ok}</Komunikat> : null}

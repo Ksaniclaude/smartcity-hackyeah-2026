@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { zaproponujPytanie } from "@/api/api";
-import { TEMATY_WYKLUCZONE, type Kategoria } from "@/api/types";
+import { ZASADY_PYTANIA, type Kategoria } from "@/api/types";
 import { useAkcja } from "@/ui/hooks";
 import { Komunikat } from "@/ui/komponenty";
 
@@ -61,7 +61,7 @@ export default function Zaproponuj() {
           <span className="etykieta">Link do publicznego źródła</span>
           <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" required />
         </label>
-        <p className="pomoc">Tematy wykluczone: {TEMATY_WYKLUCZONE.join(", ")}.</p>
+        <p className="pomoc">Każdy temat jest dozwolony. Zasady: {ZASADY_PYTANIA.join("; ")}.</p>
         {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
         <button className="przycisk" type="submit" disabled={trwa}>
           {trwa ? "Wysyłam…" : "Wyślij propozycję"}

@@ -438,7 +438,7 @@ async function main() {
     await page.getByLabel("Hasło").fill("tajne");
     await page.getByRole("button", { name: "Zaloguj" }).click();
     await oczekuj(page, "Dodaj pytanie");
-    await oczekuj(page, "wyniki sportowe");
+    await oczekuj(page, "Każdy temat jest dozwolony");
     await zrzut(page, "admin");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });

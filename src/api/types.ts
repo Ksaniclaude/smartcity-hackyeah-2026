@@ -18,11 +18,11 @@ export const ETYKIETY_STATUSU: Record<Status, string> = {
   uniewaznione: "unieważnione",
 };
 
-export const TEMATY_WYKLUCZONE = [
-  "wyniki sportowe",
-  "wybory i kandydaci",
-  "konkretne osoby prywatne",
-  "wypadki i zgony",
+/** Jedyne zasady treści rynku. Tematy nie są ograniczone. */
+export const ZASADY_PYTANIA = [
+  "publiczne źródło (jakiekolwiek, z linkiem)",
+  "nic zmyślonego: treść, termin i kryterium z tego źródła",
+  "wypadki tylko jako śmieszna sprawa, nigdy o ofiarach",
 ];
 
 /** Wiersz widoku v_pytania. */
