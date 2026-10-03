@@ -1101,6 +1101,22 @@ language sql stable security definer set search_path = public, pg_temp as $$
   limit greatest(1, least(coalesce(p_limit, 50), 200))
 $$;
 
+-- Gracze, których nick zawiera frazę (bez rozróżniania wielkości liter). Najpierw nicki zaczynające się
+-- od frazy, potem według miejsca w rankingu. Gracze bez prognoz też się znajdą (miejsce null, portfel = saldo).
+-- Zwraca tylko dane już publiczne (nick, portfel i liczba prognoz są w rankingu i profilu publicznym).
+create or replace function public.szukaj_graczy(p_q text, p_limit integer default 8)
+returns table (nick text, portfel double precision, prognozy integer, miejsce integer)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with q as (select lower(btrim(coalesce(p_q, ''))) as fraza)
+  select g.nick, coalesce(r.portfel, g.saldo::double precision), coalesce(r.prognozy, 0), r.miejsce
+  from public.gracze g
+  cross join q
+  left join public.ranking_graczy() r on r.gracz = g.id
+  where q.fraza <> '' and position(q.fraza in lower(g.nick)) > 0
+  order by (position(q.fraza in lower(g.nick)) = 1) desc, r.miejsce nulls last, lower(g.nick)
+  limit greatest(1, least(coalesce(p_limit, 8), 50))
+$$;
+
 -- Publiczny profil gracza po nicku: statystyki, pozycje (wartość sprzedaży teraz, po koszcie
 -- gdy kurs ukryty), ostatnia aktywność. Null, gdy nie ma takiego nicku.
 create or replace function public.profil_publiczny(p_nick text)
@@ -1251,6 +1267,7 @@ grant execute on function public.dodaj_komentarz(bigint, text) to authenticated;
 grant execute on function public.najwieksi_gracze(bigint, integer) to anon, authenticated;
 grant execute on function public.ranking(integer) to anon, authenticated;
 grant execute on function public.profil_publiczny(text) to anon, authenticated;
+grant execute on function public.szukaj_graczy(text, integer) to anon, authenticated;
 
 -- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated).
 grant execute on function public.ustaw_nick(text) to authenticated;

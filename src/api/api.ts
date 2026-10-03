@@ -18,6 +18,7 @@ import type {
   WynikSprzedazy,
   WynikZakladu,
   ZmianaTerminu,
+  ZnalezionyGracz,
 } from "./types";
 
 /** Zamienia błąd Supabase/PostgREST na czytelny komunikat po polsku. */
@@ -152,6 +153,14 @@ export async function pobierzNajwiekszych(pytanie: number, limit = 30): Promise<
 export async function pobierzRanking(limit = 50): Promise<WpisRankingu[]> {
   const r = await supabase.rpc("ranking", { p_limit: limit });
   return (sprawdz<WpisRankingu[]>(r) ?? []).map((w) => ({ ...w, saldo: Number(w.saldo), obrot: Number(w.obrot) }));
+}
+
+export async function szukajGraczy(q: string, limit = 8): Promise<ZnalezionyGracz[]> {
+  const fraza = q.trim();
+  if (!fraza) return [];
+  const r = await supabase.rpc("szukaj_graczy", { p_q: fraza, p_limit: limit });
+  if (r.error) throw r.error;
+  return (r.data ?? []) as ZnalezionyGracz[];
 }
 
 export async function pobierzPowody(): Promise<RozkladPowodu[]> {
