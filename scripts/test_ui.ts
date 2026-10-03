@@ -47,6 +47,7 @@ const stan = {
   email: undefined as string | undefined,
   prognozy: 0,
   sprzedaze: 0,
+  ostatniaSprzedaz: 0,
   komentarze: [] as { id: number; nick: string; odpowiedz: number | null; odpowiedz_tekst: string | null; powod: string | null; komentarz: string; stawka: number; czas: string }[],
   pozycje: new Map<string, { pytanie: number; odpowiedz: number; udzialy: number; wydane: number }>(),
 };
@@ -269,6 +270,7 @@ async function mock(route: Route) {
     const z = stan.pozycje.get(klucz);
     if (!stan.gracz || !z || z.udzialy <= 0) return json(route, { message: "Nie masz udziałów na tę odpowiedź" }, 400);
     const u = Math.min(body.p_udzialy, z.udzialy);
+    stan.ostatniaSprzedaz = body.p_udzialy;
     const zwrot = Math.round(u * 0.42 * 10000) / 10000;
     z.udzialy -= u;
     stan.gracz.saldo += zwrot;
@@ -445,10 +447,30 @@ async function main() {
     await oczekuj(page, "Trzymam kciuki za ZDMK");
 
     console.log("5. Sprzedaż udziałów");
+    // pozycja z końcówką, która zaokrąglona do 0,1 wychodzi w górę (np. 23,7624 → 23,8, więcej niż jest)
+    const naRynku = Number(new URL(page.url()).pathname.split("/").pop());
+    const poz = [...stan.pozycje.values()].find((z) => z.pytanie === naRynku && z.udzialy > 1);
+    if (!poz) throw new Error("Brak pozycji do testu sprzedaży");
+    poz.udzialy = Math.floor(poz.udzialy) + 0.7624;
+    const pelna = poz.udzialy;
+    const wDol = (x: number) => Math.floor(x * 10 + 1e-9) / 10;
+    await page.reload();
     await page.getByRole("tab", { name: "Sprzedaj", exact: true }).first().click();
+    await oczekuj(page, `masz ${wDol(pelna).toLocaleString("pl-PL", { minimumFractionDigits: 1 })}`);
+    const poleSprzedazy = page.getByLabel("Liczba udziałów do sprzedania");
+    await page.getByRole("button", { name: "50%", exact: true }).click();
+    if (Number(await poleSprzedazy.inputValue()) !== wDol(pelna / 2)) throw new Error(`50%: ${await poleSprzedazy.inputValue()} zamiast ${wDol(pelna / 2)}`);
     await page.getByRole("button", { name: /Wszystko/ }).first().click();
+    if (Number(await poleSprzedazy.inputValue()) !== wDol(pelna)) throw new Error(`Wszystko: ${await poleSprzedazy.inputValue()} zamiast ${wDol(pelna)}`);
+    const walidacja = await poleSprzedazy.evaluate((el) => (el as HTMLInputElement).validationMessage);
+    if (walidacja) throw new Error(`Pole sprzedaży odrzucone przez przeglądarkę: ${walidacja}`);
+    console.log(`  ✓ ${pelna} udz.: pole ${wDol(pelna)}, 50% = ${wDol(pelna / 2)}, przeglądarka przyjmuje`);
+    await poleSprzedazy.scrollIntoViewIfNeeded();
+    await zrzut(page, "sprzedaz_pole", false);
     await page.getByRole("button", { name: /^Sprzedaj /i }).first().click();
     await oczekuj(page, /Sprzedano/);
+    if (stan.ostatniaSprzedaz !== pelna || poz.udzialy !== 0) throw new Error(`Sprzedano ${stan.ostatniaSprzedaz} z ${pelna}, zostało ${poz.udzialy}`);
+    console.log("  ✓ „Wszystko” sprzedało całą pozycję razem z resztką poniżej 0,1");
     await zrzut(page, "sprzedaz");
 
     console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");

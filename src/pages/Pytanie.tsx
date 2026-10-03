@@ -30,7 +30,7 @@ import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
+import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, wDol, zmianaPp } from "@/ui/tekst";
 import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { usePostep } from "@/ui/postep";
@@ -330,14 +330,21 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   const brakPowodu = miasto && !powod;
   const pozycjaSprzedaz = posiadane.find((z) => z.odpowiedz === odpSprzedaz) ?? posiadane[0] ?? null;
   const kursSprzedazy = pozycjaSprzedaz && p.kursy ? p.kursy[pozycjaSprzedaz.odpowiedz - 1] : null;
-  const uSprzedaz = pozycjaSprzedaz ? Math.max(0, Math.min(udzialySprzedaz, pozycjaSprzedaz.udzialy)) : 0;
+  // Pole, suwak i chipy liczą udziały co 0,1 w dół, więc nigdy nie przekraczają posiadanych. Maksimum pola
+  // (posiadane zaokrąglone w dół) znaczy „wszystko”: sprzedaż bierze całą pozycję razem z resztką poniżej 0,1.
+  const maksSprzedaz = pozycjaSprzedaz ? wDol(pozycjaSprzedaz.udzialy) : 0;
+  const uSprzedaz = pozycjaSprzedaz
+    ? udzialySprzedaz >= maksSprzedaz
+      ? pozycjaSprzedaz.udzialy
+      : Math.max(0, wDol(udzialySprzedaz))
+    : 0;
   const podgladS = kursSprzedazy != null && uSprzedaz > 0 ? podgladSprzedazy(kursSprzedazy, uSprzedaz) : null;
 
   useEffect(() => {
     if (posiadane.length === 0 && tryb === "sprzedaj") setTryb("kup");
   }, [posiadane.length, tryb]);
   useEffect(() => {
-    if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * 10) / 10);
+    if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(wDol(pozycjaSprzedaz.udzialy));
   }, [pozycjaSprzedaz, udzialySprzedaz]);
 
   // Stawka ma wagę: pole podskakuje przy każdej zmianie, wygrana przy wzroście, a co 50 punktów idzie fala.
@@ -445,7 +452,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   };
 
   const mojaPozycja = posiadane.length
-    ? posiadane.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(", ")
+    ? posiadane.map((z) => `${liczba(wDol(z.udzialy), 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(", ")
     : null;
 
   if (!otwarte) {
@@ -643,7 +650,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           {odp != null && inne.length > 0 && gotowy ? (
             <div className="panel-info">
               Rynek ma jedną stronę na gracza. Masz{" "}
-              {inne.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
+              {inne.map((z) => `${liczba(wDol(z.udzialy), 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
               {p.odpowiedzi[odp - 1]}” najpierw je sprzeda
               {p.kursy ? ` (≈ ${liczba(zwrotInne, 1)} pkt wraca na saldo)` : ""}.
             </div>
@@ -740,11 +747,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 aria-pressed={pozycjaSprzedaz?.odpowiedz === z.odpowiedz}
                 onClick={() => {
                   setOdpSprzedaz(z.odpowiedz);
-                  setUdzialySprzedaz(Math.round(z.udzialy * 10) / 10);
+                  setUdzialySprzedaz(wDol(z.udzialy));
                 }}
               >
                 <span className="nazwa">{p.odpowiedzi[z.odpowiedz - 1]}</span>
-                <small>{liczba(z.udzialy, 1)} udz.</small>
+                <small>{liczba(wDol(z.udzialy), 1)} udz.</small>
               </button>
             ))}
           </div>
@@ -752,16 +759,16 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             <div className="stawka-pole">
               <div className="etykieta">
                 <span>Ile udziałów sprzedać</span>
-                <span>masz {liczba(pozycjaSprzedaz.udzialy, 1)}</span>
+                <span>masz {liczba(maksSprzedaz, 1)}</span>
               </div>
               <div className="stawka-wejscie">
                 <input
                   type="number"
                   inputMode="decimal"
-                  min={0.1}
+                  min={Math.min(0.1, maksSprzedaz)}
                   step={0.1}
-                  max={pozycjaSprzedaz.udzialy}
-                  value={Math.round(uSprzedaz * 10) / 10}
+                  max={maksSprzedaz}
+                  value={wDol(uSprzedaz)}
                   aria-label="Liczba udziałów do sprzedania"
                   onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
                 />
@@ -769,19 +776,19 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
               </div>
               <div className="stawka-chipy">
                 {[25, 50, 75].map((proc) => (
-                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(((pozycjaSprzedaz.udzialy * proc) / 100) * 10) / 10)}>
+                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(wDol((pozycjaSprzedaz.udzialy * proc) / 100))}>
                     {proc}%
                   </button>
                 ))}
-                <button type="button" onClick={() => setUdzialySprzedaz(pozycjaSprzedaz.udzialy)}>
+                <button type="button" onClick={() => setUdzialySprzedaz(maksSprzedaz)}>
                   Wszystko
                 </button>
               </div>
               <Suwak
                 min={0.1}
-                max={pozycjaSprzedaz.udzialy}
+                max={maksSprzedaz}
                 step={0.1}
-                wartosc={Math.min(uSprzedaz, pozycjaSprzedaz.udzialy)}
+                wartosc={wDol(uSprzedaz)}
                 etykieta="Suwak udziałów"
                 naZmiane={setUdzialySprzedaz}
               />
@@ -813,7 +820,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           </div>
           {sprzedaj.blad ? <Komunikat typ="blad">{sprzedaj.blad}</Komunikat> : null}
           <button type="submit" ref={refSprzedaj} className="przycisk-postaw" disabled={sprzedaj.trwa || !pozycjaSprzedaz || uSprzedaz < 0.01}>
-            {sprzedaj.trwa ? "Sprzedaję…" : `Sprzedaj ${liczba(uSprzedaz, 1)} udz.`}
+            {sprzedaj.trwa ? "Sprzedaję…" : `Sprzedaj ${liczba(wDol(uSprzedaz), 1)} udz.`}
           </button>
           <p className="zastrzezenie">Sprzedaż po bieżącym kursie: zwrot = C(q) − C(q′). Punkty wracają na saldo.</p>
         </form>
@@ -1013,7 +1020,7 @@ export default function Pytanie() {
                 <div className="nazwa">
                   {o}
                   {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
-                  {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {liczba(mojeU.udzialy, 1)} udz.</small> : null}
+                  {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {liczba(wDol(mojeU.udzialy), 1)} udz.</small> : null}
                   {k == null && ko != null ? <small>kurs otwarcia</small> : null}
                 </div>
               );
