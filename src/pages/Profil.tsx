@@ -203,6 +203,8 @@ export default function Profil() {
   const zysk = portfel - 1000;
   const zyskPozycji = portfelNaZywo?.zyskPozycji ?? 0;
   const miejsce = miejsca.get(nick) ?? null;
+  // na liście tylko pozycje od 1 udziału (resztki poniżej 1 udziału baza i tak kasuje przy sprzedaży)
+  const widoczne = pozycje.filter((p) => p.udzialy_glowne >= 1);
   const rozstrzygniete = pozycje.filter((p) => p.status === "rozstrzygniete");
   const trafione = rozstrzygniete.filter((p) => p.trafione === true).length;
 
@@ -287,7 +289,7 @@ export default function Profil() {
             onClick={() => ustawTab(z.klucz)}
           >
             {z.etykieta}
-            {z.klucz === "pozycje" && pozycje.length > 0 ? <span className="licznik">{pozycje.length}</span> : null}
+            {z.klucz === "pozycje" && widoczne.length > 0 ? <span className="licznik">{widoczne.length}</span> : null}
           </button>
         ))}
       </div>
@@ -295,12 +297,12 @@ export default function Profil() {
       {tab === "pozycje" ? (
         <>
           {laduje && !dane ? <Ladowanie /> : null}
-          {dane && pozycje.length === 0 ? (
+          {dane && widoczne.length === 0 ? (
             <p className="pusto">
               Jeszcze nic nie prognozujesz. <Link to="/">Wybierz rynek</Link>.
             </p>
           ) : null}
-          {pozycje.length > 0 ? (
+          {widoczne.length > 0 ? (
             <table className="tabela tabela-pozycje">
               <thead>
                 <tr>
@@ -315,7 +317,7 @@ export default function Profil() {
                 </tr>
               </thead>
               <tbody>
-                {pozycje.map((p) => {
+                {widoczne.map((p) => {
                   const i = p.odpowiedz_glowna - 1;
                   return (
                     <tr key={p.pytanie}>

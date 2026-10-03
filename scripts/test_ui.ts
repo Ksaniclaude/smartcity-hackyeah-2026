@@ -488,6 +488,8 @@ async function main() {
     await zrzut(page, "sprzedaz");
 
     console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
+    // resztka poniżej 1 udziału (np. sprzed zmiany reguł) nie pokazuje się na liście pozycji
+    stan.pozycje.set("4-1", { pytanie: 4, odpowiedz: 1, udzialy: 0.6, wydane: 0.3 });
     await page.goto(`${ADRES}/profil`);
     await oczekuj(page, "Rynek rozstrzygnięty");
     await oczekuj(page, "Twój typ był lepszy niż 75% graczy", 6000);
@@ -496,6 +498,11 @@ async function main() {
     await oczekuj(page, "Wartość portfela");
     await oczekuj(page, "Otwarte pozycje");
     await oczekuj(page, "krowodrza_42");
+    const listaPozycji = page.locator(".tabela-pozycje");
+    if ((await listaPozycji.locator("tbody tr").count()) === 0) throw new Error("Pusta lista pozycji w profilu");
+    if (await listaPozycji.getByText(/Budżetu Obywatelskiego/).count()) throw new Error("Pozycja poniżej 1 udziału widoczna w profilu");
+    console.log("  ✓ pozycja poniżej 1 udziału ukryta w profilu, reszta widoczna");
+    stan.pozycje.delete("4-1");
     await zrzut(page, "profil");
     await page.reload();
     await oczekuj(page, "Wartość portfela");
