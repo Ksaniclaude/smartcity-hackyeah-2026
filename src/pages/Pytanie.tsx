@@ -264,7 +264,8 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
   const otwarte = p.status === "otwarte";
   const miasto = p.kategoria === "miasto";
   const saldo = Math.floor(gracz?.saldo ?? 0);
-  const posiadane = udzialyMoje.filter((z) => z.udzialy > 0.005);
+  // poniżej 0,05 udziału pozycja jest pusta (baza sprzedaje taką resztkę razem z całością)
+  const posiadane = udzialyMoje.filter((z) => z.udzialy >= 0.05);
   // Jedna strona rynku na gracza (jak na giełdach prognoz): kupno innej odpowiedzi najpierw sprzedaje te udziały.
   const inne = odp != null ? posiadane.filter((z) => z.odpowiedz !== odp) : [];
   const zwrotInne = inne.reduce(
@@ -580,7 +581,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   min={0.1}
                   step={0.1}
                   max={pozycjaSprzedaz.udzialy}
-                  value={uSprzedaz}
+                  value={Math.round(uSprzedaz * 10) / 10}
                   aria-label="Liczba udziałów do sprzedania"
                   onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
                 />
@@ -588,7 +589,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               </div>
               <div className="stawka-chipy">
                 {[25, 50, 75].map((proc) => (
-                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * proc) / 1000)}>
+                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round((pozycjaSprzedaz.udzialy * proc) / 100 * 10) / 10)}>
                     {proc}%
                   </button>
                 ))}
@@ -601,7 +602,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                 min={0.1}
                 step={0.1}
                 max={pozycjaSprzedaz.udzialy}
-                value={uSprzedaz}
+                value={Math.min(uSprzedaz, pozycjaSprzedaz.udzialy)}
                 aria-label="Suwak udziałów"
                 onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
               />
@@ -834,7 +835,7 @@ export default function Pytanie() {
                 <div key={i} className={`wynik-wiersz ${odp === i + 1 ? "wybrany" : ""} ${p.wynik === i + 1 ? "trafiony" : ""}`}>
                   <div className="nazwa">
                     {o}
-                    {mojeU && mojeU.udzialy > 0.005 ? <small>{liczba(mojeU.udzialy, 1)} udz. · Twój typ</small> : null}
+                    {mojeU && mojeU.udzialy >= 0.05 ? <small>{liczba(mojeU.udzialy, 1)} udz. · Twój typ</small> : null}
                     {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
                   </div>
                   {k != null ? (
@@ -926,7 +927,7 @@ export default function Pytanie() {
                   </thead>
                   <tbody>
                     {(udzialyMoje ?? [])
-                      .filter((z) => z.udzialy > 0.005 || z.wydane > 0)
+                      .filter((z) => z.udzialy >= 0.05 || z.wydane > 0)
                       .map((z) => (
                         <tr key={z.odpowiedz}>
                           <td className={klasaTypu(z.odpowiedz - 1)}>{p.odpowiedzi[z.odpowiedz - 1]}</td>

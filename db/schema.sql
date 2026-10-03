@@ -420,7 +420,8 @@ begin
   if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
   v_udzialy := least(coalesce(p_udzialy, 0), z.udzialy);
   if v_udzialy <= 0 then raise exception 'Podaj liczbę udziałów'; end if;
-  if z.udzialy - v_udzialy < 1e-6 then v_udzialy := z.udzialy; end if;
+  -- resztka poniżej 0,05 udziału nie ma sensu (suwak i pole liczą co 0,1): sprzedajemy wszystko
+  if z.udzialy - v_udzialy < 0.05 then v_udzialy := z.udzialy; end if;
   v_wszystko := (v_udzialy = z.udzialy);
   if not v_wszystko and v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
   select saldo into v_saldo from public.gracze where id = v_gracz for update;
