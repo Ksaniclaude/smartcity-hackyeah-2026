@@ -34,6 +34,7 @@ function WymagaGracza({ children }: { children: ReactNode }) {
 }
 
 function Uklad() {
+  useUruchomSesje();
   const { pathname } = useLocation();
   const { stan, konto, gracz, modal, otworzModal } = useSesja();
   const pelnyEkran = pathname === "/qr";

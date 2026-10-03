@@ -35,6 +35,8 @@ export function komunikatBledu(e: unknown): string {
   if (/email rate limit|over_email_send_rate_limit/i.test(msg))
     return "Supabase wyczerpał limit wysyłki e-maili (bez własnego SMTP to ok. 2 maile na godzinę). Admin: wyłącz „Confirm email” w Authentication → Sign In / Providers → Email albo ustaw własny SMTP.";
   if (/rate limit|too many requests/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
+  if (/Email not confirmed/i.test(msg)) return "E-mail jeszcze niepotwierdzony. Kliknij w link z poczty i zaloguj się ponownie.";
+  if (/permission denied for function|Brak sesji gracza|JWT expired/i.test(msg)) return "Zaloguj się, żeby grać.";
   if (/Signups not allowed/i.test(msg)) return "Rejestracja e-mailem jest wyłączona w Supabase";
   return msg;
 }
@@ -77,6 +79,8 @@ export async function zarejestruj(email: string, haslo: string): Promise<{ wymag
   if (data.session) await supabase.auth.signOut();
   const r = await supabase.auth.signUp({ email, password: haslo });
   if (r.error) throw new Error(komunikatBledu(r.error));
+  // Supabase przy włączonym potwierdzaniu nie zdradza, że e-mail ma już konto: zwraca użytkownika bez tożsamości.
+  if (r.data.user && r.data.user.identities?.length === 0) throw new Error("Ten e-mail ma już konto. Zaloguj się.");
   return { wymagaPotwierdzenia: !r.data.session };
 }
 

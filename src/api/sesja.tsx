@@ -14,7 +14,7 @@ interface Sesja {
   /** Konto Supabase Auth (anonimowe albo z e-mailem); null przed uruchomieniem sesji. */
   konto: Konto | null;
   blad: string | null;
-  /** Loguje anonimowo i pobiera gracza (wołane przez ekrany gracza, nie przez /miasto). */
+  /** Czyta zapisaną sesję i pobiera gracza (układ strony woła to raz przy starcie). */
   uruchom: () => void;
   ustawNick: (nick: string) => Promise<void>;
   odswiezGracza: () => Promise<void>;
@@ -100,8 +100,8 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setGracz(null);
     setKonto(null);
     setModal(null);
-    uruchomiono.current = false;
-    setStan("nowa");
+    uruchomiono.current = true;
+    setStan("brak_nicku");
   }, []);
 
   return (

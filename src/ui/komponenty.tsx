@@ -411,7 +411,7 @@ function ModalNicku() {
 }
 
 function ModalJakToDziala() {
-  const { zamknijModal, otworzModal, gracz } = useSesja();
+  const { zamknijModal, otworzModal, gracz, konto } = useSesja();
   return (
     <Modal tytul="Jak to działa" onClose={zamknijModal}>
       <p className="pod">Zdążą? to rynek prognoz o Krakowie. Zamiast pieniędzy są punkty, zamiast sondażu kurs.</p>
@@ -443,8 +443,8 @@ function ModalJakToDziala() {
           Jasne
         </button>
       ) : (
-        <button type="button" className="przycisk" onClick={() => otworzModal("konto", "rejestracja")}>
-          Zacznij grać
+        <button type="button" className="przycisk" onClick={() => (konto ? otworzModal("nick") : otworzModal("konto", "rejestracja"))}>
+          {konto ? "Podaj nick" : "Zacznij grać"}
         </button>
       )}
       <p className="zastrzezenie">Gra o punkty. Punktów nie da się kupić ani wymienić, nagród nie ma.</p>
@@ -453,10 +453,15 @@ function ModalJakToDziala() {
 }
 
 /** Rejestracja i logowanie e-mailem (jak na giełdach prognoz). Sesja anonimowa z nickiem
- *  jest podnoszona do stałego konta, więc punkty zostają. */
+ *  Konto zakłada signUp; stare sesje anonimowe są porzucane przy starcie. */
 function ModalKonta() {
-  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, odswiezGracza, ustawNick } = useSesja();
-  const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(opcjaModalu === "logowanie" ? "logowanie" : "rejestracja");
+  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
+  const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(
+    konto && !gracz ? "nick" : opcjaModalu === "logowanie" ? "logowanie" : "rejestracja",
+  );
+  useEffect(() => {
+    if (gracz) zamknijModal();
+  }, [gracz, zamknijModal]);
   const [email, setEmail] = useState("");
   const [haslo, setHaslo] = useState("");
   const [nick, setNick] = useState("");
@@ -472,7 +477,16 @@ function ModalKonta() {
       setInfo("Wysłaliśmy link potwierdzający na podany adres. Kliknij w niego (otworzy stronę zalogowaną), a potem podaj nick.");
       return;
     }
-    if (nick.trim().length >= 2) await ustawNick(nick.trim());
+    if (nick.trim().length >= 2) {
+      try {
+        await ustawNick(nick.trim());
+      } catch (e) {
+        // konto już istnieje (sesja jest), tylko nick nie przeszedł: zostajemy przy formularzu nicku
+        await odswiezGracza();
+        setTryb("nick");
+        throw e;
+      }
+    }
     await odswiezGracza();
     zamknijModal();
   });
@@ -496,6 +510,7 @@ function ModalKonta() {
     return (
       <Modal tytul="Jeszcze nick" onClose={zamknijModal}>
         <p className="pod">Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
+        {rejestracja.blad ? <Komunikat typ="blad">{rejestracja.blad}</Komunikat> : null}
         <FormularzNicku />
       </Modal>
     );
@@ -533,7 +548,7 @@ function ModalKonta() {
           </label>
           {info ? <Komunikat typ="info">{info}</Komunikat> : null}
           {rejestracja.blad ? <Komunikat typ="blad">{rejestracja.blad}</Komunikat> : null}
-          <button className="przycisk" type="submit" disabled={rejestracja.trwa || stan === "laduje"}>
+          <button className="przycisk" type="submit" disabled={rejestracja.trwa || stan === "laduje" || info != null}>
             {rejestracja.trwa ? "Chwila…" : stan === "laduje" ? "Łączę z miastem…" : "Załóż konto"}
           </button>
         </form>
@@ -619,7 +634,7 @@ function ModalWiecej() {
           <Awatar nick={gracz.nick} />
           <div>
             <b>{gracz.nick}</b>
-            <div className="pod">{konto?.email ?? "konto bez e-maila (tylko ta przeglądarka)"}</div>
+            <div className="pod">{konto?.email}</div>
           </div>
         </div>
       ) : null}
@@ -663,16 +678,19 @@ function ModalWiecej() {
       </ul>
       {gracz ? (
         <div className="menu-przyciski">
-          {konto?.anonimowy ? (
-            <button type="button" className="przycisk przycisk-drugi" onClick={() => otworzModal("konto", "rejestracja")}>
-              Załóż konto
-            </button>
-          ) : (
-            <Link to="/profil" className="przycisk przycisk-drugi" onClick={zamknijModal}>
-              Profil
-            </Link>
-          )}
+          <Link to="/profil" className="przycisk przycisk-drugi" onClick={zamknijModal}>
+            Profil
+          </Link>
           <button type="button" className="przycisk" disabled={trwa} onClick={() => void wylogujSie()}>
+            Wyloguj
+          </button>
+        </div>
+      ) : konto ? (
+        <div className="menu-przyciski">
+          <button type="button" className="przycisk" onClick={() => otworzModal("nick")}>
+            Podaj nick
+          </button>
+          <button type="button" className="przycisk przycisk-drugi" disabled={trwa} onClick={() => void wylogujSie()}>
             Wyloguj
           </button>
         </div>

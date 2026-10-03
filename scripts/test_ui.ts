@@ -346,7 +346,7 @@ async function main() {
     console.log("2. Klik „Tak” na karcie → rynek → rejestracja (nick, e-mail, hasło) → prognoza");
     await page.locator(".rynek-przyciski .kup-tak").first().click();
     await oczekuj(page, "Zasady");
-    await page.getByRole("button", { name: /Zaloguj się, żeby postawić/ }).click();
+    await page.getByRole("button", { name: /Załóż konto, żeby postawić/ }).click();
     await oczekuj(page, "Witaj w Zdążą?");
     await zrzut(page, "modal_konta", false);
     await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");

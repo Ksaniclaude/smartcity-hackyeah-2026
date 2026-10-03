@@ -304,7 +304,7 @@ const PUSTO_ROZSTRZYGNIETE = "Jeszcze nic nie rozstrzygnięto";
 
 export default function Lista() {
   useUruchomSesje();
-  const { stan, gracz, otworzModal } = useSesja();
+  const { stan, gracz, konto, otworzModal } = useSesja();
   const [params, setParams] = useSearchParams();
   const { dane, blad, laduje } = usePolling(pobierzPytania, 5000);
   const [obserwowane, setObserwowane] = useState<number[]>(czytajObserwowane);
@@ -438,8 +438,12 @@ export default function Lista() {
               </div>
             ) : null}
             <div className="akcje">
-              <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
-                Zacznij grać
+              <button
+                type="button"
+                className="przycisk przycisk-glowny"
+                onClick={() => (konto ? otworzModal("nick") : otworzModal("konto", "rejestracja"))}
+              >
+                {konto ? "Podaj nick" : "Zacznij grać"}
               </button>
               <button type="button" className="przycisk przycisk-glowny przycisk-drugi" onClick={() => otworzModal("jak")}>
                 Jak to działa

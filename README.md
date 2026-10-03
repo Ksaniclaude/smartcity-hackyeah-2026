@@ -21,7 +21,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 | Polymarket | Zdążą? |
 | --- | --- |
-| Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. |
+| Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
 | Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
