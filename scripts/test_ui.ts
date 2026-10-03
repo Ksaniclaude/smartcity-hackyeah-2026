@@ -426,12 +426,22 @@ async function main() {
     console.log("  ✓ podgląd i kupon w pełnych punktach i udziałach");
     await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
-    await page.getByRole("button", { name: "Udostępnij kartę" }).first().click();
+    // udostępnianie: pasek na kuponie (relacja, komunikatory, link) i arkusz z planszą 9:16 pod „Więcej”
+    await oczekuj(page, "Pochwal się prognozą");
+    const pasek = page.locator(".kupon .pasek-udost");
+    await pasek.getByRole("button", { name: "Relacja" }).waitFor({ timeout: 5000 });
+    const whatsapp = await pasek.getByRole("link", { name: "WhatsApp" }).getAttribute("href");
+    if (!whatsapp?.startsWith("https://wa.me/?text=") || !/\/pytanie\/\d+$/.test(decodeURIComponent(whatsapp))) throw new Error(`Link WhatsApp bez adresu rynku: ${whatsapp}`);
+    await pasek.getByRole("button", { name: "Więcej" }).click();
     await oczekuj(page, "Udostępnij prognozę");
     await oczekuj(page, /Daję 44% na to, że kładka/);
-    await page.locator("img.karta-udostepniania").waitFor({ timeout: 5000 });
+    await page.locator("img.relacja-podglad").waitFor({ timeout: 5000 });
+    const plansza = await page.locator("img.relacja-podglad").evaluate((img: HTMLImageElement) => img.decode().then(() => `${img.naturalWidth}x${img.naturalHeight}`));
+    if (plansza !== "1080x1920") throw new Error(`Plansza do relacji ma ${plansza}, a powinna 1080x1920`);
+    await page.locator(".modal").getByRole("button", { name: "Kopiuj link" }).waitFor({ timeout: 3000 });
     await zrzut(page, "karta_udostepniania", false);
     await page.getByRole("button", { name: "Zamknij" }).click();
+    await page.locator(".naglowek-rynku").getByRole("button", { name: "Udostępnij", exact: true }).waitFor({ timeout: 3000 });
 
     console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();

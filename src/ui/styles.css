@@ -47,6 +47,15 @@
   --aw-5: #d3e17a;
   --aw-6: #c6b6ff;
   --na-kolorze: #0c1326;
+  /* plansza do udostępniania: zawsze nocna, niezależnie od motywu strony */
+  --plansza-tlo: #0c1324;
+  --plansza-tor: #1e2942;
+  --plansza-tekst: #f3f6fc;
+  --plansza-tekst-2: #c5cee0;
+  --plansza-mute: #8794b0;
+  --plansza-tak: #2fe08a;
+  --plansza-nie: #ff5c61;
+  --plansza-trzeci: #a78dff;
   --cien: 0 1px 2px rgba(12, 19, 38, 0.06);
   --cien-2: 0 12px 32px rgba(12, 19, 38, 0.14);
   --r: 14px;
@@ -327,7 +336,8 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .sekcja-tytul { display: flex; align-items: baseline; gap: 8px; margin: 32px 0 14px; font-size: 22px; font-weight: 700; }
 .sekcja-tytul .licznik { color: var(--mute); font-weight: 500; font-size: 14px; font-family: var(--tekstowa); letter-spacing: 0; }
 .sekcja-tytul .prawy { margin-left: auto; font-size: 13px; font-weight: 600; }
-.siatka { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+/* karta ma co najmniej 360 px: na szerokim ekranie mieszczą się trzy, a tytuł ma miejsce na całe pytanie */
+.siatka { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 14px; }
 @media (min-width: 900px) { .siatka { gap: 16px; } }
 .sekcja-opis { color: var(--mute); font-weight: 500; font-size: 14px; font-family: var(--tekstowa); letter-spacing: 0; display: none; }
 @media (min-width: 640px) { .sekcja-opis { display: inline; } }
@@ -336,13 +346,20 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .rzad-akcje { display: inline-flex; align-items: center; gap: 4px; }
 .rzad-akcje a { color: var(--tekst-2); text-decoration: none; margin-right: 6px; white-space: nowrap; }
 .rzad-akcje a:hover { color: var(--tekst); text-decoration: underline; }
-.rzad-strzalka { width: 30px; height: 30px; font-size: 20px; line-height: 1; display: none; }
+.rzad-sekcja { container-type: inline-size; --rzad-odstep: 14px; }
+.rzad-strzalka { width: 32px; height: 32px; display: none; background: var(--tlo-2); color: var(--tekst-2); }
+.rzad-strzalka svg { width: 16px; height: 16px; }
+.rzad-strzalka.wstecz svg { transform: scaleX(-1); }
 @media (min-width: 900px) { .rzad-strzalka { display: inline-flex; } }
-.rzad { display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; margin: 0 -16px; padding: 4px 16px 10px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); }
+.rzad { display: flex; gap: var(--rzad-odstep); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scroll-padding-inline: 16px; margin: 0 -16px; padding: 4px 16px 10px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); }
 .rzad::-webkit-scrollbar { display: none; }
-.rzad > .rynek { flex: 0 0 min(290px, calc(100vw - 48px)); scroll-snap-align: start; }
-@media (min-width: 900px) { .rzad { gap: 16px; margin: 0 -24px; padding: 4px 24px 12px; -webkit-mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); } .rzad > .rynek { flex-basis: 300px; } }
-.hot-ikona { display: inline-flex; align-items: center; margin-right: 6px; vertical-align: middle; color: var(--akcent-tekst); }
+/* szerokość karty z szerokości rzędu: na telefonie jedna i rąbek następnej, dalej dwie, na szerokim ekranie równo trzy */
+.rzad > .rynek { flex: 0 0 min(360px, calc(100% - 36px)); scroll-snap-align: start; }
+@container (min-width: 620px) { .rzad > .rynek { flex-basis: calc((100% - var(--rzad-odstep)) / 2); } }
+@container (min-width: 960px) { .rzad > .rynek { flex-basis: calc((100% - 2 * var(--rzad-odstep)) / 3); } }
+@media (min-width: 900px) { .rzad-sekcja { --rzad-odstep: 16px; } .rzad { scroll-padding-inline: 24px; margin: 0 -24px; padding: 4px 24px 12px; -webkit-mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); } }
+/* płomień wyśrodkowany na wysokości wersalików tytułu (rząd jest wyrównany do linii pisma, ikona by na niej stała) */
+.hot-ikona { display: inline-flex; align-self: center; position: relative; top: -3px; margin: 0 -3px; color: var(--akcent-tekst); }
 .hot-ikona svg { width: 22px; height: 22px; }
 .chipy-miast { margin: 4px 0 14px; }
 .rynek-miasto { color: var(--mute); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
@@ -924,7 +941,6 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .awans.gora { color: var(--tak-tekst); }
 .awans.dol { color: var(--mute); }
 .kupon b.zysk { color: var(--tak-tekst); }
-.kupon-akcje { margin-top: 10px; }
 .wygrana-glowna .cyfry small { font-family: var(--tekstowa); font-stretch: normal; font-weight: 600; font-size: 13px; color: var(--mute); margin-left: 6px; }
 .stawka-szybkie button { font-size: 15px; height: 36px; }
 .tasma-licznik { margin-left: 6px; font-size: 15px; color: var(--akcent-tekst); }
@@ -940,10 +956,36 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 @keyframes rysuj-odcinek { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 .wykres-odcinek-nowy { stroke-dasharray: 1; stroke-dashoffset: 0; stroke-width: 3.5; animation: rysuj-odcinek 0.7s ease-out; }
 
-/* karta do udostępnienia („Daję X% na to, że …”) */
-.karta-udostepniania { display: block; width: 100%; aspect-ratio: 1200 / 630; border-radius: var(--r-m); border: 1px solid var(--linia); object-fit: cover; background: var(--tlo-2); }
-.karta-udostepniania.szkielet { animation: szkielet 1.4s ease-in-out infinite; }
-.karta-tekst { margin: 10px 0 0; }
+/* ---------- udostępnianie: przycisk w nagłówku rynku, arkusz z planszą do relacji, cele na jedno dotknięcie ---------- */
+.przycisk-udostepnij { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px; border: 0; border-radius: 16px; background: var(--akcent-tlo); color: var(--akcent-tekst); font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background var(--szybko), color var(--szybko), transform var(--szybko); }
+.przycisk-udostepnij svg { width: 16px; height: 16px; }
+.przycisk-udostepnij:hover { background: var(--akcent); color: var(--na-akcencie); }
+.przycisk-udostepnij:active { transform: scale(0.96); }
+.meta-akcje { display: inline-flex; align-items: center; gap: 10px; }
+/* arkusz: plansza 9:16 po lewej, obok zdanie i dwa duże przyciski, pod spodem aplikacje */
+.udost { display: grid; grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr); gap: 14px; margin: 10px 0 12px; }
+.relacja-podglad { display: block; width: 100%; aspect-ratio: 9 / 16; border-radius: 14px; border: 1px solid var(--linia-2); background: var(--plansza-tlo); }
+.relacja-podglad.szkielet { animation: szkielet 1.4s ease-in-out infinite; }
+.udost-bok { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.udost-tekst { margin: 0 0 auto; font-size: 14px; line-height: 1.45; color: var(--tekst-2); display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
+.udost-przyciski { display: flex; flex-direction: column; gap: 8px; }
+.udost-przyciski.najpierw-link { flex-direction: column-reverse; }
+.udost-przyciski .przycisk { padding: 8px 12px; }
+.udost-przyciski .przycisk svg { width: 18px; height: 18px; flex: none; }
+.udost-info { margin: 0 0 12px; font-size: 13px; color: var(--mute); }
+/* cele zawsze w jednym rzędzie, ile by ich nie było (na komputerze bez systemowego „Więcej” jest ich mniej) */
+.cele { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+.cel { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; color: var(--tekst-2); font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none; cursor: pointer; }
+.cel-ikona { width: 48px; height: 48px; border-radius: 50%; background: var(--tlo-2); color: var(--tekst); display: inline-flex; align-items: center; justify-content: center; transition: background var(--szybko), transform var(--szybko); }
+.cel-ikona svg { width: 22px; height: 22px; }
+.cel:hover .cel-ikona { background: var(--tlo-3); }
+.cel:active .cel-ikona { transform: scale(0.9); }
+.cel:disabled { opacity: 0.5; cursor: default; }
+.cel-glowny .cel-ikona, .cel-glowny:hover .cel-ikona { background: var(--akcent); color: var(--na-akcencie); }
+/* pasek na kuponie tuż po prognozie */
+.pasek-udost { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--tak); }
+.pasek-udost-tytul { display: block; margin-bottom: 8px; }
+.pasek-udost .udost-info { margin: 8px 0 0; }
 .modal .przyciski .przycisk-glowny { flex: 1 1 140px; }
 
 /* ekran „Rynek rozstrzygnięty” */

@@ -6,7 +6,7 @@ import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
-import { IkPlomien } from "@/ui/ikony";
+import { IkPlomien, IkSzewron } from "@/ui/ikony";
 import { Awatar, Komunikat, OdznakaMiejsca, Szkielet, Szukajka, opisPrognoz, pasujeDoFrazy } from "@/ui/komponenty";
 import { KartaRynku, Odpowiedzi, Odsloniecie, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, liczba, odmien, pkt, zmianaPp } from "@/ui/tekst";
@@ -274,7 +274,8 @@ function Rzad({ tytul, opis, lista, link, pusto, ...reszta }: PropsListy & { tyt
   const przewin = (kierunek: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: kierunek * Math.max(240, el.clientWidth - 80), behavior: "smooth" });
+    // o szerokość widocznej części rzędu, czyli o pełny komplet kart
+    el.scrollBy({ left: kierunek * Math.max(240, el.clientWidth - 32), behavior: "smooth" });
   };
   return (
     <section className="rzad-sekcja">
@@ -285,11 +286,11 @@ function Rzad({ tytul, opis, lista, link, pusto, ...reszta }: PropsListy & { tyt
           {link ? <Link to={link}>Zobacz wszystkie</Link> : null}
           {lista.length > 1 ? (
             <>
-              <button type="button" className="przycisk-ikona rzad-strzalka" aria-label="Przewiń w lewo" onClick={() => przewin(-1)}>
-                ‹
+              <button type="button" className="przycisk-ikona rzad-strzalka wstecz" aria-label="Przewiń w lewo" onClick={() => przewin(-1)}>
+                <IkSzewron />
               </button>
               <button type="button" className="przycisk-ikona rzad-strzalka" aria-label="Przewiń w prawo" onClick={() => przewin(1)}>
-                ›
+                <IkSzewron />
               </button>
             </>
           ) : null}

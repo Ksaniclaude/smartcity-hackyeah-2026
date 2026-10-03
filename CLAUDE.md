@@ -84,6 +84,12 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   wymienić i tak ma zostać. Nową odznakę dopisuje się jednym wierszem w `policzPostep`.
 - Karta rynku, piktogram tematu, termin, licznik odsłonięcia i przyciski odpowiedzi są w `src/ui/rynek.tsx`;
   używaj ich zamiast składać kartę od nowa.
-- Siatki kart liczone z szerokości kontenera (`auto-fill`), nie z breakpointów okna, bo karty leżą też w wąskich
-  kolumnach („Podobne rynki”).
+- Udostępnianie jest w `src/ui/udostepnij.tsx`: plansza 9:16 do relacji rysowana na canvasie (`rysujRelacje`,
+  kolory z tokenów `--plansza-*`, zawsze nocna), arkusz z celami na jedno dotknięcie, pasek na kuponie po prognozie,
+  `PrzyciskUdostepnij` (rynek, ekran wyniku) i `PrzyciskLinku` (profil). Plik planszy powstaje z wyprzedzeniem, bo
+  systemowe udostępnianie musi ruszyć w tym samym dotknięciu. Podgląd linku w komunikatorach to meta `og:*`
+  w `index.html` i `public/og.png`; favicon z logo też jest w `public/`.
+- Siatki kart liczone z szerokości kontenera (`auto-fill` albo `@container`), nie z breakpointów okna, bo karty leżą
+  też w wąskich kolumnach („Podobne rynki”). Karta ma co najmniej 360 px: na szerokim ekranie w rzędzie i w siatce
+  mieszczą się trzy, żeby tytuł pokazał całe pytanie.
 - Nie pokazuj zer jako danych („0 pkt obrotu”, „(0/10)”): pusty stan dostaje słowa („bez prognoz”).
