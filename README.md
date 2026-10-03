@@ -23,11 +23,12 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 | --- | --- |
 | Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
-| Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
-| Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. Jedna strona rynku na gracza: kupno innej odpowiedzi najpierw sprzedaje posiadane udziały (w tej samej transakcji, z zapowiedzią w panelu), więc nie da się trzymać „tak” i „nie” naraz. |
-| Portfolio | /profil: wartość portfela (punkty + udziały po kursie), zysk/strata, trafność, pozycje, historia transakcji, ustawienia (nick, konto, motyw). |
-| Profile pages | /u/:nick – publiczny profil: wartość pozycji, największa wygrana, prognozy, aktywność. |
-| Leaderboard | /ranking – portfel, zysk, trafność, obrót. |
+| Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia, nowy punkt dorysowuje się z animacją), tabela odpowiedzi, zmiana kursu od godziny, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez; przy nicku odznaka „stawia 120 na tak” i miejsce w rankingu), najwięksi gracze, moje pozycje z zyskiem/stratą, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
+| Buy / Sell | Kup: szybkie stawki 20 / 50 / 100 / 200, podgląd udziałów, kursu po transakcji i „Jeśli trafisz: +X pkt (×Y)” (LMSR). Po transakcji: „Twój ruch przesunął kurs 48% → 53%”, własny nick od razu w aktywności i wśród największych graczy, komunikat o awansie w rankingu, karta do udostępnienia „Daję 70% na to, że …” (obrazek PNG, systemowe udostępnianie, kopiowanie tekstu z linkiem). Jedna strona rynku na gracza: zakład na inną odpowiedź najpierw sprzedaje dotychczasowe udziały. Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
+| Portfolio | Portfel na żywo w nagłówku (wartość + zysk/strata) i w /profil: wartość portfela, zysk/strata otwartych pozycji wobec kosztu, każda pozycja z zyskiem/stratą (zielone/czerwone), trafność, historia transakcji, ustawienia (nick, konto, motyw). Po rozstrzygnięciu rynku, na którym gracz miał pozycję, jednorazowy ekran „Rynek rozstrzygnięty”: wynik odsłania się po ok. 1 s, licznik wypłaty bije do góry, „Twój typ był lepszy niż N% graczy”. |
+| Profile pages | /u/:nick – publiczny profil: miejsce w rankingu, wartość pozycji, największa wygrana, prognozy, aktywność. |
+| Leaderboard | /ranking – miejsce, portfel, zysk, trafność, obrót; numer miejsca pokazywany też przy nickach w komentarzach i aktywności. |
+| Live activity | Strona główna: taśma „Na żywo” (ostatnie 5 ruchów i licznik prognoz z ostatnich 10 minut); karty rynków migoczą na zielono/czerwono przy zmianie kursu między odpytaniami i pokazują zmianę w pp od ostatniej godziny. |
 | Activity | /aktywnosc – ostatnie prognozy wszystkich graczy. |
 | How it works, dark mode | Modal „Jak to działa”, ciemny motyw domyślnie, jasny do wyboru. |
 | Deposit, rewards, limit orders | Nie ma: gra o punkty. |
@@ -36,8 +37,9 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 - Nowy gracz zakłada konto i dostaje 1000 punktów. Każdy rynek ma 2 albo 3 odpowiedzi; kursy ustala automatyczny animator LMSR
   (b = 1000). Po prognozie gracz widzi, jak przesunął kurs.
-- Na jeden rynek można wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki rynek ma mniej niż 10 prognoz
-  (do tego czasu widać kurs otwarcia ustawiony przez admina).
+- Na jeden rynek można wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki rynek ma mniej niż 2 prognozy
+  (do tego czasu widać kurs otwarcia ustawiony przez admina). Domyślny próg można zmienić w `/admin` (na demo: 1),
+  a admin może nadpisać próg per rynek.
 - Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Unieważnienie zwraca wydane punkty. Udziały można sprzedać
   przed terminem po bieżącym kursie. Gracz trzyma udziały tylko jednej odpowiedzi na rynek: zmiana zdania to
   sprzedaż starej strony i zakup nowej w jednej transakcji.

@@ -59,7 +59,7 @@ const pytania = [
     link_zrodla: "https://example.invalid/zdmk", termin: "2027-01-31", status: "otwarte", wynik: null, link_rozstrzygniecia: null,
     komentarz_urzedu: "Trwa procedura odbiorowa.", liczba_prognoz: 12, utworzono: iso(60 * 24 * 3), rozstrzygnieto: null,
     kurs_widoczny: true, kursy: [0.41, 0.44, 0.15], prog_widocznosci: 10, liczba_zmian_terminu: 1,
-    obrot: 1240, otwarto: iso(60 * 24 * 3), kursy_otwarcia: [0.34, 0.33, 0.33],
+    obrot: 1240, otwarto: iso(60 * 24 * 3), kursy_otwarcia: [0.34, 0.33, 0.33], kursy_1h: [0.36, 0.45, 0.19], gracze_rynku: null,
   },
   {
     id: 2, tresc: "Czy kładka Kazimierz–Ludwinów zostanie oficjalnie otwarta 4 października 2026?", kategoria: "luz",
@@ -67,7 +67,7 @@ const pytania = [
     link_zrodla: "https://example.invalid/zim", termin: "2026-10-04", status: "otwarte", wynik: null, link_rozstrzygniecia: null,
     komentarz_urzedu: null, liczba_prognoz: 11, utworzono: iso(60 * 24), rozstrzygnieto: null,
     kurs_widoczny: true, kursy: [0.41, 0.59], prog_widocznosci: 10, liczba_zmian_terminu: 0,
-    obrot: 530, otwarto: iso(60 * 24), kursy_otwarcia: [0.5, 0.5],
+    obrot: 530, otwarto: iso(60 * 24), kursy_otwarcia: [0.5, 0.5], kursy_1h: [0.43, 0.57], gracze_rynku: null,
   },
   {
     id: 3, tresc: "Czy wczoraj padało na Rynku Głównym?", kategoria: "luz",
@@ -75,13 +75,14 @@ const pytania = [
     status: "rozstrzygniete", wynik: 2, link_rozstrzygniecia: "https://example.invalid/imgw/wynik", komentarz_urzedu: null,
     liczba_prognoz: 30, utworzono: iso(60 * 48), rozstrzygnieto: iso(30),
     kurs_widoczny: true, kursy: [0.72, 0.28], prog_widocznosci: 10, liczba_zmian_terminu: 0,
-    obrot: 2100, otwarto: iso(60 * 48), kursy_otwarcia: [0.5, 0.5],
+    obrot: 2100, otwarto: iso(60 * 48), kursy_otwarcia: [0.5, 0.5], kursy_1h: null, gracze_rynku: { graczy: 4, trafilo: 1 },
   },
   {
     id: 4, tresc: "Czy lista zwycięskich projektów 13. edycji Budżetu Obywatelskiego Krakowa zostanie opublikowana do 13 listopada 2026?", kategoria: "luz",
     odpowiedzi: ["tak", "nie"], kryterium: "Lista na budzet.krakow.pl do 13.11.2026.", link_zrodla: "https://example.invalid/bo", termin: "2026-11-13",
     status: "otwarte", wynik: null, link_rozstrzygniecia: null, komentarz_urzedu: null, liczba_prognoz: 3, utworzono: iso(50), rozstrzygnieto: null,
     kurs_widoczny: false, kursy: null, prog_widocznosci: 10, liczba_zmian_terminu: 0, obrot: 60, otwarto: iso(50), kursy_otwarcia: [0.5, 0.5],
+    kursy_1h: null, gracze_rynku: null,
   },
 ];
 // Propozycje widzi tylko admin: 21 i 22 się otworzą, 23 odrzuci serwer (minięta data), 24 nie ma kryterium.
@@ -129,6 +130,8 @@ const ranking = [
   { nick: "zwierzyniec", saldo: 975, wartosc_pozycji: 26.1, portfel: 1001.1, zysk: 1.1, prognozy: 2, obrot: 30, trafione: 1, rozstrzygniete: 2 },
   { nick: "nowa_huta", saldo: 940, wartosc_pozycji: 22.3, portfel: 962.3, zysk: -37.7, prognozy: 3, obrot: 70, trafione: 0, rozstrzygniete: 1 },
 ];
+// rozstrzygnięta pozycja gracza (rynek 3, wynik „nie”): ekran „Rynek rozstrzygnięty” na /profil
+stan.pozycje.set("3-2", { pytanie: 3, odpowiedz: 2, udzialy: 61.9, wydane: 40 });
 stan.komentarze.push({ id: 1, nick: "zwierzyniec", odpowiedz: 2, odpowiedz_tekst: "nie", powod: null, komentarz: "Aneks do umowy był już raz.", stawka: 25, czas: iso(20) });
 
 function json(route: Route, body: unknown, status = 200) {
@@ -141,10 +144,12 @@ function mojePozycje() {
     const p = pytania.find((q) => q.id === pid)!;
     const glowna = [...lista].sort((a, b) => b.wydane - a.wydane)[0];
     const wydane = lista.reduce((s, z) => s + z.wydane, 0);
-    const wartosc = p.kursy ? lista.reduce((s, z) => s + z.udzialy * (p.kursy![z.odpowiedz - 1] ?? 0), 0) : wydane;
+    const wyplata = p.status === "rozstrzygniete" ? lista.filter((z) => z.odpowiedz === p.wynik).reduce((s, z) => s + z.udzialy, 0) : 0;
+    const wartosc = p.status === "rozstrzygniete" ? wyplata : p.kursy ? lista.reduce((s, z) => s + z.udzialy * (p.kursy![z.odpowiedz - 1] ?? 0), 0) : wydane;
     return {
       pytanie: pid, tresc: p.tresc, kategoria: p.kategoria, odpowiedzi: p.odpowiedzi, status: p.status, termin: p.termin, wynik: p.wynik,
-      odpowiedz_glowna: glowna.odpowiedz, wydane, wyplata: 0, trafione: null, kursy: p.kursy, udzialy_glowne: glowna.udzialy, wartosc,
+      odpowiedz_glowna: glowna.odpowiedz, wydane, wyplata, trafione: p.status === "rozstrzygniete" ? glowna.odpowiedz === p.wynik : null,
+      kursy: p.kursy, udzialy_glowne: glowna.udzialy, wartosc,
     };
   });
 }
@@ -214,7 +219,7 @@ async function mock(route: Route) {
     const body = req.postDataJSON() as { p_nick: string };
     if (body.p_nick !== "podgorze_7") return json(route, null);
     return json(route, {
-      nick: "podgorze_7", utworzono: iso(60 * 24 * 10), prognozy: 4, obrot: 120, wartosc_pozycji: 96.4, najwieksza_wygrana: 61.9, trafione: 2, rozstrzygniete: 2,
+      nick: "podgorze_7", utworzono: iso(60 * 24 * 10), prognozy: 4, obrot: 120, wartosc_pozycji: 96.4, najwieksza_wygrana: 61.9, trafione: 2, rozstrzygniete: 2, miejsce: 1,
       pozycje: [{ pytanie: 1, tresc: pytania[0].tresc, kategoria: "miasto", odpowiedzi: pytania[0].odpowiedzi, status: "otwarte", wynik: null, odpowiedz: 2, udzialy: 108.3, wydane: 50, kurs: 0.44, wartosc: 47.6 }],
       aktywnosc: aktywnosc.filter((a) => a.nick === "podgorze_7"),
     });
@@ -255,6 +260,7 @@ async function mock(route: Route) {
       pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, stawka: body.p_stawka, udzialy: 23.7,
       kurs_przed: 0.41, kurs_po: 0.44, kursy: q.odpowiedzi.length === 2 ? [0.44, 0.56] : [0.41, 0.47, 0.12], saldo: stan.gracz.saldo, liczba_prognoz: 12, obrot: q.obrot + body.p_stawka,
       sprzedano, zwrot_ze_sprzedazy: sprzedano.reduce((s, x) => s + x.zwrot, 0),
+      miejsce_przed: stan.prognozy === 1 ? null : 3, miejsce_po: stan.prognozy === 1 ? 3 : 2, graczy_w_rankingu: 4,
     });
   }
   if (p === "/rest/v1/rpc/sprzedaj_udzialy") {
@@ -267,7 +273,7 @@ async function mock(route: Route) {
     z.udzialy -= u;
     stan.gracz.saldo += zwrot;
     stan.sprzedaze++;
-    return json(route, { pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, udzialy: u, zwrot, kurs_przed: 0.44, kurs_po: 0.42, kursy: [0.42, 0.58], saldo: stan.gracz.saldo, udzialy_pozostale: z.udzialy });
+    return json(route, { pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, udzialy: u, zwrot, kurs_przed: 0.44, kurs_po: 0.42, kursy: [0.42, 0.58], saldo: stan.gracz.saldo, udzialy_pozostale: z.udzialy, miejsce_przed: 2, miejsce_po: 2 });
   }
   if (p === "/rest/v1/rpc/dodaj_komentarz") {
     const body = req.postDataJSON() as { p_pytanie: number; p_tresc: string };
@@ -282,7 +288,7 @@ async function mock(route: Route) {
     return json(route, ok);
   }
   if (p === "/rest/v1/rpc/admin_pytania")
-    return json(route, [...pytania, ...propozycje].map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null })));
+    return json(route, [...pytania, ...propozycje].map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null, prog_widocznosci: null })));
   if (p === "/rest/v1/rpc/admin_otworz") {
     const body = req.postDataJSON() as { p_pytanie: number; p_kurs_otwarcia: number[] | null };
     const q = propozycje.find((x) => x.id === body.p_pytanie);
@@ -293,6 +299,8 @@ async function mock(route: Route) {
     return json(route, null);
   }
   if (p === "/rest/v1/rpc/admin_dodaj_pytanie") return json(route, 5);
+  if (p === "/rest/v1/rpc/admin_ustaw_prog") return json(route, null);
+  if (p === "/rest/v1/rpc/admin_ustaw_prog_domyslny") return json(route, (req.postDataJSON() as { p_prog: number }).p_prog);
   console.log(`  (brak mocka) ${m} ${p}${url.search}`);
   return json(route, { message: `brak mocka dla ${p}` }, 404);
 }
@@ -379,6 +387,8 @@ async function main() {
     await oczekuj(page, "12 prognoz");
     await oczekuj(page, "3/10 prognoz");
     await oczekuj(page, "tłum się pomylił");
+    await oczekuj(page, "w 10 min");
+    await oczekuj(page, "2 pp / 1 h");
     await zrzut(page, "rynki_gosc");
 
     console.log("2. Klik „Tak” na karcie → rynek → rejestracja (nick, e-mail, hasło) → prognoza");
@@ -392,10 +402,20 @@ async function main() {
     await page.getByLabel(/Hasło/).fill("haslo123");
     await page.locator(".modal").getByRole("button", { name: "Załóż konto", exact: true }).click();
     await page.getByRole("button", { name: /^Postaw/ }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("group", { name: "Szybka stawka" }).getByRole("button", { name: "50", exact: true }).click();
+    await oczekuj(page, "Jeśli trafisz");
+    await oczekuj(page, "(×");
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
-    await oczekuj(page, "przesunęła kurs z 41% na 44%");
+    await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
+    await page.getByRole("button", { name: "Udostępnij kartę" }).first().click();
+    await oczekuj(page, "Udostępnij prognozę");
+    await oczekuj(page, /Daję 44% na to, że kładka/);
+    await page.locator("img.karta-udostepniania").waitFor({ timeout: 5000 });
+    await zrzut(page, "karta_udostepniania", false);
+    await page.getByRole("button", { name: "Zamknij" }).click();
 
     console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
@@ -411,8 +431,10 @@ async function main() {
     await page.getByRole("button", { name: "wykonawca", exact: true }).click();
     await page.getByPlaceholder("Jedno zdanie komentarza (opcjonalnie)").fill("Wykonawca już raz prosił o aneks");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
-    await oczekuj(page, "przesunęła kurs z 41% na 44%");
+    await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await oczekuj(page, "Awans w rankingu: 3 → 2");
     await oczekuj(page, "Wykonawca już raz prosił o aneks");
+    await oczekuj(page, /stawia 20 na po terminie/);
     await zrzut(page, "rynek_miasto");
 
     console.log("4. Komentarz bez zakładu");
@@ -429,11 +451,19 @@ async function main() {
     await oczekuj(page, /Sprzedano/);
     await zrzut(page, "sprzedaz");
 
-    console.log("6. Profil (portfolio), ranking, aktywność, profil publiczny");
+    console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
     await page.goto(`${ADRES}/profil`);
+    await oczekuj(page, "Rynek rozstrzygnięty");
+    await oczekuj(page, "Twój typ był lepszy niż 75% graczy", 6000);
+    await zrzut(page, "rozstrzygniecie", false);
+    await page.getByRole("button", { name: "Jasne" }).click();
     await oczekuj(page, "Wartość portfela");
+    await oczekuj(page, "Otwarte pozycje");
     await oczekuj(page, "krowodrza_42");
     await zrzut(page, "profil");
+    await page.reload();
+    await oczekuj(page, "Wartość portfela");
+    if (await page.getByText("Rynek rozstrzygnięty").count()) throw new Error("Ekran rozstrzygnięcia pokazał się drugi raz");
     await page.goto(`${ADRES}/ranking`);
     await oczekujNaglowka(page, "Ranking");
     await oczekuj(page, "podgorze_7");
@@ -444,6 +474,7 @@ async function main() {
     await zrzut(page, "aktywnosc");
     await page.goto(`${ADRES}/u/podgorze_7`);
     await oczekuj(page, "Największa wygrana");
+    await oczekuj(page, "1. miejsce w rankingu");
     await zrzut(page, "profil_publiczny");
 
     console.log("7. Desktop: strona główna, rynek, jasny motyw, /miasto");
@@ -483,6 +514,7 @@ async function main() {
     await page.getByLabel("Hasło").fill("tajne");
     await page.getByRole("button", { name: "Zaloguj" }).click();
     await oczekuj(page, "Dodaj pytanie");
+    await oczekuj(page, "Próg ukrycia kursu");
     await oczekuj(page, "wyniki sportowe");
     await oczekujNaglowka(page, "Propozycje (kolejka) (4)");
     await oczekuj(page, "do uzupełnienia przed otwarciem: 1");

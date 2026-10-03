@@ -79,6 +79,29 @@ export function opisPrognoz(p: Pick<Pytanie, "liczba_prognoz" | "prog_widocznosc
   return odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz");
 }
 
+/** Numer miejsca w rankingu przy nicku: „#3”. Nic, gdy gracz nie jest w rankingu. */
+export function OdznakaMiejsca({ miejsce, duza = false }: { miejsce: number | null | undefined; duza?: boolean }) {
+  if (miejsce == null) return null;
+  return (
+    <span className={`miejsce-odznaka cyfry ${miejsce <= 3 ? "top" : ""} ${duza ? "duza" : ""}`} title={`${miejsce}. miejsce w rankingu`}>
+      #{miejsce}
+    </span>
+  );
+}
+
+/** Zysk/strata z jawnym znakiem, zielony/czerwony; `miejsca` = miejsca po przecinku. */
+export function ZyskStrata({ wartosc, miejsca = 0, sufiks = " pkt" }: { wartosc: number; miejsca?: number; sufiks?: string }) {
+  const zaokr = Number(wartosc.toFixed(miejsca));
+  const klasa = zaokr > 0 ? "zysk" : zaokr < 0 ? "strata" : "zero";
+  const tekst = zaokr > 0 ? `+${liczba(zaokr, miejsca)}` : zaokr < 0 ? `−${liczba(-zaokr, miejsca)}` : liczba(0, miejsca);
+  return (
+    <span className={`zysk-strata ${klasa}`}>
+      {tekst}
+      {sufiks}
+    </span>
+  );
+}
+
 /** Inicjały gracza na kole w kolorze wyliczonym z nicku. */
 export function Awatar({ nick, duzy = false }: { nick: string; duzy?: boolean }) {
   return (
@@ -166,7 +189,7 @@ export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolea
 /* ---------- nagłówek ---------- */
 
 export function Naglowek() {
-  const { gracz, konto, stan, otworzModal } = useSesja();
+  const { gracz, konto, stan, otworzModal, portfel } = useSesja();
   const [motyw, przelaczMotyw] = useMotyw();
   const klasa = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "aktywny" : ""}`;
   // Kto w tej wizycie założył konto albo się zalogował (a nie wrócił z zapisaną sesją), widzi, jak punkty
@@ -226,16 +249,17 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Twoje punkty i profil" ref={refPortfela}>
+            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + udziały po kursie, zysk wobec 1000 na start" ref={refPortfela}>
               <span className="portfel-saldo">
                 <LiczbaZywa
                   className="cyfry"
-                  wartosc={Math.floor(gracz.saldo)}
+                  wartosc={portfel ? Math.round(portfel.wartosc) : Math.floor(gracz.saldo)}
                   od={bylGosciem.current ? 0 : undefined}
                   czas={bylGosciem.current ? 1100 : 450}
                   format={(n) => liczba(Math.round(n))}
                 />
                 <small>pkt</small>
+                {portfel ? <ZyskStrata wartosc={Math.round(portfel.zysk)} sufiks="" /> : null}
               </span>
               <Awatar nick={gracz.nick} />
             </Link>

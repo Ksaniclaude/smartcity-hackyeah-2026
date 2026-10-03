@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { pobierzMojePozycje, pobierzMojeTransakcje } from "@/api/api";
+import { pobierzMojeTransakcje } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja } from "@/api/sesja";
 import type { MojaPozycja, MojaTransakcja } from "@/api/types";
-import { useAkcja, usePolling } from "@/ui/hooks";
+import { useAkcja, useMiejsca, usePolling } from "@/ui/hooks";
 import { IkKsiezyc, IkSlonce } from "@/ui/ikony";
-import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaStatusu, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
+import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
+import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { czasTemu, liczba, pkt } from "@/ui/tekst";
 import { LiczbaZywa } from "@/ui/zywe";
 import { klasaTypu } from "@/pages/Aktywnosc";
-import { zeZnakiem } from "@/pages/Ranking";
 
 type Tab = "pozycje" | "historia" | "ustawienia";
 const ZAKLADKI: { klucz: Tab; etykieta: string }[] = [
@@ -173,27 +173,34 @@ function Ustawienia() {
   );
 }
 
-/** Portfel gracza (/profil): statystyki, pozycje, historia transakcji, ustawienia. Wymaga nicku. */
+/** Zysk/strata pozycji wobec kosztu: po kursie dla otwartych, po wypłacie dla rozstrzygniętych; unieważnione to zwrot. */
+function ZyskPozycji({ p }: { p: MojaPozycja }) {
+  if (p.status === "uniewaznione") return <span className="mala">zwrot</span>;
+  return <ZyskStrata wartosc={p.wartosc - p.wydane} miejsca={1} />;
+}
+
+/** Portfel gracza (/profil): statystyki na żywo (pozycje z sesji, odpytywane co 5 s), pozycje, historia, ustawienia. */
 export default function Profil() {
-  const { gracz, konto, wyloguj } = useSesja();
+  const { gracz, konto, wyloguj, pozycje: dane, portfel: portfelNaZywo } = useSesja();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const t = params.get("tab");
   const tab: Tab = t === "historia" || t === "ustawienia" ? t : "pozycje";
-  const { dane, blad, laduje } = usePolling(pobierzMojePozycje, 5000);
+  const miejsca = useMiejsca(10000);
+  const rozstrzygniecie = useRozstrzygniecieDoPokazania(gracz?.nick ?? null, dane);
   const wylogowanie = useAkcja(async () => {
     await wyloguj();
     navigate("/");
   });
 
   const nick = gracz?.nick ?? "";
+  const laduje = dane == null;
   const pozycje = dane ?? [];
   const saldo = Math.floor(gracz?.saldo ?? 0);
-  const wartoscUdzialow = pozycje
-    .filter((p) => p.status === "otwarte" || p.status === "zamkniete")
-    .reduce((s, p) => s + p.wartosc, 0);
-  const portfel = Math.round(saldo + wartoscUdzialow);
+  const portfel = Math.round(portfelNaZywo?.wartosc ?? saldo);
   const zysk = portfel - 1000;
+  const zyskPozycji = portfelNaZywo?.zyskPozycji ?? 0;
+  const miejsce = miejsca.get(nick) ?? null;
   const rozstrzygniete = pozycje.filter((p) => p.status === "rozstrzygniete");
   const trafione = rozstrzygniete.filter((p) => p.trafione === true).length;
 
@@ -209,8 +216,13 @@ export default function Profil() {
       <div className="profil-naglowek">
         <Awatar nick={nick} duzy />
         <div>
-          <h1>{nick}</h1>
-          <div className="pod">{konto?.email}</div>
+          <h1>
+            {nick} <OdznakaMiejsca miejsce={miejsce} duza />
+          </h1>
+          <div className="pod">
+            {miejsce != null ? `${miejsce}. miejsce w rankingu · ` : ""}
+            {konto?.email}
+          </div>
         </div>
         <div className="akcje">
           <button
@@ -227,8 +239,11 @@ export default function Profil() {
       <div className="staty">
         <div className="stat">
           <div className="etykieta">Wartość portfela</div>
-          <div className="wartosc">{dane ? <LiczbaZywa wartosc={portfel} format={(n) => pkt(Math.round(n))} /> : "–"}</div>
-          <div className="pod">punkty + udziały po kursie</div>
+          <div className="wartosc">
+            {dane ? <LiczbaZywa wartosc={portfel} format={(n) => pkt(Math.round(n))} /> : "–"}
+            {dane ? <ZyskStrata wartosc={zysk} sufiks="" /> : null}
+          </div>
+          <div className="pod">punkty + udziały po kursie; zysk wobec 1000 na start</div>
         </div>
         <div className="stat">
           <div className="etykieta">Punkty</div>
@@ -238,9 +253,15 @@ export default function Profil() {
           <div className="pod">do postawienia</div>
         </div>
         <div className="stat">
-          <div className="etykieta">Zysk/strata</div>
-          <div className={`wartosc ${dane && zysk > 0 ? "zysk" : dane && zysk < 0 ? "strata" : ""}`}>{dane ? zeZnakiem(zysk) : "–"}</div>
-          <div className="pod">wobec 1000 pkt na start</div>
+          <div className="etykieta">Otwarte pozycje</div>
+          <div className={`wartosc ${dane && zyskPozycji > 0.05 ? "zysk" : dane && zyskPozycji < -0.05 ? "strata" : ""}`}>
+            {dane ? <ZyskStrata wartosc={zyskPozycji} miejsca={1} /> : "–"}
+          </div>
+          <div className="pod">
+            {portfelNaZywo && portfelNaZywo.kosztPozycji > 0
+              ? `warte ${liczba(portfelNaZywo.wartoscPozycji, 1)} pkt, koszt ${liczba(portfelNaZywo.kosztPozycji, 1)} pkt`
+              : "zysk/strata wobec kosztu"}
+          </div>
         </div>
         <div className="stat">
           <div className="etykieta">Trafność</div>
@@ -249,7 +270,6 @@ export default function Profil() {
         </div>
       </div>
 
-      {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {wylogowanie.blad ? <Komunikat typ="blad">{wylogowanie.blad}</Komunikat> : null}
 
       <div className="zakladki" role="tablist">
@@ -283,8 +303,10 @@ export default function Profil() {
                   <th>Rynek</th>
                   <th>Twój typ</th>
                   <th className="liczba">Udziały</th>
+                  <th className="liczba">Koszt</th>
                   <th className="liczba">Kurs teraz</th>
                   <th className="liczba">Wartość</th>
+                  <th className="liczba">Zysk/strata</th>
                   <th>Wynik</th>
                 </tr>
               </thead>
@@ -305,11 +327,17 @@ export default function Profil() {
                       <td className="liczba" data-etykieta="Udziały">
                         {liczba(p.udzialy_glowne, 1)}
                       </td>
+                      <td className="liczba" data-etykieta="Koszt">
+                        {pkt(p.wydane)}
+                      </td>
                       <td className="liczba" data-etykieta="Kurs teraz">
                         {p.kursy ? procent(p.kursy[i]) : <span className="mala">ukryty</span>}
                       </td>
                       <td className="liczba" data-etykieta="Wartość">
                         {liczba(p.wartosc, 1)} pkt
+                      </td>
+                      <td className="liczba" data-etykieta="Zysk/strata">
+                        <ZyskPozycji p={p} />
                       </td>
                       <td data-etykieta="Wynik">
                         <Wynik p={p} />
@@ -326,6 +354,9 @@ export default function Profil() {
       ) : (
         <Ustawienia />
       )}
+      {rozstrzygniecie.pozycja ? (
+        <EkranRozstrzygniecia moja={rozstrzygniecie.pozycja} onClose={() => rozstrzygniecie.oznacz(rozstrzygniecie.pozycja!.pytanie)} />
+      ) : null}
     </main>
   );
 }

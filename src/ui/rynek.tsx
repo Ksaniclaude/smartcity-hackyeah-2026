@@ -18,6 +18,7 @@ import {
   IkTramwaj,
   IkZegar,
 } from "@/ui/ikony";
+import { useBlysk } from "@/ui/hooks";
 import { formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { koniecTerminu, odliczanie, opisTerminu, poPrognozach, ulamekCzasu, zmianaPp } from "@/ui/tekst";
 import { LiczbaZywa, useTeraz, wystrzel } from "@/ui/zywe";
@@ -69,6 +70,19 @@ export function Zmiana({ pp, pelna = false }: { pp: number | null; pelna?: boole
       {pp > 0 ? <IkGora /> : <IkDol />}
       {Math.abs(pp)}
       {pelna ? " pkt proc. od otwarcia" : null}
+    </span>
+  );
+}
+
+/** Zmiana kursu od godziny (kurs sprzed godziny z historii; dla rynku młodszego: od otwarcia). Zero pokazane jako „bez zmian”. */
+export function ZmianaOdGodziny({ p, pelna = false }: { p: Pick<Pytanie, "kursy" | "kursy_1h">; pelna?: boolean }) {
+  const pp = zmianaPp(p.kursy?.[0], p.kursy_1h?.[0]);
+  if (pp == null) return null;
+  return (
+    <span className={`zmiana ${pp > 0 ? "gora" : pp < 0 ? "dol" : "zero"}`} title="Zmiana kursu w ostatniej godzinie">
+      {pp > 0 ? <IkGora /> : pp < 0 ? <IkDol /> : null}
+      {pp === 0 ? "bez zmian" : `${Math.abs(pp)} pp`}
+      {pelna ? " / 1 godz." : " / 1 h"}
     </span>
   );
 }
@@ -188,6 +202,8 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
   const ukryty = otwarte && kursy == null;
   const otwartoMs = p.otwarto ? new Date(p.otwarto).getTime() : Number.NaN;
   const nowy = otwarte && !ukryty && Number.isFinite(otwartoMs) && Date.now() - otwartoMs < 3 * DZIEN;
+  // zmiana kursu między odpytaniami: karta błyska na zielono/czerwono przez ok. 1 s
+  const blysk = useBlysk(kursy ? kursy[0] : null);
 
   // Rozstrzygnięcie: ile tłum dawał na faktyczny wynik i czy trafił (wynik miał najwyższy kurs).
   const wynik = p.status === "rozstrzygniete" && p.wynik != null ? p.wynik : null;
@@ -228,7 +244,7 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
   }
 
   return (
-    <article className={`rynek ${zakonczone ? "rynek-zakonczony" : ""}`}>
+    <article className={`rynek ${zakonczone ? "rynek-zakonczony" : ""} ${blysk ? `karta-blysk-${blysk}` : ""}`}>
       <div className="rynek-gora">
         <Link to={`/pytanie/${p.id}`} className="rynek-link">
           <Piktogram tresc={p.tresc} kategoria={p.kategoria} />
@@ -260,7 +276,8 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
         <span className="rynek-meta" title={ukryty ? `Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}` : undefined}>
           {opisPrognoz(p)}
         </span>
-        {otwarte ? <Zmiana pp={zmianaPp(kursy?.[0], p.kursy_otwarcia?.[0])} /> : null}
+        {otwarte ? <ZmianaOdGodziny p={p} /> : null}
+        {otwarte && !p.kursy_1h ? <Zmiana pp={zmianaPp(kursy?.[0], p.kursy_otwarcia?.[0])} /> : null}
         <span className="prawy">
           {otwarte ? <Termin termin={p.termin} /> : <span>do {formatujDateKrotko(p.termin)}</span>}
         </span>

@@ -62,6 +62,14 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
   const pad = { l: 2, r: 40, t: 10, b: kompakt ? 8 : 24 };
   const wybrane = serie ?? (odpowiedzi.length === 2 ? [0] : odpowiedzi.map((_, i) => i));
 
+  // Nowy punkt (po własnej prognozie albo odpytaniu): ostatni odcinek dorysowuje się animacją.
+  const liczbaRef = useRef(0);
+  const [animacja, setAnimacja] = useState(0);
+  useEffect(() => {
+    if (liczbaRef.current > 0 && historia.length > liczbaRef.current) setAnimacja((a) => a + 1);
+    liczbaRef.current = historia.length;
+  }, [historia.length]);
+
   const { punkty, t0, t1 } = useMemo(() => {
     const pkt = historia
       .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
@@ -127,6 +135,12 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
   const ostatni = punkty[punkty.length - 1];
   const akt = hover != null ? punkty[hover] : ostatni;
   const xAkt = hover != null ? x(akt.t) : prawy;
+  const ostatniOdcinek = (i: number) => {
+    if (punkty.length < 2) return "";
+    const a = punkty[punkty.length - 2];
+    const b = punkty[punkty.length - 1];
+    return `M${x(a.t).toFixed(1)},${y(a.kursy[i] ?? 0).toFixed(1)} H${x(b.t).toFixed(1)} V${y(b.kursy[i] ?? 0).toFixed(1)} H${prawy.toFixed(1)}`;
+  };
 
   const naRuch = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -166,6 +180,11 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
         {wybrane.map((i) => (
           <path key={i} d={sciezka(i)} className={`wykres-linia seria-${KLASY[i] ?? "trzeci"}`} />
         ))}
+        {animacja > 0 && punkty.length >= 2
+          ? wybrane.map((i) => (
+              <path key={`n${animacja}-${i}`} d={ostatniOdcinek(i)} pathLength={1} className={`wykres-linia wykres-odcinek-nowy seria-${KLASY[i] ?? "trzeci"}`} />
+            ))
+          : null}
         {hover != null ? <line x1={xAkt} x2={xAkt} y1={pad.t} y2={dol} className="wykres-kursor" /> : null}
         {wybrane.map((i) => (
           <g key={i} className={`wykres-punkt seria-${KLASY[i] ?? "trzeci"}`}>

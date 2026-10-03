@@ -26,7 +26,18 @@ select * from public.aktywnosc(null, 5) limit 1;
 select * from public.najwieksi_gracze(1, 5) limit 1;
 select * from public.ranking(5) limit 1;
 select public.profil_publiczny('nikt');
+select kursy_1h, gracze_rynku, prog_widocznosci from public.v_pytania limit 1;
+select public.kurs_widoczny(1), public.prog_pytania(1), public.kursy_godzine_temu(1), public.gracze_rynku(1);
 reset role;
+-- funkcje wewnętrzne niedostępne dla anon
+do $$ begin
+  set local role anon;
+  begin perform public.ranking_graczy(); raise exception 'anon może wołać ranking_graczy';
+  exception when insufficient_privilege then null; end;
+  begin perform public.miejsce_w_rankingu(gen_random_uuid()); raise exception 'anon może wołać miejsce_w_rankingu';
+  exception when insufficient_privilege then null; end;
+  reset role;
+end $$;
 set local role authenticated;
 select count(*) from public.v_pytania;
 select count(*) from public.v_moje_pozycje;
@@ -36,7 +47,9 @@ SQL
 echo "role: OK"
 
 echo "symulacja 100 graczy (2 i 3 odpowiedzi):"
-psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/symulacja.sql 2>&1 | grep -E "SYMULACJA|ERROR|BŁĄD" || true
+WYNIK_SYM=$(psql -v ON_ERROR_STOP=1 -d "$DB" -q -f db/test/symulacja.sql 2>&1 || true)
+echo "$WYNIK_SYM" | grep -E "SYMULACJA|ERROR|BŁĄD" || true
+if ! echo "$WYNIK_SYM" | grep -q "SYMULACJA OK"; then echo "symulacja: BŁĄD"; exit 1; fi
 
 echo "zakłady równoległe (8 procesów x 40 zakładów na jednym pytaniu):"
 # przygotowanie: admin, pytanie, 8 graczy

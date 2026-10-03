@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { pobierzAktywnosc, pobierzHistorie, pobierzMojePozycje, pobierzPytania } from "@/api/api";
+import { pobierzAktywnosc, pobierzHistorie, pobierzPytania } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Pytanie } from "@/api/types";
@@ -163,16 +163,23 @@ function Wyrozniony({ p, powod }: { p: Pytanie; powod: string }) {
   );
 }
 
-/** Taśma ostatnich prognoz wszystkich graczy (odpytywana co 10 s); pusta nie zajmuje miejsca. */
+const DZIESIEC_MINUT = 10 * 60 * 1000;
+
+/** Taśma świeżych ruchów: ostatnie 5 prognoz i licznik prognoz z ostatnich 10 minut (RPC aktywnosc, co 5 s). Pusta nie zajmuje miejsca. */
 function Tasma() {
-  const { dane } = usePolling(() => pobierzAktywnosc(null, 8), 10000);
-  const wpisy = dane ?? [];
+  const { dane } = usePolling(() => pobierzAktywnosc(null, 100), 5000);
+  const wszystkie = dane ?? [];
+  const wpisy = wszystkie.slice(0, 5);
   if (wpisy.length === 0) return null;
+  const teraz = Date.now();
+  const ostatnie10 = wszystkie.filter((a) => a.udzialy > 0 && teraz - new Date(a.czas).getTime() <= DZIESIEC_MINUT).length;
   return (
     <div className="tasma">
       <span className="tasma-etykieta">
         <i className="puls" />
         Na żywo
+        <small className="tasma-licznik cyfry">{ostatnie10}</small>
+        <small className="tasma-opis">{ostatnie10 === 1 ? "prognoza" : ostatnie10 >= 2 && ostatnie10 <= 4 ? "prognozy" : "prognoz"} w 10 min</small>
       </span>
       <div className="tasma-wpisy">
         {wpisy.map((a) => (
@@ -243,7 +250,7 @@ export default function Lista() {
   const { stan, gracz, konto, otworzModal } = useSesja();
   const [params, setParams] = useSearchParams();
   const { dane, blad, laduje } = usePolling(pobierzPytania, 5000);
-  const { dane: moje } = usePolling(() => (gracz ? pobierzMojePozycje() : Promise.resolve([])), 10000, gracz?.id ?? "");
+  const { pozycje: moje } = useSesja();
   const [obserwowane, setObserwowane] = useState<number[]>(czytajObserwowane);
 
   const filtr = czytajFiltr(params.get("f"));

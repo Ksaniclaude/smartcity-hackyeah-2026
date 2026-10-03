@@ -95,6 +95,10 @@ begin
       if (select count(*) from public.pozycje where gracz = v_id and pytanie = v_pyt and udzialy > 0) > 1 then
         raise exception 'Gracz ma udziały na dwóch odpowiedziach naraz';
       end if;
+      -- miejsce w rankingu: po zakładzie gracz jest w rankingu
+      if (v_wynik ->> 'miejsce_po') is null or (v_wynik ->> 'miejsce_po')::integer < 1 then
+        raise exception 'Brak miejsca w rankingu po zakładzie: %', v_wynik;
+      end if;
 
       -- kursy sumują się do 1
       select sum(x) into v_suma from unnest((select public.kursy(q, b) from public.pytania where id = v_pyt)) as x;
@@ -137,6 +141,13 @@ begin
   if abs(v_suma_sald_przed - v_suma_sald_po - v_netto) > 1e-6 then
     raise exception 'Bilans się nie zgadza: % - % <> %', v_suma_sald_przed, v_suma_sald_po, v_netto;
   end if;
+  -- kurs sprzed godziny: tuż po otwarciu równa się kursowi otwarcia; statystyka graczy tylko po rozstrzygnięciu
+  if (select kursy_1h from public.v_pytania where id = v_pyt2) is distinct from (select kursy_otwarcia from public.v_pytania where id = v_pyt2) then
+    raise exception 'kursy_1h świeżego rynku powinny być kursem otwarcia';
+  end if;
+  if (select gracze_rynku from public.v_pytania where id = v_pyt3) is not null then
+    raise exception 'gracze_rynku powinno być puste przed rozstrzygnięciem';
+  end if;
 
   -- rozstrzygnięcie pytania z 3 odpowiedziami: wypłata = suma udziałów trafionej odpowiedzi
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
@@ -154,6 +165,36 @@ begin
   if v_suma_udzialow - v_netto > 1000 * ln(1 / 0.44) + 1e-6 then
     raise exception 'Strata animatora % przekracza b*ln(1/0,44)', v_suma_udzialow - v_netto;
   end if;
+  -- statystyka do ekranu rozstrzygnięcia: trafiło <= graczy, graczy > 0, trafiło = graczy z wypłatą
+  if (select (gracze_rynku ->> 'graczy')::int from public.v_pytania where id = v_pyt3) <= 0
+     or (select (gracze_rynku ->> 'trafilo')::int from public.v_pytania where id = v_pyt3)
+        > (select (gracze_rynku ->> 'graczy')::int from public.v_pytania where id = v_pyt3) then
+    raise exception 'gracze_rynku po rozstrzygnięciu: %', (select gracze_rynku from public.v_pytania where id = v_pyt3);
+  end if;
+  if (select (gracze_rynku ->> 'trafilo')::int from public.v_pytania where id = v_pyt3) <> (v_wyplata ->> 'graczy')::int then
+    raise exception 'gracze_rynku.trafilo % <> graczy z wypłatą %', (select gracze_rynku from public.v_pytania where id = v_pyt3), v_wyplata;
+  end if;
+
+  -- próg per rynek: admin ustawia 1000 i kurs znika, zdejmuje i wraca; domyślny próg to 2
+  perform public.admin_ustaw_prog(v_pyt2, 1000);
+  if (select kursy from public.v_pytania where id = v_pyt2) is not null or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 1000 then
+    raise exception 'Próg per rynek nie ukrył kursu';
+  end if;
+  if (select count(*) from public.historia_kursu(v_pyt2)) <> 0 then raise exception 'Historia widoczna mimo progu'; end if;
+  perform public.admin_ustaw_prog(v_pyt2, null);
+  if (select kursy from public.v_pytania where id = v_pyt2) is null or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 2 then
+    raise exception 'Próg domyślny powinien wynosić 2 i odsłaniać kurs';
+  end if;
+  if public.admin_ustaw_prog_domyslny(1) <> 1 then raise exception 'Domyślny próg nie zapisał się'; end if;
+  if public.prog_widocznosci_kursu() <> 1 or (select prog_widocznosci from public.v_pytania where id = v_pyt2) <> 1 then
+    raise exception 'Domyślny próg z ustawień nie działa';
+  end if;
+  delete from public.ustawienia where klucz = 'prog_widocznosci_kursu';
+  -- ranking w kolejności miejsc, a profil publiczny zwraca miejsce lidera = 1
+  if (select array_agg(nick) from public.ranking(3)) <> (select array_agg(nick order by miejsce) from public.ranking_graczy() where miejsce <= 3) then
+    raise exception 'Ranking nie jest w kolejności miejsc';
+  end if;
+  if (public.profil_publiczny((select nick from public.ranking(1))) ->> 'miejsce')::int <> 1 then raise exception 'Profil lidera bez miejsca 1'; end if;
 
   -- unieważnienie pytania z 2 odpowiedziami: pełny zwrot
   select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where pytanie = v_pyt2;

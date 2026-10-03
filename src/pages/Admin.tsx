@@ -8,6 +8,8 @@ import {
   adminPytania,
   adminRozstrzygnij,
   adminUniewaznij,
+  adminUstawProg,
+  adminUstawProgDomyslny,
   adminZaloguj,
   adminZamknij,
   adminZmienTermin,
@@ -229,6 +231,7 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
   const [nowyTermin, setNowyTermin] = useState("");
   const [linkTerminu, setLinkTerminu] = useState("");
   const [powodUniewaznienia, setPowodUniewaznienia] = useState("");
+  const [prog, setProg] = useState<string>(p.prog_widocznosci == null ? "" : String(p.prog_widocznosci));
   const [proc, setProc] = useState<number[]>(() => kursy.map((k) => Math.round(k * 1000) / 10));
   const [edycja, setEdycja] = useState({
     tresc: p.tresc,
@@ -448,6 +451,28 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
           </>
         ) : null}
 
+        {!koniec ? (
+          <>
+            <h3>Próg ukrycia kursu</h3>
+            <div className="wiersz">
+              <label className="pole">
+                <span className="etykieta">Kurs tłumu widoczny od N prognoz (puste = domyślny próg gry)</span>
+                <input type="number" min={1} value={prog} onChange={(e) => setProg(e.target.value)} placeholder="domyślny" />
+              </label>
+            </div>
+            <div className="przyciski">
+              <button
+                type="button"
+                className="przycisk przycisk-maly przycisk-drugi"
+                disabled={trwa}
+                onClick={() => akcja("Zapisano próg", () => adminUstawProg(p.id, prog.trim() === "" ? null : Number(prog)))}
+              >
+                Zapisz próg
+              </button>
+            </div>
+          </>
+        ) : null}
+
         <h3>Komentarz urzędu</h3>
         <label className="pole">
           <textarea value={komentarz} onChange={(e) => setKomentarz(e.target.value)} placeholder="np. termin przesunięty aneksem nr 3 z powodu…" />
@@ -466,6 +491,40 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
 }
 
 // ---------------------------------------------------------------------------
+
+/** Domyślny próg ukrycia kursu dla wszystkich rynków (zapis w ustawieniach; na demo 1). */
+function ProgDomyslny() {
+  const [prog, setProg] = useState("2");
+  const [ok, setOk] = useState<string | null>(null);
+  const { wykonaj, trwa, blad } = useAkcja(adminUstawProgDomyslny);
+  return (
+    <form
+      className="karta"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const n = await wykonaj(Number(prog));
+        if (n != null) setOk(`Domyślny próg: kurs tłumu widoczny od ${n} ${n === 1 ? "prognozy" : "prognoz"}.`);
+      }}
+    >
+      <h2 className="karta-tytul">Próg ukrycia kursu</h2>
+      <p className="mala">
+        Kurs tłumu jest ukryty, dopóki rynek ma mniej prognoz niż próg (domyślnie 2; na demo 1). Próg per rynek ustawia się w karcie
+        pytania.
+      </p>
+      <div className="wiersz">
+        <label className="pole">
+          <span className="etykieta">Domyślny próg (liczba prognoz)</span>
+          <input type="number" min={1} value={prog} onChange={(e) => setProg(e.target.value)} required />
+        </label>
+      </div>
+      {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
+      {ok ? <Komunikat typ="ok">{ok}</Komunikat> : null}
+      <button className="przycisk przycisk-maly" type="submit" disabled={trwa || !prog}>
+        Zapisz domyślny próg
+      </button>
+    </form>
+  );
+}
 
 /** Otwiera po kolei wszystkie propozycje z kryterium i linkiem, z kursem zapisanym w propozycji. */
 function OtworzWszystkie({ propozycje, odswiez }: { propozycje: PytanieAdmin[]; odswiez: () => Promise<void> }) {
@@ -532,6 +591,7 @@ function PanelAdmina() {
         Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miast</Link>
       </p>
       <FormularzDodawania poDodaniu={odswiez} />
+      <ProgDomyslny />
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
       {grupy.map((g) => {
