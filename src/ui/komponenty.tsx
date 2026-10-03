@@ -225,9 +225,6 @@ export function Naglowek() {
           <NavLink to="/" end className={klasa}>
             Rynki
           </NavLink>
-          <NavLink to="/miasto" className={klasa}>
-            Dla miast
-          </NavLink>
           <NavLink to="/aktywnosc" className={klasa}>
             Aktywność
           </NavLink>
@@ -250,7 +247,7 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + udziały po kursie, zysk wobec 1000 na start" ref={refPortfela}>
+            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + tyle, ile da sprzedaż udziałów teraz, zysk wobec 1000 na start" ref={refPortfela}>
               <span className="portfel-saldo">
                 <LiczbaZywa
                   className="cyfry"
@@ -322,7 +319,6 @@ export function StopkaStrony() {
   return (
     <footer className="stopka-strony">
       <div className="stopka-wnetrze">
-        <Link to="/miasto">Widok dla miast</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
@@ -655,12 +651,6 @@ function ModalWiecej() {
         </div>
       ) : null}
       <ul className="menu-lista">
-        <li>
-          <Link to="/miasto" onClick={zamknijModal}>
-            <IkMiasto />
-            Widok dla miast
-          </Link>
-        </li>
         <li>
           <Link to="/ranking" onClick={zamknijModal}>
             <IkRanking />

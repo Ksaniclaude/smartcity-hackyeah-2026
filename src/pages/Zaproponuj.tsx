@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { zaproponujPytanie } from "@/api/api";
-import { TEMATY_WYKLUCZONE, type Kategoria } from "@/api/types";
+import { MIASTA_PODPOWIEDZI, MIASTO_DOMYSLNE, ZASADY_PYTANIA, type Kategoria } from "@/api/types";
 import { useAkcja } from "@/ui/hooks";
 import { Komunikat } from "@/ui/komponenty";
 
@@ -11,12 +11,13 @@ export default function Zaproponuj() {
   const [tresc, setTresc] = useState("");
   const [termin, setTermin] = useState("");
   const [link, setLink] = useState("");
+  const [miasto, setMiasto] = useState(MIASTO_DOMYSLNE);
   const [wyslano, setWyslano] = useState(false);
   const { wykonaj, trwa, blad } = useAkcja(zaproponujPytanie);
 
   const wyslij = async (e: FormEvent) => {
     e.preventDefault();
-    const id = await wykonaj({ tresc: tresc.trim(), kategoria, termin, link: link.trim() });
+    const id = await wykonaj({ tresc: tresc.trim(), kategoria, termin, link: link.trim(), miasto: miasto.trim() || MIASTO_DOMYSLNE });
     if (id) {
       setWyslano(true);
       setTresc("");
@@ -50,6 +51,15 @@ export default function Zaproponuj() {
           </div>
         </div>
         <label className="pole">
+          <span className="etykieta">Miasto („Polska” dla rynków ogólnokrajowych)</span>
+          <input type="text" list="miasta-podpowiedzi" value={miasto} onChange={(e) => setMiasto(e.target.value)} maxLength={40} required />
+          <datalist id="miasta-podpowiedzi">
+            {MIASTA_PODPOWIEDZI.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        </label>
+        <label className="pole">
           <span className="etykieta">Treść ({szablon})</span>
           <input type="text" value={tresc} onChange={(e) => setTresc(e.target.value)} placeholder={szablon} maxLength={200} required />
         </label>
@@ -61,7 +71,7 @@ export default function Zaproponuj() {
           <span className="etykieta">Link do publicznego źródła</span>
           <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" required />
         </label>
-        <p className="pomoc">Tematy wykluczone: {TEMATY_WYKLUCZONE.join(", ")}.</p>
+        <p className="pomoc">Każdy temat jest dozwolony. Zasady: {ZASADY_PYTANIA.join("; ")}.</p>
         {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
         <button className="przycisk" type="submit" disabled={trwa}>
           {trwa ? "Wysyłam…" : "Wyślij propozycję"}

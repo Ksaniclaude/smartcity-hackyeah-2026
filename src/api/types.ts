@@ -1,4 +1,11 @@
 export type Kategoria = "miasto" | "luz";
+
+/** Miasto domyślne dla starych rynków i formularzy. */
+export const MIASTO_DOMYSLNE = "Kraków";
+/** Rynki ogólnopolskie (bez konkretnego miasta). */
+export const MIASTO_POLSKA = "Polska";
+/** Podpowiedzi w formularzach; wpisać można dowolne inne miasto. */
+export const MIASTA_PODPOWIEDZI = ["Kraków", "Polska", "Warszawa", "Wrocław", "Łódź", "Poznań", "Gdańsk", "Katowice"];
 export type Status = "propozycja" | "otwarte" | "zamkniete" | "rozstrzygniete" | "uniewaznione";
 export type Powod = "wykonawca" | "decyzja_polityczna" | "pieniadze" | "formalnosci" | "inne";
 
@@ -18,11 +25,11 @@ export const ETYKIETY_STATUSU: Record<Status, string> = {
   uniewaznione: "unieważnione",
 };
 
-export const TEMATY_WYKLUCZONE = [
-  "wyniki sportowe",
-  "wybory i kandydaci",
-  "konkretne osoby prywatne",
-  "wypadki i zgony",
+/** Jedyne zasady treści rynku. Tematy nie są ograniczone. */
+export const ZASADY_PYTANIA = [
+  "publiczne źródło (jakiekolwiek, z linkiem)",
+  "nic zmyślonego: treść, termin i kryterium z tego źródła",
+  "wypadki tylko jako śmieszna sprawa, nigdy o ofiarach",
 ];
 
 /** Wiersz widoku v_pytania. */
@@ -50,6 +57,8 @@ export interface Pytanie {
   otwarto: string | null;
   /** Kurs otwarcia ustawiony przez admina (widoczny zawsze, bo nie mówi nic o tłumie). */
   kursy_otwarcia: number[] | null;
+  /** Miasto rynku („Polska” dla rynków ogólnokrajowych). */
+  miasto: string;
   /** Kurs sprzed godziny (albo kurs otwarcia, gdy rynek młodszy); null, gdy kurs ukryty lub rynek zakończony. */
   kursy_1h: number[] | null;
   /** Po rozstrzygnięciu: ilu graczy miało pozycję i ilu trafiło. */
@@ -75,6 +84,7 @@ export interface PytanieAdmin {
   zaproponowal: string | null;
   utworzono: string;
   rozstrzygnieto: string | null;
+  miasto: string;
   /** Próg ukrycia kursu nadpisany przez admina (null = domyślny). */
   prog_widocznosci: number | null;
 }
@@ -134,7 +144,7 @@ export interface PozycjaPubliczna {
   wydane: number;
   /** Bieżący kurs wybranej odpowiedzi (null, gdy ukryty). */
   kurs: number | null;
-  /** Wartość: udziały × kurs; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu. */
+  /** Wartość: ile da sprzedaż teraz (C(q) − C(q − s)); po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu. */
   wartosc: number;
 }
 
@@ -169,7 +179,7 @@ export interface MojaPozycja {
   trafione: boolean | null;
   kursy: number[] | null;
   udzialy_glowne: number;
-  /** Bieżąca wartość udziałów (po kursie; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu). */
+  /** Bieżąca wartość udziałów (ile da sprzedaż teraz; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu). */
   wartosc: number;
 }
 

@@ -4,7 +4,6 @@ import { SesjaProvider, useSesja, useUruchomSesje } from "@/api/sesja";
 import Admin from "@/pages/Admin";
 import Aktywnosc from "@/pages/Aktywnosc";
 import Lista from "@/pages/Lista";
-import Miasto from "@/pages/Miasto";
 import Profil from "@/pages/Profil";
 import ProfilPubliczny from "@/pages/ProfilPubliczny";
 import Pytanie from "@/pages/Pytanie";
@@ -83,7 +82,7 @@ function Uklad() {
         <Route path="/u/:nick" element={<ProfilPubliczny />} />
         <Route path="/ranking" element={<Ranking />} />
         <Route path="/aktywnosc" element={<Aktywnosc />} />
-        <Route path="/miasto" element={<Miasto />} />
+        <Route path="/miasto" element={<Navigate to="/" replace />} />
         <Route path="/liczba" element={<Navigate to="/" replace />} />
         <Route path="/start" element={<Navigate to="/" replace />} />
         <Route path="/qr" element={<Qr />} />

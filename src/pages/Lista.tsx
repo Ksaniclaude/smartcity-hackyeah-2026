@@ -1,9 +1,9 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { pobierzAktywnosc, pobierzHistorie, pobierzPytania } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
-import type { Pytanie } from "@/api/types";
+import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
 import { Awatar, Komunikat, Szkielet, Szukajka, opisPrognoz } from "@/ui/komponenty";
@@ -107,6 +107,34 @@ function porownanie(s: Sortowanie): (a: Pytanie, b: Pytanie) => number {
 function porownanieZakonczonych(s: Sortowanie): (a: Pytanie, b: Pytanie) => number {
   if (s !== "termin") return porownanie(s);
   return (a, b) => czasRozstrzygniecia(b) - czasRozstrzygniecia(a) || b.id - a.id;
+}
+
+/* ---------- „Hot”: rynki z największym ruchem w ostatniej dobie ---------- */
+
+const HOT_OKNO = 24 * 60 * 60 * 1000;
+const HOT_ILE = 10;
+
+/**
+ * Otwarte rynki uszeregowane po liczbie prognoz z ostatniej doby, potem po obrocie i liczbie prognoz.
+ * Gdy ruchu jest mało, listę dopełniają rynki z największym obrotem, a na końcu najnowsze.
+ */
+function wybierzHot(otwarte: Pytanie[], aktywnosc: Aktywnosc[], teraz: number): Pytanie[] {
+  const ruch = new Map<number, number>();
+  for (const a of aktywnosc) {
+    const t = new Date(a.czas).getTime();
+    if (Number.isFinite(t) && teraz - t <= HOT_OKNO) ruch.set(a.pytanie, (ruch.get(a.pytanie) ?? 0) + 1);
+  }
+  const r = (p: Pytanie) => ruch.get(p.id) ?? 0;
+  return [...otwarte]
+    .sort((a, b) => r(b) - r(a) || b.obrot - a.obrot || b.liczba_prognoz - a.liczba_prognoz || czasOtwarcia(b) - czasOtwarcia(a) || a.id - b.id)
+    .slice(0, HOT_ILE);
+}
+
+/** Miasta z listy rynków: od największej liczby rynków, przy remisie alfabetycznie. */
+function miastaZ(lista: Pytanie[]): string[] {
+  const ile = new Map<string, number>();
+  for (const p of lista) ile.set(p.miasto, (ile.get(p.miasto) ?? 0) + 1);
+  return [...ile.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pl")).map(([m]) => m);
 }
 
 /* ---------- czołówka: hasło dla gościa, wyróżniony rynek, taśma ostatnich prognoz ---------- */
@@ -243,6 +271,69 @@ function Sekcja({ tytul, pusto, lista, ...reszta }: PropsListy & { tytul: string
   );
 }
 
+/** Jeden rząd kart przewijany w poziomie (strzałki na szerokim ekranie); tytuł z licznikiem i linkiem „zobacz wszystkie”. */
+function Rzad({ tytul, opis, lista, link, pusto, ...reszta }: PropsListy & { tytul: ReactNode; opis?: string; link?: string; pusto?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const przewin = (kierunek: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: kierunek * Math.max(240, el.clientWidth - 80), behavior: "smooth" });
+  };
+  return (
+    <section className="rzad-sekcja">
+      <h2 className="sekcja-tytul">
+        {tytul} <span className="licznik">{lista.length}</span>
+        {opis ? <span className="sekcja-opis">{opis}</span> : null}
+        <span className="prawy rzad-akcje">
+          {link ? <Link to={link}>Zobacz wszystkie</Link> : null}
+          {lista.length > 1 ? (
+            <>
+              <button type="button" className="przycisk-ikona rzad-strzalka" aria-label="Przewiń w lewo" onClick={() => przewin(-1)}>
+                ‹
+              </button>
+              <button type="button" className="przycisk-ikona rzad-strzalka" aria-label="Przewiń w prawo" onClick={() => przewin(1)}>
+                ›
+              </button>
+            </>
+          ) : null}
+        </span>
+      </h2>
+      {lista.length === 0 ? (
+        <p className="pusto">{pusto ?? PUSTO_OTWARTE}</p>
+      ) : (
+        <div className="rzad" ref={ref}>
+          {lista.map((p) => (
+            <KartaRynku
+              key={p.id}
+              p={p}
+              obserwowany={reszta.obserwowane.includes(p.id)}
+              przelaczObserwowanie={reszta.przelaczObserwowanie}
+              mojTyp={reszta.typy.get(p.id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Chipy miast nad listą w zakładkach Miasto / Na luzie. */
+function ChipyMiast({ miasta, wybrane, naWybor }: { miasta: string[]; wybrane: string; naWybor: (m: string) => void }) {
+  if (miasta.length === 0) return null;
+  return (
+    <div className="chipy chipy-miast" role="group" aria-label="Miasto">
+      <button type="button" className={`chip ${wybrane === "" ? "aktywny" : ""}`} onClick={() => naWybor("")}>
+        Wszystkie miasta
+      </button>
+      {miasta.map((m) => (
+        <button type="button" key={m} className={`chip ${wybrane === m ? "aktywny" : ""}`} onClick={() => naWybor(m)}>
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ---------- strona główna ---------- */
 
 const PUSTO_OTWARTE = "Na razie brak otwartych rynków";
@@ -260,11 +351,15 @@ export default function Lista() {
   const filtr = czytajFiltr(params.get("f"));
   const sortowanie = czytajSortowanie(params.get("s"));
   const q = (params.get("q") ?? "").trim();
+  const miastoParam = (params.get("m") ?? "").trim();
+  // Ruch z ostatniej doby do sekcji „Hot” (tylko strona główna, odpytywane rzadziej niż rynki).
+  const { dane: ruch } = usePolling(() => (filtr === "wszystkie" && !q ? pobierzAktywnosc(null, 100) : Promise.resolve([])), 15000, `${filtr}|${q}`);
 
-  const ustawParam = (klucz: "f" | "s", wartosc: string, domyslna: string) => {
+  const ustawParam = (klucz: "f" | "s" | "m", wartosc: string, domyslna: string) => {
     const nowe = new URLSearchParams(params);
     if (wartosc === domyslna) nowe.delete(klucz);
     else nowe.set(klucz, wartosc);
+    if (klucz === "f") nowe.delete("m");
     setParams(nowe, { replace: true });
   };
 
@@ -304,6 +399,10 @@ export default function Lista() {
   const miasto = aktywne.filter((p) => p.kategoria === "miasto");
   const luz = aktywne.filter((p) => p.kategoria === "luz");
   const liczbaWidocznych = filtr === "rozstrzygniete" ? zakonczone.length : aktywne.length + zakonczone.length;
+  const hot = filtr === "wszystkie" && !q ? wybierzHot(aktywne.filter((p) => p.status === "otwarte"), ruch ?? [], teraz) : [];
+  // Zakładki Miasto / Na luzie: podział po miastach (chipy z adresu ?m=).
+  const miastaKategorii = filtr === "miasto" || filtr === "luz" ? miastaZ(aktywne.concat(zakonczone)) : [];
+  const wybraneMiasto = miastaKategorii.includes(miastoParam) ? miastoParam : "";
 
   const czolowka = filtr === "wszystkie" && !q;
   const wyrozniony = czolowka ? wybierzWyrozniony(aktywne) : null;
@@ -315,16 +414,66 @@ export default function Lista() {
     const pustoAktywne = filtr === "obserwowane" ? PUSTO_OBSERWOWANE : PUSTO_OTWARTE;
     if (q && liczbaWidocznych === 0) {
       zawartosc = <p className="pusto">Nic nie znaleziono dla „{q}”</p>;
-    } else if (filtr === "wszystkie") {
+    } else if (filtr === "wszystkie" && q) {
       zawartosc = (
         <>
-          {!q || miasto.length > 0 ? <Sekcja tytul="Miasto" pusto={pustoAktywne} lista={miasto} {...listaProps} /> : null}
-          {!q || luz.length > 0 ? <Sekcja tytul="Na luzie" pusto={pustoAktywne} lista={luz} {...listaProps} /> : null}
+          {miasto.length > 0 ? <Sekcja tytul="Miasto" pusto={pustoAktywne} lista={miasto} {...listaProps} /> : null}
+          {luz.length > 0 ? <Sekcja tytul="Na luzie" pusto={pustoAktywne} lista={luz} {...listaProps} /> : null}
           {zakonczone.length > 0 ? (
             <Sekcja tytul="Rozstrzygnięte" pusto={PUSTO_ROZSTRZYGNIETE} lista={zakonczone} {...listaProps} />
           ) : null}
         </>
       );
+    } else if (filtr === "wszystkie") {
+      // Strona główna: każda kategoria to jeden rząd przewijany w prawo, od najgorętszych rynków.
+      zawartosc = (
+        <>
+          {hot.length > 0 ? (
+            <Rzad
+              tytul={
+                <>
+                  <span className="hot-ikona" aria-hidden="true">
+                    <i className="puls" />
+                  </span>
+                  Hot
+                </>
+              }
+              opis="najwięcej ruchu w ostatniej dobie"
+              lista={hot}
+              link="/?s=obrot"
+              {...listaProps}
+            />
+          ) : null}
+          <Rzad tytul="Miasto" lista={miasto} link="/?f=miasto" pusto={pustoAktywne} {...listaProps} />
+          <Rzad tytul="Na luzie" lista={luz} link="/?f=luz" pusto={pustoAktywne} {...listaProps} />
+          {zakonczone.length > 0 ? <Rzad tytul="Rozstrzygnięte" lista={zakonczone} link="/?f=rozstrzygniete" {...listaProps} /> : null}
+        </>
+      );
+    } else if (filtr === "miasto" || filtr === "luz") {
+      const chipy = <ChipyMiast miasta={miastaKategorii} wybrane={wybraneMiasto} naWybor={(m) => ustawParam("m", m, "")} />;
+      if (wybraneMiasto || miastaKategorii.length <= 1) {
+        // Jedno miasto (wybrane albo jedyne): zwykła siatka.
+        const a = wybraneMiasto ? aktywne.filter((p) => p.miasto === wybraneMiasto) : aktywne;
+        const z = wybraneMiasto ? zakonczone.filter((p) => p.miasto === wybraneMiasto) : zakonczone;
+        zawartosc = (
+          <>
+            {chipy}
+            {a.length > 0 ? <Siatka lista={a} {...listaProps} /> : <p className="pusto">{pustoAktywne}</p>}
+            {z.length > 0 ? <Sekcja tytul="Rozstrzygnięte" pusto={PUSTO_ROZSTRZYGNIETE} lista={z} {...listaProps} /> : null}
+          </>
+        );
+      } else {
+        // Wiele miast: rząd na miasto, w kolejności od największej liczby rynków.
+        zawartosc = (
+          <>
+            {chipy}
+            {miastaKategorii.map((m) => (
+              <Rzad key={m} tytul={m} lista={aktywne.filter((p) => p.miasto === m)} link={`/?f=${filtr}&m=${encodeURIComponent(m)}`} {...listaProps} />
+            ))}
+            {zakonczone.length > 0 ? <Rzad tytul="Rozstrzygnięte" lista={zakonczone} link="/?f=rozstrzygniete" {...listaProps} /> : null}
+          </>
+        );
+      }
     } else if (filtr === "rozstrzygniete") {
       zawartosc = <Sekcja tytul="Rozstrzygnięte" pusto={PUSTO_ROZSTRZYGNIETE} lista={zakonczone} {...listaProps} />;
     } else {

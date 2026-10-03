@@ -175,7 +175,7 @@ function Ustawienia() {
   );
 }
 
-/** Zysk/strata pozycji wobec kosztu: po kursie dla otwartych, po wypłacie dla rozstrzygniętych; unieważnione to zwrot. */
+/** Zysk/strata pozycji wobec kosztu: po sprzedaży teraz dla otwartych, po wypłacie dla rozstrzygniętych; unieważnione to zwrot. */
 function ZyskPozycji({ p }: { p: MojaPozycja }) {
   if (p.status === "uniewaznione") return <span className="mala">zwrot</span>;
   return <ZyskStrata wartosc={p.wartosc - p.wydane} miejsca={1} />;
@@ -245,7 +245,7 @@ export default function Profil() {
             {dane ? <LiczbaZywa wartosc={portfel} format={(n) => pkt(Math.round(n))} /> : "–"}
             {dane ? <ZyskStrata wartosc={zysk} sufiks="" /> : null}
           </div>
-          <div className="pod">punkty + udziały po kursie; zysk wobec 1000 na start</div>
+          <div className="pod">punkty + tyle, ile da sprzedaż udziałów teraz; zysk wobec 1000 na start</div>
         </div>
         <div className="stat">
           <div className="etykieta">Punkty</div>

@@ -202,5 +202,64 @@ begin
 end $$;
 SQL
 
+echo "wycena pozycji: portfel, ranking i profil = zwrot ze sprzedaży wszystkiego (a nie udziały × kurs)"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare v_admin uuid := gen_random_uuid(); v_a uuid := gen_random_uuid(); v_b uuid := gen_random_uuid();
+        v_x uuid; v_pyt bigint; k int; v_w jsonb; v_kurs double precision;
+        v_portfel double precision; v_ranking double precision; v_profil double precision; v_stara double precision;
+        v_udz double precision; v_zwrot double precision;
+begin
+  insert into auth.users (id) values (v_admin), (v_a), (v_b);
+  insert into public.gracze (id, nick, czy_admin) values (v_admin, 'wyc_admin', true), (v_a, 'wyc_a', false), (v_b, 'wyc_b', false);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  v_pyt := public.admin_dodaj_pytanie('TEST wycena', 'miasto', null, 'k', 'https://example.invalid', current_date + 10, array[0.5, 0.3, 0.2], true);
+  -- kilka prognoz innych graczy, żeby kurs był widoczny
+  for k in 1..12 loop
+    v_x := gen_random_uuid();
+    insert into auth.users (id) values (v_x);
+    insert into public.gracze (id, nick) values (v_x, 'wyc_' || k);
+    perform set_config('request.jwt.claims', json_build_object('sub', v_x, 'role', 'authenticated')::text, true);
+    perform public.postaw_prognoze(v_pyt, 1 + k % 3, 5, 'inne', null);
+  end loop;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_b, 'role', 'authenticated')::text, true);
+  perform public.postaw_prognoze(v_pyt, 2, 120, 'inne', null);
+  -- starsza pozycja z udziałami na dwóch odpowiedziach (dziś niemożliwa przez RPC): dopisana razem z q
+  insert into public.pozycje (gracz, pytanie, odpowiedz, udzialy, wydane_punkty) values (v_b, v_pyt, 3, 40, 0);
+  update public.pytania set q[3] = q[3] + 40 where id = v_pyt;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_a, 'role', 'authenticated')::text, true);
+  perform public.postaw_prognoze(v_pyt, 1, 150, 'inne', null);
+  if not public.kurs_widoczny(v_pyt) then raise exception 'Kurs ukryty, test wyceny nic nie sprawdza'; end if;
+
+  -- gracz A: jedna strona rynku
+  select wartosc into v_portfel from public.v_moje_pozycje where pytanie = v_pyt;
+  select wartosc_pozycji into v_ranking from public.ranking_graczy() where gracz = v_a;
+  v_profil := (public.profil_publiczny('wyc_a') ->> 'wartosc_pozycji')::double precision;
+  select udzialy into v_udz from public.pozycje where gracz = v_a and pytanie = v_pyt and odpowiedz = 1;
+  v_kurs := (public.kursy_pytania(v_pyt))[1];
+  v_stara := v_udz * v_kurs;
+  v_w := public.sprzedaj_udzialy(v_pyt, 1, 1e9);
+  v_zwrot := (v_w ->> 'zwrot')::double precision;
+  if abs(v_portfel - v_zwrot) > 2e-4 then raise exception 'Portfel % <> zwrot ze sprzedaży %', v_portfel, v_zwrot; end if;
+  if abs(v_ranking - v_portfel) > 1e-9 or abs(v_profil - v_portfel) > 1e-9 then
+    raise exception 'Ranking % / profil % <> portfel %', v_ranking, v_profil, v_portfel;
+  end if;
+  if v_stara - v_zwrot < 1 then raise exception 'Udziały × kurs (%) nie zawyżały wartości (zwrot %)?', v_stara, v_zwrot; end if;
+  raise notice 'WYCENA OK: % udziałów, udziały × kurs = %, wartość = %, zwrot ze sprzedaży = %',
+    round(v_udz::numeric, 2), round(v_stara::numeric, 2), round(v_portfel::numeric, 4), round(v_zwrot::numeric, 4);
+
+  -- gracz B: udziały na dwóch odpowiedziach, wycenione razem = suma dwóch kolejnych sprzedaży
+  perform set_config('request.jwt.claims', json_build_object('sub', v_b, 'role', 'authenticated')::text, true);
+  select wartosc into v_portfel from public.v_moje_pozycje where pytanie = v_pyt;
+  select wartosc_pozycji into v_ranking from public.ranking_graczy() where gracz = v_b;
+  v_zwrot := (public.sprzedaj_udzialy(v_pyt, 2, 1e9) ->> 'zwrot')::double precision
+           + (public.sprzedaj_udzialy(v_pyt, 3, 1e9) ->> 'zwrot')::double precision;
+  if abs(v_portfel - v_zwrot) > 4e-4 or abs(v_ranking - v_portfel) > 1e-9 then
+    raise exception 'Dwie strony: portfel %, ranking %, zwrot ze sprzedaży %', v_portfel, v_ranking, v_zwrot;
+  end if;
+  raise notice 'WYCENA DWÓCH STRON OK: wartość = %, zwrot z dwóch sprzedaży = %', round(v_portfel::numeric, 4), round(v_zwrot::numeric, 4);
+end $$;
+SQL
+
 psql -v ON_ERROR_STOP=1 -d postgres -q -c "drop database $DB;"
 echo "gotowe"

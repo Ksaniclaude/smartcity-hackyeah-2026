@@ -1,6 +1,6 @@
 // Test ścieżki gracza w prawdziwym Chromium (playwright-core) na zamockowanym Supabase:
 // rynki jako gość → prognoza (nick w modalu) → rynek „miasto” z powodem → komentarz → sprzedaż →
-// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /qr. Zrzuty: telefon,
+// profil, ranking, aktywność, profil publiczny, /admin, /qr. Zrzuty: telefon,
 // desktop, jasny motyw. Nie potrzebuje sieci.
 //
 // Użycie: npm run build && npm run test:ui   (build z VITE_SUPABASE_URL=https://test.supabase.local VITE_SUPABASE_KEY=test)
@@ -145,7 +145,7 @@ function mojePozycje() {
     const glowna = [...lista].sort((a, b) => b.wydane - a.wydane)[0];
     const wydane = lista.reduce((s, z) => s + z.wydane, 0);
     const wyplata = p.status === "rozstrzygniete" ? lista.filter((z) => z.odpowiedz === p.wynik).reduce((s, z) => s + z.udzialy, 0) : 0;
-    const wartosc = p.status === "rozstrzygniete" ? wyplata : p.kursy ? lista.reduce((s, z) => s + z.udzialy * (p.kursy![z.odpowiedz - 1] ?? 0), 0) : wydane;
+    const wartosc = p.status === "rozstrzygniete" ? wyplata : p.kursy ? -1000 * Math.log(1 - lista.reduce((s, z) => s + (p.kursy![z.odpowiedz - 1] ?? 0) * (1 - Math.exp(-z.udzialy / 1000)), 0)) : wydane;
     return {
       pytanie: pid, tresc: p.tresc, kategoria: p.kategoria, odpowiedzi: p.odpowiedzi, status: p.status, termin: p.termin, wynik: p.wynik,
       odpowiedz_glowna: glowna.odpowiedz, wydane, wyplata, trafione: p.status === "rozstrzygniete" ? glowna.odpowiedz === p.wynik : null,
@@ -220,7 +220,7 @@ async function mock(route: Route) {
     if (body.p_nick !== "podgorze_7") return json(route, null);
     return json(route, {
       nick: "podgorze_7", utworzono: iso(60 * 24 * 10), prognozy: 4, obrot: 120, wartosc_pozycji: 96.4, najwieksza_wygrana: 61.9, trafione: 2, rozstrzygniete: 2, miejsce: 1,
-      pozycje: [{ pytanie: 1, tresc: pytania[0].tresc, kategoria: "miasto", odpowiedzi: pytania[0].odpowiedzi, status: "otwarte", wynik: null, odpowiedz: 2, udzialy: 108.3, wydane: 50, kurs: 0.44, wartosc: 47.6 }],
+      pozycje: [{ pytanie: 1, tresc: pytania[0].tresc, kategoria: "miasto", odpowiedzi: pytania[0].odpowiedzi, status: "otwarte", wynik: null, odpowiedz: 2, udzialy: 108.3, wydane: 50, kurs: 0.44, wartosc: 46.2 }],
       aktywnosc: aktywnosc.filter((a) => a.nick === "podgorze_7"),
     });
   }
@@ -477,7 +477,7 @@ async function main() {
     await oczekuj(page, "1. miejsce w rankingu");
     await zrzut(page, "profil_publiczny");
 
-    console.log("7. Desktop: strona główna, rynek, jasny motyw, /miasto");
+    console.log("7. Desktop: strona główna, rynek, jasny motyw");
     const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "pl-PL", colorScheme: "dark" });
     await ctx2.route(`${SUPABASE}/**`, mock);
     await ctx2.route("https://fonts.googleapis.com/**", (r) => r.abort());
@@ -498,11 +498,6 @@ async function main() {
     await page2.goto(`${ADRES}/`);
     await oczekuj(page2, "41%");
     await zrzut(page2, "rynki_desktop_jasny", false);
-    await page2.goto(`${ADRES}/miasto`);
-    await oczekuj(page2, "Termin oficjalny");
-    await oczekuj(page2, "Trwa procedura odbiorowa");
-    await oczekuj(page2, "wykonawca");
-    await zrzut(page2, "miasto");
     await ctx2.close();
 
     console.log("8. /admin, /qr");
@@ -515,7 +510,7 @@ async function main() {
     await page.getByRole("button", { name: "Zaloguj" }).click();
     await oczekuj(page, "Dodaj pytanie");
     await oczekuj(page, "Próg ukrycia kursu");
-    await oczekuj(page, "wyniki sportowe");
+    await oczekuj(page, "Każdy temat jest dozwolony");
     await oczekujNaglowka(page, "Propozycje (kolejka) (4)");
     await oczekuj(page, "do uzupełnienia przed otwarciem: 1");
     await zrzut(page, "admin");

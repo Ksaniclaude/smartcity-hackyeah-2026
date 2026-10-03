@@ -15,6 +15,9 @@
 - Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Stare sesje
   anonimowe są podnoszone do konta przy rejestracji (updateUser).
 - Nie wymyślaj pytań, terminów, źródeł ani liczb z zamówień publicznych. Puste dane mają być widoczne jako puste.
+- Tematy rynków nie są ograniczone (sport, polityka, afery też). Trzy zasady treści (`ZASADY_PYTANIA` w
+  `src/api/types.ts`): publiczne źródło z linkiem, nic zmyślonego, wypadki tylko jako śmieszna sprawa, nigdy o ofiarach.
+  Celem jest jak najwięcej emocji dla gracza: krótkie rynki, szybkie rozstrzygnięcia, widoczne ruchy kursu.
 - Próg ukrycia kursu: `prog_widocznosci_kursu()` czyta `ustawienia.prog_widocznosci_kursu` (domyślnie 2), a `pytania.prog_widocznosci`
   nadpisuje go per rynek; do sprawdzania widoczności używaj `kurs_widoczny(id)`, nie porównuj progu ręcznie.
 - Jedna strona rynku na gracza: `postaw_prognoze` najpierw sprzedaje udziały na innych odpowiedziach (pole `sprzedano` w wyniku).

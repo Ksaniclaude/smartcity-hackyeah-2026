@@ -5,7 +5,6 @@ co wydarzy się w Polsce, od terminów miejskich inwestycji po celebrytów, a ku
 Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
 - **Demo:** https://zdaza.vercel.app
-- **Widok dla miast (bez logowania):** https://zdaza.vercel.app/miasto
 - **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
 - **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
 
@@ -23,10 +22,10 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 | Polymarket | Zdążą? |
 | --- | --- |
 | Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
-| Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
+| Markets, search, categories, sort | Strona główna: sekcja „Hot” (rynki z największym ruchem w ostatniej dobie), potem Miasto, Na luzie i Rozstrzygnięte, każda jako jeden rząd kart przewijany w prawo. Zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane; w Miasto i Na luzie podział po miastach (chipy, rząd na miasto; „Polska” dla rynków ogólnokrajowych). Wyszukiwarka, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia, nowy punkt dorysowuje się z animacją), tabela odpowiedzi, zmiana kursu od godziny, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez; przy nicku odznaka „stawia 120 na tak” i miejsce w rankingu), najwięksi gracze, moje pozycje z zyskiem/stratą, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
 | Buy / Sell | Kup: szybkie stawki 20 / 50 / 100 / 200, podgląd udziałów, kursu po transakcji i „Jeśli trafisz: +X pkt (×Y)” (LMSR). Po transakcji: „Twój ruch przesunął kurs 48% → 53%”, własny nick od razu w aktywności i wśród największych graczy, komunikat o awansie w rankingu, karta do udostępnienia „Daję 70% na to, że …” (obrazek PNG, systemowe udostępnianie, kopiowanie tekstu z linkiem). Jedna strona rynku na gracza: zakład na inną odpowiedź najpierw sprzedaje dotychczasowe udziały. Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
-| Portfolio | Portfel na żywo w nagłówku (wartość + zysk/strata) i w /profil: wartość portfela, zysk/strata otwartych pozycji wobec kosztu, każda pozycja z zyskiem/stratą (zielone/czerwone), trafność, historia transakcji, ustawienia (nick, konto, motyw). Po rozstrzygnięciu rynku, na którym gracz miał pozycję, jednorazowy ekran „Rynek rozstrzygnięty”: wynik odsłania się po ok. 1 s, licznik wypłaty bije do góry, „Twój typ był lepszy niż N% graczy”. |
+| Portfolio | Portfel na żywo w nagłówku (wartość + zysk/strata) i w /profil: wartość portfela (punkty + tyle, ile da sprzedaż udziałów teraz: C(q) − C(q − s), nie udziały × kurs, bo sprzedaż obniża kurs), zysk/strata otwartych pozycji wobec kosztu, każda pozycja z zyskiem/stratą (zielone/czerwone), trafność, historia transakcji, ustawienia (nick, konto, motyw). Po rozstrzygnięciu rynku, na którym gracz miał pozycję, jednorazowy ekran „Rynek rozstrzygnięty”: wynik odsłania się po ok. 1 s, licznik wypłaty bije do góry, „Twój typ był lepszy niż N% graczy”. |
 | Profile pages | /u/:nick – publiczny profil: miejsce w rankingu, wartość pozycji, największa wygrana, prognozy, aktywność. |
 | Leaderboard | /ranking – miejsce, portfel, zysk, trafność, obrót; numer miejsca pokazywany też przy nickach w komentarzach i aktywności. |
 | Live activity | Strona główna: taśma „Na żywo” (ostatnie 5 ruchów i licznik prognoz z ostatnich 10 minut); karty rynków migoczą na zielono/czerwono przy zmianie kursu między odpytaniami i pokazują zmianę w pp od ostatniej godziny. |
@@ -47,7 +46,8 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 - Liczba otwartych rynków nie jest ograniczona. Rynki „miasto” startują od odsetka umów wykonanych
   w terminie (z Biuletynu Zamówień Publicznych), „na luzie” od 50%.
 - Każdy rynek musi mieć: treść, kategorię, odpowiedzi, kryterium rozstrzygnięcia, link do publicznego źródła i termin.
-  Tematy wykluczone: wyniki sportowe, wybory i kandydaci, konkretne osoby prywatne, wypadki i zgony.
+  Każdy temat jest dozwolony (sport, polityka, życie miasta, afery). Trzy zasady: publiczne źródło z linkiem,
+  nic zmyślonego, a wypadki tylko jako śmieszna sprawa, nigdy pytania o ofiary.
 - Dane odświeżają się odpytywaniem co 5 sekund, bez realtime.
 
 ## Pytania startowe
@@ -111,7 +111,7 @@ Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje praw
 `scripts/zamowienia.ts` pobiera z publicznej wyszukiwarki Biuletynu Zamówień Publicznych
 (`https://ezamowienia.gov.pl/mo-board/api/v1/Board/Search`) ogłoszenia o wykonaniu umowy krakowskich jednostek
 miejskich, dociąga szczegóły i liczy odsetek umów wykonanych w pierwotnym terminie (ogółem i dla robót budowlanych).
-Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/miasto`,
+Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na stronie głównej,
 na stronę główną i jako kurs otwarcia rynków „miasto”.
 
 ```bash

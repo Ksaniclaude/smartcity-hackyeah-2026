@@ -294,6 +294,22 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .sekcja-tytul .prawy { margin-left: auto; font-size: 13px; font-weight: 600; }
 .siatka { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; }
 @media (min-width: 900px) { .siatka { gap: 16px; } }
+.sekcja-opis { color: var(--mute); font-weight: 500; font-size: 14px; font-family: var(--tekstowa); letter-spacing: 0; display: none; }
+@media (min-width: 640px) { .sekcja-opis { display: inline; } }
+/* Rząd kart przewijany w poziomie: jedna kategoria = jeden pasek, pod nim następna. */
+.rzad-sekcja .sekcja-tytul { margin-bottom: 8px; }
+.rzad-akcje { display: inline-flex; align-items: center; gap: 4px; }
+.rzad-akcje a { color: var(--tekst-2); text-decoration: none; margin-right: 6px; white-space: nowrap; }
+.rzad-akcje a:hover { color: var(--tekst); text-decoration: underline; }
+.rzad-strzalka { width: 30px; height: 30px; font-size: 20px; line-height: 1; display: none; }
+@media (min-width: 900px) { .rzad-strzalka { display: inline-flex; } }
+.rzad { display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; margin: 0 -16px; padding: 4px 16px 10px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, black 16px, black calc(100% - 24px), transparent); }
+.rzad::-webkit-scrollbar { display: none; }
+.rzad > .rynek { flex: 0 0 min(290px, calc(100vw - 48px)); scroll-snap-align: start; }
+@media (min-width: 900px) { .rzad { gap: 16px; margin: 0 -24px; padding: 4px 24px 12px; -webkit-mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 32px), transparent); } .rzad > .rynek { flex-basis: 300px; } }
+.hot-ikona { display: inline-flex; align-items: center; margin-right: 6px; vertical-align: middle; }
+.chipy-miast { margin: 4px 0 14px; }
+.rynek-miasto { color: var(--mute); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
 .szukaj-mobil { margin: 0 0 14px; }
 .szukaj-mobil .szukaj { max-width: none; }
 @media (min-width: 900px) { .szukaj-mobil { display: none; } }

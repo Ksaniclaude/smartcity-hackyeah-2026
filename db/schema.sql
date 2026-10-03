@@ -54,6 +54,7 @@ create table public.pytania (
   obrot                 numeric(14, 4) not null default 0 check (obrot >= 0),
   kursy_otwarcia        double precision[],
   otwarto               timestamptz,
+  miasto                text not null default 'Kraków' check (char_length(btrim(miasto)) between 2 and 40),
   prog_widocznosci      integer check (prog_widocznosci is null or prog_widocznosci >= 1),
   constraint odpowiedzi_2_3 check (array_length(odpowiedzi, 1) between 2 and 3),
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
@@ -62,6 +63,7 @@ create table public.pytania (
     (status <> 'rozstrzygniete' or (wynik is not null and link_rozstrzygniecia is not null))
 );
 create index pytania_status on public.pytania (status, kategoria);
+create index pytania_miasto on public.pytania (miasto);
 
 create table public.pozycje (
   gracz          uuid not null references public.gracze (id) on delete cascade,
@@ -198,6 +200,20 @@ begin
   end loop;
   return wynik;
 end $$;
+
+-- Wartość udziałów gracza na jednym rynku: tyle, ile dostanie, sprzedając teraz wszystkie (po kolei przez
+-- sprzedaj_udzialy): C(q) - C(q - s) = -b*ln(1 - Σ_k p_k*(1 - e^(-s_k/b))). Zależy tylko od kursów p,
+-- więc nie odsłania q. „Udziały × kurs” zawyża wartość o to, o ile sama sprzedaż obniży kurs.
+-- Null, gdy kursy są ukryte (null).
+create or replace function public.wartosc_sprzedazy(p_kursy double precision[], p_odpowiedzi integer[],
+                                                    p_udzialy double precision[], p_b double precision)
+returns double precision
+language sql immutable set search_path = public, pg_temp as $$
+  select case when p_kursy is null then null else
+    -p_b * ln(1 - coalesce((select sum(p_kursy[o.odp] * (1 - exp(-greatest(o.u, 0) / p_b)))
+                            from unnest(p_odpowiedzi, p_udzialy) as o(odp, u)), 0))
+  end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Pomocnicze
@@ -508,7 +524,8 @@ create or replace function public.zaproponuj_pytanie(
   p_tresc text,
   p_kategoria public.kategoria,
   p_termin date,
-  p_link text
+  p_link text,
+  p_miasto text default 'Kraków'
 )
 returns bigint
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -517,6 +534,7 @@ declare
   v_id bigint;
   v_odp text[];
   v_q double precision[];
+  v_miasto text := coalesce(nullif(btrim(p_miasto), ''), 'Kraków');
 begin
   if btrim(coalesce(p_tresc, '')) = '' or btrim(coalesce(p_link, '')) = '' or p_termin is null then
     raise exception 'Podaj treść, termin i link do źródła';
@@ -534,8 +552,8 @@ begin
     v_odp := array['tak', 'nie'];
     v_q := public.q_z_kursu(array[0.5, 0.5], 1000);
   end if;
-  insert into public.pytania (tresc, kategoria, odpowiedzi, termin, link_zrodla, q, zaproponowal)
-  values (btrim(p_tresc), p_kategoria, v_odp, p_termin, btrim(p_link), v_q, v_gracz)
+  insert into public.pytania (tresc, kategoria, odpowiedzi, termin, link_zrodla, q, zaproponowal, miasto)
+  values (btrim(p_tresc), p_kategoria, v_odp, p_termin, btrim(p_link), v_q, v_gracz, v_miasto)
   returning id into v_id;
   return v_id;
 end $$;
@@ -583,7 +601,8 @@ create or replace function public.admin_dodaj_pytanie(
   p_link_zrodla text,
   p_termin date,
   p_kurs_otwarcia double precision[],
-  p_otworz boolean default true
+  p_otworz boolean default true,
+  p_miasto text default 'Kraków'
 )
 returns bigint
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -592,6 +611,7 @@ declare
   v_id bigint;
   v_odp text[] := p_odpowiedzi;
   v_kurs double precision[] := p_kurs_otwarcia;
+  v_miasto text := coalesce(nullif(btrim(p_miasto), ''), 'Kraków');
   p public.pytania;
 begin
   if v_odp is null or array_length(v_odp, 1) is null then
@@ -608,10 +628,10 @@ begin
     raise exception 'Kurs otwarcia musi mieć tyle wartości, ile odpowiedzi';
   end if;
   insert into public.pytania
-    (tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, q)
+    (tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, q, miasto)
   values
     (btrim(coalesce(p_tresc, '')), p_kategoria, v_odp, btrim(coalesce(p_kryterium, '')),
-     btrim(coalesce(p_link_zrodla, '')), p_termin, public.q_z_kursu(v_kurs, 1000))
+     btrim(coalesce(p_link_zrodla, '')), p_termin, public.q_z_kursu(v_kurs, 1000), v_miasto)
   returning * into p;
   v_id := p.id;
   if p_otworz then
@@ -627,7 +647,8 @@ create or replace function public.admin_edytuj_pytanie(
   p_odpowiedzi text[],
   p_kryterium text,
   p_link_zrodla text,
-  p_termin date
+  p_termin date,
+  p_miasto text default null
 )
 returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -653,7 +674,8 @@ begin
                   else q end,
          kryterium = coalesce(nullif(btrim(p_kryterium), ''), kryterium),
          link_zrodla = coalesce(nullif(btrim(p_link_zrodla), ''), link_zrodla),
-         termin = coalesce(p_termin, termin)
+         termin = coalesce(p_termin, termin),
+         miasto = coalesce(nullif(btrim(p_miasto), ''), miasto)
    where id = p_pytanie;
 end $$;
 
@@ -873,7 +895,8 @@ select
   (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu,
   p.obrot, p.otwarto, p.kursy_otwarcia,
   public.kursy_godzine_temu(p.id) as kursy_1h,
-  public.gracze_rynku(p.id) as gracze_rynku
+  public.gracze_rynku(p.id) as gracze_rynku,
+  p.miasto
 from public.pytania p
 where p.status <> 'propozycja';
 
@@ -1011,22 +1034,26 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 -- Ranking graczy (tylko ci, którzy coś postawili). Portfel = saldo + wartość
--- udziałów w otwartych pytaniach (po bieżącym kursie; po koszcie, dopóki kurs
--- ukryty). Trafność liczona jak w profilu: główny typ vs wynik.
+-- udziałów w otwartych pytaniach (wartość sprzedaży teraz; po koszcie, dopóki
+-- kurs ukryty). Trafność liczona jak w profilu: główny typ vs wynik.
 create or replace function public.ranking_graczy()
 returns table (gracz uuid, nick text, saldo numeric, wartosc_pozycji double precision, portfel double precision,
                zysk double precision, prognozy integer, obrot numeric, trafione integer, rozstrzygniete integer,
                miejsce integer)
 language sql stable security definer set search_path = public, pg_temp as $$
-  with poz as (
+  with rynki as (
     select z.gracz,
-           sum(case
-                 when p.status not in ('otwarte', 'zamkniete') then 0
-                 when public.kurs_widoczny(p.id) then z.udzialy * (public.kursy(p.q, p.b))[z.odpowiedz]
-                 else z.wydane_punkty::double precision
-               end) as wartosc
+           case
+             when p.status not in ('otwarte', 'zamkniete') then 0
+             when public.kurs_widoczny(p.id)
+               then public.wartosc_sprzedazy(public.kursy(p.q, p.b), array_agg(z.odpowiedz::integer), array_agg(z.udzialy), p.b)
+             else sum(z.wydane_punkty)::double precision
+           end as wartosc
     from public.pozycje z join public.pytania p on p.id = z.pytanie
-    group by z.gracz
+    group by z.gracz, p.id
+  ),
+  poz as (
+    select gracz, sum(wartosc) as wartosc from rynki group by gracz
   ),
   tr as (
     -- tylko rynki widoczne publicznie (bez propozycji, np. pytań testowych)
@@ -1074,7 +1101,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
   limit greatest(1, least(coalesce(p_limit, 50), 200))
 $$;
 
--- Publiczny profil gracza po nicku: statystyki, pozycje (wartość po kursie, po koszcie
+-- Publiczny profil gracza po nicku: statystyki, pozycje (wartość sprzedaży teraz, po koszcie
 -- gdy kurs ukryty), ostatnia aktywność. Null, gdy nie ma takiego nicku.
 create or replace function public.profil_publiczny(p_nick text)
 returns jsonb
@@ -1090,7 +1117,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
              when p.status = 'rozstrzygniete' then case when p.wynik = z.odpowiedz then z.udzialy else 0 end
              when p.status = 'uniewaznione' then 0
              when public.kursy_pytania(p.id) is null then z.wydane_punkty::double precision
-             else z.udzialy * (public.kursy_pytania(p.id))[z.odpowiedz]
+             else public.wartosc_sprzedazy(public.kursy_pytania(p.id), array[z.odpowiedz::integer], array[z.udzialy], p.b)
            end as wartosc
     from public.pozycje z
     join g on g.id = z.gracz
@@ -1129,7 +1156,8 @@ language sql stable security definer set search_path = public, pg_temp as $$
     'utworzono', (select utworzono from g),
     'prognozy', (select prognozy from tr),
     'obrot', (select obrot from tr),
-    'wartosc_pozycji', coalesce((select sum(wartosc) from poz where status in ('otwarte', 'zamkniete')), 0),
+    -- ta sama liczba co w rankingu (rynek z udziałami na dwóch odpowiedziach wyceniony razem)
+    'wartosc_pozycji', coalesce((select r.wartosc_pozycji from public.ranking_graczy() r where r.gracz = (select id from g)), 0),
     'najwieksza_wygrana', (select najwieksza from wygrana),
     'trafione', coalesce((select trafione from wyn), 0),
     'rozstrzygniete', coalesce((select rozstrzygniete from wyn), 0),
@@ -1159,12 +1187,13 @@ select
   case when p.status = 'rozstrzygniete' then (w.odpowiedz_glowna = p.wynik) end as trafione,
   public.kursy_pytania(p.id) as kursy,
   coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = w.odpowiedz_glowna), 0) as udzialy_glowne,
-  -- wartość: udziały po bieżącym kursie; po koszcie, dopóki kurs ukryty; wypłata po rozstrzygnięciu
+  -- wartość: ile da sprzedaż teraz (sprzedaż obniża kurs); po koszcie, dopóki kurs ukryty; wypłata po rozstrzygnięciu
   case
     when p.status = 'rozstrzygniete' then coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = p.wynik), 0)
     when p.status = 'uniewaznione' then 0
     when public.kursy_pytania(p.id) is null then w.wydane::double precision
-    else (select sum(m.udzialy * (public.kursy_pytania(p.id))[m.odpowiedz]) from moje m where m.pytanie = p.id)
+    else (select public.wartosc_sprzedazy(public.kursy_pytania(p.id), array_agg(m.odpowiedz::integer), array_agg(m.udzialy), p.b)
+          from moje m where m.pytanie = p.id)
   end as wartosc
 from wybor w
 join public.pytania p on p.id = w.pytanie;
@@ -1197,7 +1226,7 @@ create policy zmiany_publiczne on public.zmiany_terminow for select to anon, aut
 -- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
 grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
               wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto, obrot, otwarto,
-              kursy_otwarcia, prog_widocznosci)
+              kursy_otwarcia, prog_widocznosci, miasto)
   on public.pytania to anon, authenticated;
 create policy pytania_publiczne on public.pytania for select to anon, authenticated
   using (status <> 'propozycja');
@@ -1206,6 +1235,7 @@ create policy pytania_publiczne on public.pytania for select to anon, authentica
 grant select on public.v_pytania to anon, authenticated;
 grant select on public.v_moje_pozycje to authenticated;
 grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
+grant execute on function public.wartosc_sprzedazy(double precision[], integer[], double precision[], double precision) to anon, authenticated;
 grant execute on function public.prog_widocznosci_kursu() to anon, authenticated;
 grant execute on function public.prog_pytania(bigint) to anon, authenticated;
 grant execute on function public.kurs_widoczny(bigint) to anon, authenticated;
@@ -1226,10 +1256,10 @@ grant execute on function public.profil_publiczny(text) to anon, authenticated;
 grant execute on function public.ustaw_nick(text) to authenticated;
 grant execute on function public.postaw_prognoze(bigint, integer, integer, public.powod, text) to authenticated;
 grant execute on function public.sprzedaj_udzialy(bigint, integer, double precision) to authenticated;
-grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date, text) to authenticated;
+grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date, text, text) to authenticated;
 grant execute on function public.admin_zaloguj(text) to authenticated;
-grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean) to authenticated;
-grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date) to authenticated;
+grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean, text) to authenticated;
+grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date, text) to authenticated;
 grant execute on function public.admin_otworz(bigint, double precision[]) to authenticated;
 grant execute on function public.admin_zamknij(bigint) to authenticated;
 grant execute on function public.admin_rozstrzygnij(bigint, integer, text) to authenticated;
