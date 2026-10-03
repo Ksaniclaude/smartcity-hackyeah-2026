@@ -307,7 +307,6 @@ export function StopkaStrony() {
       <div className="stopka-wnetrze">
         <Link to="/miasto">Widok dla miasta</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
-        <Link to="/admin">Panel</Link>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
     </footer>
@@ -668,12 +667,6 @@ function ModalWiecej() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
             {motyw === "ciemny" ? "Jasny motyw" : "Ciemny motyw"}
           </button>
-        </li>
-        <li>
-          <Link to="/admin" onClick={zamknijModal}>
-            <IkProfil />
-            Panel admina
-          </Link>
         </li>
       </ul>
       {gracz ? (
