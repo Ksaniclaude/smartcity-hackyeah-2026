@@ -15,6 +15,8 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   zrzuty w `data/zrzuty_dev/` (ok. 5 s, przez HMR, bez builda). Nazwy plików są stałe, np.
   `data/zrzuty_dev/desktop_rynki.png`, `tel_pytanie_1.png`, więc po edycji wystarczy otworzyć ten sam plik
   (narzędzie Read pokazuje PNG).
+- Uruchamiaj w katalogu repo po `npm install`. Na Macu i Linuksie skrypt bierze zainstalowanego Chrome'a,
+  w kontenerze Chromium z `/opt/pw-browsers`; bez żadnego: `npx playwright install chromium` albo `CHROMIUM_PATH=…`.
 - Jednorazowo: `npm run zrzuty` (ok. 15 s). Przydatne opcje:
   `--dane=pusty` (stan jak na starcie produkcji: rynki bez prognoz, tylko kursy otwarcia), `--gracz` (zalogowany
   gracz), `--motyw=jasny`, `--strony=/,/pytanie/1,/profil,/ranking`, `--urzadzenia=desktop` albo `tel`.

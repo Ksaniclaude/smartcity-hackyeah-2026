@@ -3,7 +3,7 @@
 // w kółko po każdej zmianie. W trybie --watch pilnuje katalogu src/ i po każdym zapisie odnawia
 // zrzuty (HMR Vite, bez builda), zwykle w sekundę.
 //
-// Użycie:
+// Użycie (w katalogu repo, po `npm install`; potrzebny Chrome albo Chromium, patrz uruchomPrzegladarke):
 //   npm run zrzuty                       # jednorazowo: strony domyślne, dane „żywe”, gość, oba urządzenia
 //   npm run zrzuty -- --watch            # trzyma przeglądarkę i odświeża zrzuty po każdej zmianie w src/
 //   npm run zrzuty -- --dane=pusty       # stan jak na starcie produkcji: rynki bez prognoz, kursy otwarcia
@@ -170,7 +170,41 @@ async function mock(route: Route) {
   return json(route, []);
 }
 
-/* ---------- serwer, przeglądarka, zrzuty ---------- */
+/* ---------- przeglądarka ---------- */
+
+/** Chromium albo Chrome z tej maszyny: CHROMIUM_PATH, kontener Claude (/opt/pw-browsers), macOS, Linux,
+ *  a na końcu Playwright (`npx playwright install chromium`). */
+async function uruchomPrzegladarke(): Promise<Browser> {
+  const kandydaci = [
+    process.env.CHROMIUM_PATH ?? "",
+    "/opt/pw-browsers/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].filter((k) => k && fs.existsSync(k));
+  for (const executablePath of kandydaci) {
+    try {
+      return await chromium.launch({ executablePath, args: ["--no-sandbox"] });
+    } catch {
+      /* następny kandydat */
+    }
+  }
+  for (const opcje of [{ channel: "chrome" as const }, {}]) {
+    try {
+      return await chromium.launch(opcje);
+    } catch {
+      /* dalej */
+    }
+  }
+  throw new Error(
+    "Nie znalazłem Chrome ani Chromium. Zainstaluj Chrome, uruchom `npx playwright install chromium` " +
+      "albo ustaw CHROMIUM_PATH na plik wykonywalny przeglądarki.",
+  );
+}
+
+/* ---------- serwer, zrzuty ---------- */
 
 function slug(strona: string): string {
   if (strona === "/") return "rynki";
@@ -247,7 +281,7 @@ try {
     env: { ...process.env, VITE_SUPABASE_URL: SUPABASE, VITE_SUPABASE_KEY: "test", BROWSER: "none" },
   });
   await czekajNaSerwer();
-  browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
+  browser = await uruchomPrzegladarke();
   const konteksty = new Map<string, { ctx: BrowserContext; strony: Map<string, Page> }>();
   for (const u of URZADZENIA) konteksty.set(u, await otworz(browser, u));
 
