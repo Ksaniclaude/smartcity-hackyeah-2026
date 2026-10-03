@@ -82,7 +82,8 @@ export function ZmianaOdGodziny({ p, pelna = false }: { p: Pick<Pytanie, "kursy"
     <span className={`zmiana ${pp > 0 ? "gora" : pp < 0 ? "dol" : "zero"}`} title="Zmiana kursu w ostatniej godzinie">
       {pp > 0 ? <IkGora /> : pp < 0 ? <IkDol /> : null}
       {pp === 0 ? "bez zmian" : `${Math.abs(pp)} pp`}
-      {pelna ? " / 1 godz." : " / 1 h"}
+      {/* okres w osobnym elemencie: wąska stopka karty (telefon) chowa go, żeby zmieścić termin */}
+      <span className="zmiana-okres">{pelna ? " / 1 godz." : " / 1 h"}</span>
     </span>
   );
 }
