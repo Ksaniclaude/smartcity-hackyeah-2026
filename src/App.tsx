@@ -1,9 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SesjaProvider, useSesja, useUruchomSesje } from "@/api/sesja";
 import Admin from "@/pages/Admin";
 import Aktywnosc from "@/pages/Aktywnosc";
-import Liczba from "@/pages/Liczba";
 import Lista from "@/pages/Lista";
 import Miasto from "@/pages/Miasto";
 import Profil from "@/pages/Profil";
@@ -35,8 +34,18 @@ function WymagaGracza({ children }: { children: ReactNode }) {
 }
 
 function Uklad() {
+  useUruchomSesje();
   const { pathname } = useLocation();
+  const { stan, konto, gracz, modal, otworzModal } = useSesja();
   const pelnyEkran = pathname === "/qr";
+  // Konto e-mail bez nicku (np. zaraz po kliknięciu w link potwierdzający): raz otwieramy okno nicku.
+  const pytanoONick = useRef(false);
+  useEffect(() => {
+    if (stan === "brak_nicku" && konto && !gracz && modal === null && !pytanoONick.current) {
+      pytanoONick.current = true;
+      otworzModal("nick");
+    }
+  }, [stan, konto, gracz, modal, otworzModal]);
   return (
     <div className="aplikacja">
       {!pelnyEkran ? <Naglowek /> : null}
@@ -71,7 +80,7 @@ function Uklad() {
         <Route path="/ranking" element={<Ranking />} />
         <Route path="/aktywnosc" element={<Aktywnosc />} />
         <Route path="/miasto" element={<Miasto />} />
-        <Route path="/liczba" element={<Liczba />} />
+        <Route path="/liczba" element={<Navigate to="/" replace />} />
         <Route path="/start" element={<Navigate to="/" replace />} />
         <Route path="/qr" element={<Qr />} />
         <Route path="*" element={<Navigate to="/" replace />} />

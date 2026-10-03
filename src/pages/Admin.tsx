@@ -60,7 +60,7 @@ function LogowanieAdmina({ poZalogowaniu }: { poZalogowaniu: () => Promise<void>
   return (
     <main className="ekran">
       <h1>Panel admina</h1>
-      <p className="mala">Hasło admina ustawia się w bazie (patrz README). Po zalogowaniu ta przeglądarka ma prawa admina.</p>
+      <p className="mala">Hasło admina ustawia się w bazie (patrz README). Po zalogowaniu to konto ma prawa admina.</p>
       <form onSubmit={wyslij} className="karta">
         <label className="pole">
           <span className="etykieta">Hasło</span>

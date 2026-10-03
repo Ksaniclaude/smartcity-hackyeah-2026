@@ -132,7 +132,8 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 @keyframes tyk { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes wjazd { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes wjazd-arkusza { from { transform: translateY(32px); } to { transform: none; } }
-@keyframes zaslona { from { opacity: 0; } to { opacity: 1; } }
+/* przyciemnienie wchodzi kolorem tła, nie kryciem, żeby wjeżdżający arkusz był od razu nieprzezroczysty */
+@keyframes zaslona { from { background-color: transparent; } }
 @keyframes iskra { 0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--obrot)) scale(0.4); opacity: 0; } }
 @keyframes pieczec { 0% { transform: scale(0.6); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @keyframes szkielet { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
@@ -202,6 +203,9 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .przycisk-tekst { background: none; border: 0; color: var(--mute); font: inherit; font-weight: 600; font-size: 14px; padding: 6px 10px; border-radius: var(--r-s); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .przycisk-tekst:hover { color: var(--tekst); background: var(--tlo-2); }
 .przycisk-tekst svg { width: 16px; height: 16px; }
+/* przycisk wyglądający jak łącze w zdaniu („Masz już konto? Zaloguj się”) */
+.lacze { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--tekst); text-decoration: underline; text-decoration-color: var(--slaby); text-underline-offset: 3px; cursor: pointer; }
+.lacze:hover { text-decoration-color: currentColor; }
 .przycisk-ikona { width: 36px; height: 36px; border-radius: var(--r-s); border: 0; background: transparent; color: var(--mute); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0; transition: color var(--szybko), background var(--szybko), transform var(--szybko); }
 .przycisk-ikona:hover { background: var(--tlo-2); color: var(--tekst); }
 .przycisk-ikona:active { transform: scale(0.88); }
@@ -384,7 +388,8 @@ button.wynik:active { transform: scale(0.98); }
 @media (min-width: 1000px) {
   .rynek-strona { grid-template-columns: minmax(0, 1fr) 372px; column-gap: 40px; row-gap: 0; align-items: start; }
   .rynek-glowna, .rynek-reszta { grid-column: 1; }
-  .panel-kolumna { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--naglowek-h) + 20px); max-height: calc(100dvh - var(--naglowek-h) - 40px); overflow-y: auto; scrollbar-width: thin; }
+  /* Panel przewija się niezależnie od strony: po zakupie dochodzi kupon i panel bywa wyższy niż ekran. */
+  .panel-kolumna { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--naglowek-h) + 20px); max-height: calc(100vh - var(--naglowek-h) - 40px); max-height: calc(100dvh - var(--naglowek-h) - 40px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 }
 .rynek-glowna, .rynek-reszta { min-width: 0; }
 .okruszki { font-size: 13px; color: var(--mute); margin: 0 0 14px; display: flex; gap: 6px; align-items: center; }
@@ -723,20 +728,10 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .trafione { color: var(--tak-tekst); font-weight: 700; }
 .chybione { color: var(--nie-tekst); font-weight: 700; }
 details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
-.zestawienie { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
-.zestawienie > div { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--r); padding: 12px 14px; }
-.zestawienie .etykieta { font-size: 13px; color: var(--mute); }
-.zestawienie .wartosc { font-family: var(--wyswietlana); font-stretch: 75%; font-size: 30px; font-weight: 800; }
 .powod-pasek { display: grid; grid-template-columns: 120px 1fr 36px; gap: 6px; align-items: center; font-size: 13px; margin: 3px 0; }
 .powod-pasek .slupek { height: 8px; background: var(--tlo-3); border-radius: 4px; overflow: hidden; }
 .powod-pasek .slupek i { display: block; height: 100%; background: var(--akcent); border-radius: 4px; }
-.wielka-liczba { font-family: var(--wyswietlana); font-stretch: 75%; font-size: 96px; font-weight: 800; line-height: 1; margin: 12px 0 6px; color: var(--akcent-tekst); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.lista-prosta { list-style: none; padding: 0; margin: 0; }
-.lista-prosta li { padding: 8px 0; border-bottom: 1px solid var(--linia); }
 .start-tytul { font-size: clamp(44px, 12vw, 64px); font-stretch: 75%; font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; margin: 16px 0 12px; }
-.start-zasady { display: grid; gap: 10px; margin: 16px 0; }
-.start-zasady div { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 15px; }
-.start-zasady b { font-family: var(--wyswietlana); font-stretch: 75%; font-size: 24px; font-weight: 800; line-height: 1; color: var(--akcent-tekst); }
 
 /* ---------- szkielet ładowania ---------- */
 .szkielet { background: var(--tlo-2); border-radius: 6px; animation: szkielet 1.4s ease-in-out infinite; display: block; }

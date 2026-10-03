@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { komunikatBledu, pobierzGracza, pobierzKonto, ustawNick as ustawNickApi, wylogujKonto, zalogujAnonimowo, type Konto } from "./api";
+import { komunikatBledu, pobierzGracza, pobierzKonto, ustawNick as ustawNickApi, wylogujKonto, type Konto } from "./api";
 import { konfiguracjaOk } from "./supabase";
 import type { Gracz } from "./types";
 
+/** brak_nicku = gość bez konta (konto null) albo konto e-mail bez nicku (konto ustawione). */
 type Stan = "nowa" | "laduje" | "brak_nicku" | "gotowy" | "blad";
 export type Modal = "nick" | "jak" | "konto" | "szukaj" | "wiecej" | null;
 export type OpcjaModalu = "rejestracja" | "logowanie" | null;
@@ -13,7 +14,7 @@ interface Sesja {
   /** Konto Supabase Auth (anonimowe albo z e-mailem); null przed uruchomieniem sesji. */
   konto: Konto | null;
   blad: string | null;
-  /** Loguje anonimowo i pobiera gracza (wołane przez ekrany gracza, nie przez /miasto). */
+  /** Czyta zapisaną sesję i pobiera gracza (układ strony woła to raz przy starcie). */
   uruchom: () => void;
   ustawNick: (nick: string) => Promise<void>;
   odswiezGracza: () => Promise<void>;
@@ -44,6 +45,8 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setStan(g ? "gotowy" : "brak_nicku");
   }, []);
 
+  /** Sprawdza zapisaną sesję (bez sieci). Gość bez konta ma stan „brak_nicku” i konto = null;
+   *  konto zakłada się e-mailem w modalu rejestracji (jak na giełdach prognoz). */
   const uruchom = useCallback(() => {
     if (uruchomiono.current) return;
     uruchomiono.current = true;
@@ -55,8 +58,22 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setStan("laduje");
     (async () => {
       try {
-        await zalogujAnonimowo();
-        await odswiezGracza();
+        const k = await pobierzKonto();
+        if (k) {
+          if (k.anonimowy) {
+            // sesja anonimowa ze starszej wersji gry: gra wymaga konta e-mail, więc ją porzucamy
+            await wylogujKonto();
+          } else {
+            const g = await pobierzGracza();
+            setKonto(k);
+            setGracz(g);
+            setStan(g ? "gotowy" : "brak_nicku");
+            return;
+          }
+        }
+        setKonto(null);
+        setGracz(null);
+        setStan("brak_nicku");
       } catch (e) {
         setBlad(komunikatBledu(e));
         setStan("blad");
@@ -83,8 +100,8 @@ export function SesjaProvider({ children }: { children: ReactNode }) {
     setGracz(null);
     setKonto(null);
     setModal(null);
-    uruchomiono.current = false;
-    setStan("nowa");
+    uruchomiono.current = true;
+    setStan("brak_nicku");
   }, []);
 
   return (

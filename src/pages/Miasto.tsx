@@ -61,8 +61,7 @@ export default function Miasto() {
           {t.roboty_budowlane.odsetek != null
             ? `, w robotach budowlanych ${Math.round(t.roboty_budowlane.odsetek * 100)}%`
             : ""}{" "}
-          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy).{" "}
-          <Link to="/liczba">Szczegóły</Link>
+          (Biuletyn Zamówień Publicznych, {t.ogolem.liczba} ogłoszeń o wykonaniu umowy).
         </Komunikat>
       ) : null}
 

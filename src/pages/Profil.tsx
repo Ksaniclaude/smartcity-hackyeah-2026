@@ -87,7 +87,7 @@ function Historia({ nick }: { nick: string }) {
 }
 
 function Ustawienia() {
-  const { gracz, konto, ustawNick, otworzModal, wyloguj } = useSesja();
+  const { gracz, konto, ustawNick, wyloguj } = useSesja();
   const navigate = useNavigate();
   const [motyw, przelaczMotyw] = useMotyw();
   const [nick, setNick] = useState(gracz?.nick ?? "");
@@ -140,22 +140,10 @@ function Ustawienia() {
 
       <div className="karta">
         <h3>Konto</h3>
-        {konto?.anonimowy ? (
-          <>
-            <p className="mala">
-              Grasz bez e-maila: punkty i prognozy są przypisane do tej przeglądarki. Załóż konto, żeby je zachować i
-              zalogować się na innym urządzeniu.
-            </p>
-            <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
-              Załóż konto
-            </button>
-          </>
-        ) : (
-          <p>
-            Zalogowano jako <b>{konto?.email ?? "–"}</b>
-            {konto && !konto.potwierdzony ? <span className="mala"> (e-mail jeszcze niepotwierdzony)</span> : null}
-          </p>
-        )}
+        <p>
+          Zalogowano jako <b>{konto?.email ?? "–"}</b>
+          {konto && !konto.potwierdzony ? <span className="mala"> (e-mail jeszcze niepotwierdzony)</span> : null}
+        </p>
       </div>
 
       <div className="karta">
@@ -169,9 +157,7 @@ function Ustawienia() {
       <div className="karta">
         <h3>Sesja</h3>
         <p className="mala">
-          {konto?.anonimowy
-            ? "Po wylogowaniu z konta bez e-maila nie da się wrócić do tych punktów."
-            : "Zalogujesz się ponownie e-mailem i hasłem."}
+          Zalogujesz się ponownie e-mailem i hasłem.
         </p>
         {wylogowanie.blad ? <Komunikat typ="blad">{wylogowanie.blad}</Komunikat> : null}
         <button
@@ -189,7 +175,7 @@ function Ustawienia() {
 
 /** Portfel gracza (/profil): statystyki, pozycje, historia transakcji, ustawienia. Wymaga nicku. */
 export default function Profil() {
-  const { gracz, konto, otworzModal, wyloguj } = useSesja();
+  const { gracz, konto, wyloguj } = useSesja();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const t = params.get("tab");
@@ -224,14 +210,9 @@ export default function Profil() {
         <Awatar nick={nick} duzy />
         <div>
           <h1>{nick}</h1>
-          <div className="pod">{konto?.email ?? "konto bez e-maila, tylko ta przeglądarka"}</div>
+          <div className="pod">{konto?.email}</div>
         </div>
         <div className="akcje">
-          {konto?.anonimowy ? (
-            <button type="button" className="przycisk przycisk-glowny przycisk-maly" onClick={() => otworzModal("konto", "rejestracja")}>
-              Załóż konto, żeby zachować punkty
-            </button>
-          ) : null}
           <button
             type="button"
             className="przycisk przycisk-maly przycisk-drugi"

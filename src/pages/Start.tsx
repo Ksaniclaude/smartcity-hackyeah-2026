@@ -1,38 +1,47 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FormularzNicku } from "@/ui/komponenty";
+import { useSesja } from "@/api/sesja";
 
-/** Ekran nicku dla gościa, który wszedł na /profil, /zaproponuj albo /admin. */
+/** Gość wszedł na /profil, /zaproponuj albo /admin: od razu otwieramy rejestrację
+ *  (albo formularz nicku, gdy konto e-mail nie ma jeszcze nicku). */
 export default function Start() {
+  const { konto, otworzModal } = useSesja();
+  useEffect(() => {
+    otworzModal(konto ? "nick" : "konto", konto ? null : "rejestracja");
+  }, [konto, otworzModal]);
   return (
     <main className="ekran">
-      <h1 className="start-tytul">
-        Czy miasto zdąży<span>?</span>
-      </h1>
+      <h1 className="start-tytul">Czy miasto zdąży?</h1>
       <p className="mala">
         Rynek prognoz dla Krakowa. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
-        wierzą. Żeby wejść na ten ekran, podaj nick.
+        wierzą.
       </p>
-      <div className="start-zasady">
-        <div>
-          <b>1</b>
-          <span>Dostajesz 1000 punktów. Stawiasz je na odpowiedzi, kurs się przesuwa.</span>
-        </div>
-        <div>
-          <b>2</b>
-          <span>Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Rozstrzygamy według publicznego źródła.</span>
-        </div>
-        <div>
-          <b>3</b>
-          <span>
-            <strong>Punktów nie da się kupić ani wymienić.</strong> Udział jest darmowy, nagród nie ma.
-          </span>
-        </div>
-      </div>
       <div className="karta">
-        <FormularzNicku etykietaPrzycisku="Zaczynam prognozować" />
+        <h3>{konto ? "Jeszcze nick" : "Ten ekran wymaga konta"}</h3>
+        <p className="mala">
+          {konto
+            ? "Zalogowano. Nick zobaczą inni gracze przy Twoich prognozach."
+            : "Załóż konto (nick, e-mail, hasło) i dostań 1000 punktów albo zaloguj się, jeśli już je masz."}
+        </p>
+        <div className="przyciski">
+          {konto ? (
+            <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("nick")}>
+              Podaj nick
+            </button>
+          ) : (
+            <>
+              <button type="button" className="przycisk przycisk-glowny" onClick={() => otworzModal("konto", "rejestracja")}>
+                Zarejestruj się
+              </button>
+              <button type="button" className="przycisk przycisk-glowny przycisk-drugi" onClick={() => otworzModal("konto", "logowanie")}>
+                Zaloguj się
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <p className="stopka">
-        Bez e-maila i danych osobowych. Sesja zostaje w tej przeglądarce. <Link to="/">Wróć do rynków</Link>
+        <Link to="/">Wróć do rynków</Link>
       </p>
     </main>
   );

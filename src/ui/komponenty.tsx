@@ -12,7 +12,6 @@ import {
   IkInfo,
   IkKalendarz,
   IkKsiezyc,
-  IkLink,
   IkLuz,
   IkMiasto,
   IkPlus,
@@ -167,7 +166,7 @@ export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolea
 /* ---------- nagłówek ---------- */
 
 export function Naglowek() {
-  const { gracz, stan, otworzModal } = useSesja();
+  const { gracz, konto, stan, otworzModal } = useSesja();
   const [motyw, przelaczMotyw] = useMotyw();
   const klasa = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "aktywny" : ""}`;
   return (
@@ -218,6 +217,10 @@ export function Naglowek() {
             </Link>
           ) : stan === "laduje" ? (
             <span className="szkielet szkielet-przycisk" />
+          ) : konto ? (
+            <button type="button" className="pigulka pigulka-pelna" onClick={() => otworzModal("nick")}>
+              Podaj nick
+            </button>
           ) : (
             <>
               <button type="button" className="pigulka ukryj-mobil" onClick={() => otworzModal("konto", "logowanie")}>
@@ -268,12 +271,7 @@ export function StopkaStrony() {
     <footer className="stopka-strony">
       <div className="stopka-wnetrze">
         <Link to="/miasto">Widok dla miasta</Link>
-        <Link to="/liczba">Terminowość umów (BZP)</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
-        <Link to="/admin">Panel</Link>
-        <a href="https://github.com/ksaniclaude/smartcity-hackyeah-2026" target="_blank" rel="noreferrer">
-          Kod
-        </a>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
     </footer>
@@ -330,7 +328,7 @@ export function FormularzNicku({ etykietaPrzycisku = "Zaczynam" }: { etykietaPrz
       }}
     >
       <label className="pole">
-        <span className="etykieta">Nick (tylko tyle o Tobie zapisujemy)</span>
+        <span className="etykieta">Nick (widzą go inni gracze)</span>
         <input
           type="text"
           value={nick}
@@ -368,7 +366,7 @@ function ModalNicku() {
   return (
     <Modal tytul="Podaj nick" onClose={zamknijModal}>
       <p className="pod">
-        Dostaniesz 1000 punktów na prognozy. Bez e-maila i hasła, sesja zostaje w tej przeglądarce.{" "}
+        Nick zobaczą inni gracze przy Twoich prognozach i komentarzach. Dostajesz 1000 punktów na prognozy.{" "}
         <b>Punktów nie da się kupić ani wymienić.</b>
       </p>
       <FormularzNicku />
@@ -377,7 +375,7 @@ function ModalNicku() {
 }
 
 function ModalJakToDziala() {
-  const { zamknijModal, otworzModal, gracz } = useSesja();
+  const { zamknijModal, otworzModal, gracz, konto } = useSesja();
   return (
     <Modal tytul="Jak to działa" onClose={zamknijModal}>
       <p className="pod">Zdążą? to rynek prognoz o Krakowie. Zamiast pieniędzy są punkty, zamiast sondażu kurs.</p>
@@ -409,8 +407,8 @@ function ModalJakToDziala() {
           Jasne
         </button>
       ) : (
-        <button type="button" className="przycisk" onClick={() => otworzModal("nick")}>
-          Zacznij grać
+        <button type="button" className="przycisk" onClick={() => (konto ? otworzModal("nick") : otworzModal("konto", "rejestracja"))}>
+          {konto ? "Podaj nick" : "Zacznij grać"}
         </button>
       )}
       <p className="zastrzezenie">Gra o punkty. Punktów nie da się kupić ani wymienić, nagród nie ma.</p>
@@ -419,10 +417,15 @@ function ModalJakToDziala() {
 }
 
 /** Rejestracja i logowanie e-mailem (jak na giełdach prognoz). Sesja anonimowa z nickiem
- *  jest podnoszona do stałego konta, więc punkty zostają. */
+ *  Konto zakłada signUp; stare sesje anonimowe są porzucane przy starcie. */
 function ModalKonta() {
-  const { zamknijModal, otworzModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
-  const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(opcjaModalu === "logowanie" ? "logowanie" : "rejestracja");
+  const { zamknijModal, opcjaModalu, stan, uruchom, gracz, konto, odswiezGracza, ustawNick } = useSesja();
+  const [tryb, setTryb] = useState<"rejestracja" | "logowanie" | "nick">(
+    konto && !gracz ? "nick" : opcjaModalu === "logowanie" ? "logowanie" : "rejestracja",
+  );
+  useEffect(() => {
+    if (gracz) zamknijModal();
+  }, [gracz, zamknijModal]);
   const [email, setEmail] = useState("");
   const [haslo, setHaslo] = useState("");
   const [nick, setNick] = useState("");
@@ -434,11 +437,22 @@ function ModalKonta() {
   const rejestracja = useAkcja(async () => {
     const w = await zarejestruj(email.trim(), haslo);
     if (w.wymagaPotwierdzenia) {
-      setInfo("Wysłaliśmy link potwierdzający na podany adres. Po kliknięciu w link konto będzie stałe.");
+      // Supabase ma włączone potwierdzanie e-maila: sesja powstanie po kliknięciu w link z poczty.
+      setInfo("Wysłaliśmy link potwierdzający na podany adres. Kliknij w niego (otworzy stronę zalogowaną), a potem podaj nick.");
+      return;
     }
-    if (!gracz && nick.trim().length >= 2) await ustawNick(nick.trim());
+    if (nick.trim().length >= 2) {
+      try {
+        await ustawNick(nick.trim());
+      } catch (e) {
+        // konto już istnieje (sesja jest), tylko nick nie przeszedł: zostajemy przy formularzu nicku
+        await odswiezGracza();
+        setTryb("nick");
+        throw e;
+      }
+    }
     await odswiezGracza();
-    if (!w.wymagaPotwierdzenia) zamknijModal();
+    zamknijModal();
   });
   const logowanie = useAkcja(async () => {
     await zalogujEmailem(email.trim(), haslo);
@@ -460,6 +474,7 @@ function ModalKonta() {
     return (
       <Modal tytul="Jeszcze nick" onClose={zamknijModal}>
         <p className="pod">Zalogowano. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
+        {rejestracja.blad ? <Komunikat typ="blad">{rejestracja.blad}</Komunikat> : null}
         <FormularzNicku />
       </Modal>
     );
@@ -468,10 +483,8 @@ function ModalKonta() {
     <Modal tytul={tryb === "logowanie" ? "Zaloguj się" : "Witaj w Zdążą?"} onClose={zamknijModal}>
       <p className="pod">
         {tryb === "logowanie"
-          ? "Konto e-mail działa na każdym urządzeniu."
-          : gracz && konto?.anonimowy
-            ? "Twoje punkty i prognozy zostaną przy koncie, a zalogujesz się na innym telefonie."
-            : "Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
+          ? "Zaloguj się e-mailem i hasłem, które podałeś przy rejestracji."
+          : "Załóż konto: nick, e-mail i hasło. Dostajesz 1000 punktów na prognozy. Punktów nie da się kupić ani wymienić."}
       </p>
       <div className="modal-zakladki" role="tablist">
         <button type="button" role="tab" className={tryb === "rejestracja" ? "aktywna" : ""} onClick={() => setTryb("rejestracja")}>
@@ -499,7 +512,7 @@ function ModalKonta() {
           </label>
           {info ? <Komunikat typ="info">{info}</Komunikat> : null}
           {rejestracja.blad ? <Komunikat typ="blad">{rejestracja.blad}</Komunikat> : null}
-          <button className="przycisk" type="submit" disabled={rejestracja.trwa || stan === "laduje"}>
+          <button className="przycisk" type="submit" disabled={rejestracja.trwa || stan === "laduje" || info != null}>
             {rejestracja.trwa ? "Chwila…" : stan === "laduje" ? "Łączę z miastem…" : "Załóż konto"}
           </button>
         </form>
@@ -519,15 +532,25 @@ function ModalKonta() {
           </button>
         </form>
       )}
-      {!gracz ? (
-        <>
-          <div className="lub">lub</div>
-          <button type="button" className="przycisk przycisk-drugi" onClick={() => otworzModal("nick")}>
-            Graj bez konta, tylko z nickiem
-          </button>
-        </>
-      ) : null}
-      <p className="zastrzezenie">Gra o punkty, bez pieniędzy. Zapisujemy tylko nick i e-mail.</p>
+      <p className="zastrzezenie">
+        {tryb === "logowanie" ? (
+          <>
+            Nie masz konta?{" "}
+            <button type="button" className="lacze" onClick={() => setTryb("rejestracja")}>
+              Zarejestruj się
+            </button>
+          </>
+        ) : (
+          <>
+            Masz już konto?{" "}
+            <button type="button" className="lacze" onClick={() => setTryb("logowanie")}>
+              Zaloguj się
+            </button>
+          </>
+        )}
+        <br />
+        Gra o punkty, bez pieniędzy. Zapisujemy tylko nick i e-mail.
+      </p>
     </Modal>
   );
 }
@@ -575,7 +598,7 @@ function ModalWiecej() {
           <Awatar nick={gracz.nick} />
           <div>
             <b>{gracz.nick}</b>
-            <div className="pod">{konto?.email ?? "konto bez e-maila (tylko ta przeglądarka)"}</div>
+            <div className="pod">{konto?.email}</div>
           </div>
         </div>
       ) : null}
@@ -590,12 +613,6 @@ function ModalWiecej() {
           <Link to="/ranking" onClick={zamknijModal}>
             <IkRanking />
             Ranking
-          </Link>
-        </li>
-        <li>
-          <Link to="/liczba" onClick={zamknijModal}>
-            <IkKalendarz />
-            Terminowość umów (BZP)
           </Link>
         </li>
         <li>
@@ -616,26 +633,22 @@ function ModalWiecej() {
             {motyw === "ciemny" ? "Jasny motyw" : "Ciemny motyw"}
           </button>
         </li>
-        <li>
-          <a href="https://github.com/ksaniclaude/smartcity-hackyeah-2026" target="_blank" rel="noreferrer">
-            <IkLink />
-            Kod i dokumentacja
-            <span className="pod">GitHub</span>
-          </a>
-        </li>
       </ul>
       {gracz ? (
         <div className="menu-przyciski">
-          {konto?.anonimowy ? (
-            <button type="button" className="przycisk przycisk-drugi" onClick={() => otworzModal("konto", "rejestracja")}>
-              Załóż konto
-            </button>
-          ) : (
-            <Link to="/profil" className="przycisk przycisk-drugi" onClick={zamknijModal}>
-              Profil
-            </Link>
-          )}
+          <Link to="/profil" className="przycisk przycisk-drugi" onClick={zamknijModal}>
+            Profil
+          </Link>
           <button type="button" className="przycisk" disabled={trwa} onClick={() => void wylogujSie()}>
+            Wyloguj
+          </button>
+        </div>
+      ) : konto ? (
+        <div className="menu-przyciski">
+          <button type="button" className="przycisk" onClick={() => otworzModal("nick")}>
+            Podaj nick
+          </button>
+          <button type="button" className="przycisk przycisk-drugi" disabled={trwa} onClick={() => void wylogujSie()}>
             Wyloguj
           </button>
         </div>

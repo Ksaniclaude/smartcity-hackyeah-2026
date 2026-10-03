@@ -7,7 +7,6 @@ czy miasto dotrzyma terminu, a kurs pokazuje, ile w to wierzą. Projekt na HackY
 - **Widok dla miasta (bez logowania):** https://zdaza.vercel.app/miasto
 - **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
 - **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
-- **Liczba z zamówień publicznych:** https://zdaza.vercel.app/liczba
 
 Dwie kategorie rynków:
 
@@ -22,7 +21,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 | Polymarket | Zdążą? |
 | --- | --- |
-| Sign up / Log in (e-mail) | Rejestracja i logowanie e-mailem (Supabase Auth). Można też grać bez konta, tylko z nickiem (sesja anonimowa); rejestracja podnosi tę sesję do stałego konta, więc punkty zostają. |
+| Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
 | Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
 | Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. |
@@ -35,7 +34,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 
 ## Zasady gry
 
-- Nowy gracz dostaje 1000 punktów. Każdy rynek ma 2 albo 3 odpowiedzi; kursy ustala automatyczny animator LMSR
+- Nowy gracz zakłada konto i dostaje 1000 punktów. Każdy rynek ma 2 albo 3 odpowiedzi; kursy ustala automatyczny animator LMSR
   (b = 1000). Po prognozie gracz widzi, jak przesunął kurs.
 - Na jeden rynek można wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki rynek ma mniej niż 10 prognoz
   (do tego czasu widać kurs otwarcia ustawiony przez admina).
@@ -63,7 +62,7 @@ VITE_SUPABASE_URL=… VITE_SUPABASE_KEY=… ADMIN_HASLO=… npm run pytania -- -
 
 ## Stack
 
-React 19 + Vite + TypeScript, Supabase (Postgres, Auth: sesje anonimowe i e-mail, funkcje RPC), Vercel. Bez osobnego
+React 19 + Vite + TypeScript, Supabase (Postgres, Auth e-mail, funkcje RPC), Vercel. Bez osobnego
 backendu. Klient tylko czyta (RLS, widoki `security_invoker`, uprawnienia kolumnowe ukrywają stan rynku `q`), każdy
 zapis idzie przez funkcję RPC `SECURITY DEFINER`, która sprawdza gracza po `auth.uid()` i trzyma blokadę wiersza
 rynku (`SELECT … FOR UPDATE`), więc równoległe zakłady są bezpieczne. Design: własny system w CSS (tokeny kolorów
@@ -89,10 +88,12 @@ npm run dev
    values ('haslo_admina', extensions.crypt('TU_WPISZ_HASLO', extensions.gen_salt('bf')))
    on conflict (klucz) do update set wartosc = excluded.wartosc;
    ```
-3. Authentication → Sign In / Providers: włącz **Allow anonymous sign-ins** (gra bez konta) i **Email** (rejestracja).
-   Na demo wyłącz **Confirm email**, inaczej rejestracja wymaga kliknięcia w link z poczty (Supabase wysyła
-   kilka maili na godzinę bez własnego SMTP). Domyślny limit to 30 anonimowych logowań na godzinę z jednego IP
-   (Authentication → Rate Limits); na prezentacji z jednej sieci Wi-Fi warto go podnieść.
+3. Authentication → Sign In / Providers: włącz **Email** (rejestracja i logowanie) i **wyłącz Confirm email**.
+   Przy włączonym potwierdzaniu każda rejestracja wysyła mail, a Supabase bez własnego SMTP pozwala na ok. 2 maile
+   na godzinę: trzecia osoba zobaczy „limit wysyłki e-maili”. Jeśli potwierdzanie ma zostać, skonfiguruj własny
+   SMTP (Authentication → Emails → SMTP Settings) i ustaw Site URL na adres aplikacji (Authentication → URL
+   Configuration), żeby link z maila wracał na stronę, a nie na localhost. Logowanie anonimowe nie jest potrzebne.
+   Sprawdź limity w Authentication → Rate Limits przed prezentacją z jednej sieci Wi-Fi.
 4. W projekcie Vercel ustaw `VITE_SUPABASE_URL` i `VITE_SUPABASE_KEY` (klucz publishable, publiczny z założenia).
 
 Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje prawa admina (`gracze.czy_admin`).
@@ -102,8 +103,8 @@ Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje praw
 `scripts/zamowienia.ts` pobiera z publicznej wyszukiwarki Biuletynu Zamówień Publicznych
 (`https://ezamowienia.gov.pl/mo-board/api/v1/Board/Search`) ogłoszenia o wykonaniu umowy krakowskich jednostek
 miejskich, dociąga szczegóły i liczy odsetek umów wykonanych w pierwotnym terminie (ogółem i dla robót budowlanych).
-Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/liczba`,
-`/miasto`, na stronę główną i jako kurs otwarcia rynków „miasto”.
+Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/miasto`,
+na stronę główną i jako kurs otwarcia rynków „miasto”.
 
 ```bash
 npm run zamowienia -- --od=2024-01-01 --do=2025-12-31      # pełny przebieg
@@ -142,7 +143,7 @@ wcześniej zepsuł produkcję).
 | `db/test/` | Namiastka `auth` do lokalnego Postgresa i symulacja |
 | `src/api/` | Klient Supabase, RPC, sesja (anonimowa i e-mail), podgląd LMSR |
 | `src/ui/` | `styles.css` (design system, jasny i ciemny motyw), `komponenty.tsx` (nagłówek, nawigacja, modale, wskaźnik), `wykres.tsx` (SVG), ikony |
-| `src/pages/` | `Lista` (rynki), `Pytanie` (rynek), `Profil`, `ProfilPubliczny`, `Ranking`, `Aktywnosc`, `Miasto`, `Admin`, `Liczba`, `Qr`, `Zaproponuj`, `Start` |
+| `src/pages/` | `Lista` (rynki), `Pytanie` (rynek), `Profil`, `ProfilPubliczny`, `Ranking`, `Aktywnosc`, `Miasto`, `Admin`, `Qr`, `Zaproponuj`, `Start` |
 | `src/dane/terminowosc.json` | Liczba z zamówień publicznych (generowana skryptem) |
 | `scripts/` | `zamowienia.ts`, `terminowosc.ts` (BZP), `pytania_startowe.ts` (wgranie CSV), `test_db_local.sh`, `test_ui.ts` |
 | `data/` | `pytania_startowe.csv` (realne pytania), `umowy.csv` (szablon BZP) |
@@ -170,11 +171,11 @@ Claude Code (Anthropic), w tym z równoległymi agentami do researchu i budowy e
 
 ## Ograniczenia
 
-- Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie; bez tego na ekranie jest „brak danych”.
+- Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie; bez tego nie pokazuje się nigdzie.
 - Terminy pytań startowych pochodzą z komunikatów znalezionych wyszukiwarką; strony nie były otwierane z środowiska
   budowania (blokada sieci). Sprawdź linki przed demem.
-- Gra bez konta = jedna przeglądarka; rejestracja e-mailem to naprawia. Bez własnego SMTP Supabase wysyła tylko
-  kilka maili na godzinę, dlatego na demo lepiej wyłączyć potwierdzanie e-maila.
+- Bez własnego SMTP Supabase wysyła tylko kilka maili na godzinę, dlatego na demo lepiej wyłączyć potwierdzanie
+  e-maila (inaczej nowi gracze czekają na link).
 - Hasło admina jest wspólne dla zespołu.
 - Nicki i komentarze graczy są publiczne (aktywność, ranking, komentarze), jak na giełdach prognoz.
 - Supabase domyślnie limituje anonimowe logowania do 30 na godzinę z jednego IP.

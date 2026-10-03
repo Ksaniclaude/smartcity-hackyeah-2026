@@ -149,9 +149,9 @@ function b64url(s: string) {
   return Buffer.from(s).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 const jwt = `${b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${b64url(
-  JSON.stringify({ sub: UID, role: "authenticated", is_anonymous: true, email: "", aud: "authenticated", exp: 4102444800, iat: 1700000000, session_id: "s1" }),
+  JSON.stringify({ sub: UID, role: "authenticated", is_anonymous: false, email: "krowodrza@przyklad.pl", aud: "authenticated", exp: 4102444800, iat: 1700000000, session_id: "s1" }),
 )}.podpis`;
-const uzytkownik = { id: UID, aud: "authenticated", role: "authenticated", is_anonymous: true, email: "", email_confirmed_at: null, app_metadata: {}, user_metadata: {}, created_at: iso(60 * 24) };
+const uzytkownik = { id: UID, aud: "authenticated", role: "authenticated", is_anonymous: false, email: "krowodrza@przyklad.pl", email_confirmed_at: iso(60 * 24), app_metadata: {}, user_metadata: {}, created_at: iso(60 * 24) };
 const sesja = { access_token: jwt, token_type: "bearer", expires_in: 999999, expires_at: 4102444800, refresh_token: "r1", user: uzytkownik };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -276,9 +276,14 @@ async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: Brow
   const w = WYMIARY[urzadzenie];
   if (!w) throw new Error(`Nieznane urządzenie „${urzadzenie}”; dostępne: ${Object.keys(WYMIARY).join(", ")}`);
   const ctx = await browser.newContext({ viewport: { width: w.width, height: w.height }, deviceScaleFactor: 1, locale: "pl-PL" });
-  await ctx.addInitScript((m: string) => {
-    if (m) localStorage.setItem("motyw", m);
-  }, MOTYW);
+  // Gra wymaga konta e-mail, więc gracz dostaje zapisaną sesję Supabase (klucz wg adresu: sb-test-auth-token).
+  await ctx.addInitScript(
+    ({ motyw, zapisanaSesja }: { motyw: string; zapisanaSesja: string }) => {
+      if (motyw) localStorage.setItem("motyw", motyw);
+      if (zapisanaSesja) localStorage.setItem("sb-test-auth-token", zapisanaSesja);
+    },
+    { motyw: MOTYW, zapisanaSesja: GRACZ ? JSON.stringify(sesja) : "" },
+  );
   await ctx.route(`${SUPABASE}/**`, mock);
   const strony = new Map<string, Page>();
   for (const s of STRONY) {

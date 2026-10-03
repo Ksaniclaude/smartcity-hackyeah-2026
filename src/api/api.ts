@@ -32,7 +32,11 @@ export function komunikatBledu(e: unknown): string {
   if (/User already registered|already been registered/i.test(msg)) return "Ten e-mail ma już konto. Zaloguj się.";
   if (/Password should be at least/i.test(msg)) return "Hasło musi mieć co najmniej 6 znaków";
   if (/Unable to validate email|invalid format/i.test(msg)) return "Nieprawidłowy adres e-mail";
-  if (/rate limit|Email rate limit/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
+  if (/email rate limit|over_email_send_rate_limit/i.test(msg))
+    return "Supabase wyczerpał limit wysyłki e-maili (bez własnego SMTP to ok. 2 maile na godzinę). Admin: wyłącz „Confirm email” w Authentication → Sign In / Providers → Email albo ustaw własny SMTP.";
+  if (/rate limit|too many requests/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
+  if (/Email not confirmed/i.test(msg)) return "E-mail jeszcze niepotwierdzony. Kliknij w link z poczty i zaloguj się ponownie.";
+  if (/permission denied for function|Brak sesji gracza|JWT expired/i.test(msg)) return "Zaloguj się, żeby grać.";
   if (/Signups not allowed/i.test(msg)) return "Rejestracja e-mailem jest wyłączona w Supabase";
   return msg;
 }
@@ -66,21 +70,17 @@ export async function pobierzKonto(): Promise<Konto | null> {
 }
 
 /**
- * Rejestracja e-mailem. Sesja anonimowa (z nickiem i punktami) jest podnoszona do stałego
- * konta przez updateUser, więc punkty zostają. Bez sesji: zwykłe signUp.
- * Zwraca true, gdy Supabase wymaga potwierdzenia e-maila (link w skrzynce).
+ * Rejestracja e-mailem (signUp). Ewentualna sesja anonimowa ze starszej wersji gry jest porzucana:
+ * jej podniesienie przez updateUser wymagałoby potwierdzenia e-maila, więc konto zakładamy od nowa.
+ * Zwraca true, gdy Supabase wymaga potwierdzenia e-maila (sesja powstanie po kliknięciu w link).
  */
 export async function zarejestruj(email: string, haslo: string): Promise<{ wymagaPotwierdzenia: boolean }> {
   const { data } = await supabase.auth.getSession();
-  if (data.session?.user) {
-    const r = await supabase.auth.updateUser({ email, password: haslo });
-    if (r.error) throw new Error(komunikatBledu(r.error));
-    const u = r.data.user;
-    const wymaga = Boolean(u?.new_email) && !u?.email_confirmed_at;
-    return { wymagaPotwierdzenia: wymaga };
-  }
+  if (data.session) await supabase.auth.signOut();
   const r = await supabase.auth.signUp({ email, password: haslo });
   if (r.error) throw new Error(komunikatBledu(r.error));
+  // Supabase przy włączonym potwierdzaniu nie zdradza, że e-mail ma już konto: zwraca użytkownika bez tożsamości.
+  if (r.data.user && r.data.user.identities?.length === 0) throw new Error("Ten e-mail ma już konto. Zaloguj się.");
   return { wymagaPotwierdzenia: !r.data.session };
 }
 
@@ -99,16 +99,6 @@ export async function zmienHaslo(nowe: string): Promise<void> {
   if (r.error) throw new Error(komunikatBledu(r.error));
 }
 
-
-/** Zwraca id zalogowanego (anonimowo) użytkownika; loguje, jeśli trzeba. */
-export async function zalogujAnonimowo(): Promise<string> {
-  const { data } = await supabase.auth.getSession();
-  if (data.session?.user) return data.session.user.id;
-  const r = await supabase.auth.signInAnonymously();
-  if (r.error) throw new Error(komunikatBledu(r.error));
-  if (!r.data.user) throw new Error("Nie udało się zalogować anonimowo");
-  return r.data.user.id;
-}
 
 export async function pobierzGracza(): Promise<Gracz | null> {
   const r = await supabase.from("gracze").select("id, nick, saldo, czy_admin").maybeSingle();

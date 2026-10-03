@@ -137,7 +137,7 @@ function Komentarze({
   komentarze: Komentarz[];
   odswiez: () => Promise<void>;
 }) {
-  const { stan, otworzModal } = useSesja();
+  const { stan, konto, otworzModal } = useSesja();
   const [tekst, setTekst] = useState("");
   const dodaj = useAkcja(async () => {
     await dodajKomentarz(pid, tekst.trim());
@@ -168,11 +168,15 @@ function Komentarze({
           {tekst.length > 0 ? <span className="mala">{tekst.length}/500</span> : null}
           {dodaj.blad ? <Komunikat typ="blad">{dodaj.blad}</Komunikat> : null}
         </form>
-      ) : (
+      ) : stan === "laduje" || stan === "nowa" ? null : (
         <div className="panel-info">
-          Zaloguj się, żeby komentować.{" "}
-          <button type="button" className="przycisk przycisk-maly przycisk-drugi" onClick={() => otworzModal("konto", "rejestracja")}>
-            Zaloguj się
+          {konto ? "Podaj nick, żeby komentować." : "Załóż konto, żeby komentować."}{" "}
+          <button
+            type="button"
+            className="przycisk przycisk-maly przycisk-drugi"
+            onClick={() => (konto ? otworzModal("nick") : otworzModal("konto", "rejestracja"))}
+          >
+            {konto ? "Podaj nick" : "Załóż konto"}
           </button>
         </div>
       )}
@@ -251,7 +255,7 @@ function KursPoZmianie({ przed, po }: { przed: number; po: number }) {
 }
 
 function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelProps) {
-  const { gracz, stan, otworzModal, uruchom, odswiezGracza } = useSesja();
+  const { gracz, konto, stan, otworzModal, uruchom, odswiezGracza } = useSesja();
   const [tryb, setTryb] = useState<"kup" | "sprzedaj">("kup");
   const [stawka, setStawka] = useState(10);
   const [powod, setPowod] = useState<Powod | null>(null);
@@ -542,8 +546,12 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                     : `Postaw ${liczba(stawkaOk)} pkt: ${p.odpowiedzi[odp - 1]}`}
             </button>
           ) : stan === "brak_nicku" ? (
-            <button type="button" className="przycisk-postaw" onClick={() => otworzModal("konto", "rejestracja")}>
-              Zaloguj się, żeby postawić
+            <button
+              type="button"
+              className="przycisk-postaw"
+              onClick={() => (konto ? otworzModal("nick") : otworzModal("konto", "rejestracja"))}
+            >
+              {konto ? "Podaj nick, żeby postawić" : "Załóż konto, żeby postawić"}
             </button>
           ) : stan === "blad" ? null : (
             <button type="button" className="przycisk-postaw" disabled>

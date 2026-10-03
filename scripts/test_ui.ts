@@ -1,6 +1,6 @@
 // Test ścieżki gracza w prawdziwym Chromium (playwright-core) na zamockowanym Supabase:
 // rynki jako gość → prognoza (nick w modalu) → rynek „miasto” z powodem → komentarz → sprzedaż →
-// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /liczba, /qr. Zrzuty: telefon,
+// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /qr. Zrzuty: telefon,
 // desktop, jasny motyw. Nie potrzebuje sieci.
 //
 // Użycie: npm run build && npm run test:ui   (build z VITE_SUPABASE_URL=https://test.supabase.local VITE_SUPABASE_KEY=test)
@@ -344,16 +344,16 @@ async function main() {
     await oczekuj(page, "tłum się pomylił");
     await zrzut(page, "rynki_gosc");
 
-    console.log("2. Klik „Tak” na karcie → rynek → konto → nick w modalu → prognoza");
+    console.log("2. Klik „Tak” na karcie → rynek → rejestracja (nick, e-mail, hasło) → prognoza");
     await page.locator(".rynek-przyciski .kup-tak").first().click();
     await oczekuj(page, "Zasady");
-    await page.getByRole("button", { name: /Zaloguj się, żeby postawić/ }).click();
+    await page.getByRole("button", { name: /Załóż konto, żeby postawić/ }).click();
     await oczekuj(page, "Witaj w Zdążą?");
     await zrzut(page, "modal_konta", false);
-    await page.getByRole("button", { name: /Graj bez konta/ }).click();
-    await oczekuj(page, "Podaj nick");
     await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
-    await page.getByRole("button", { name: "Zaczynam" }).click();
+    await page.getByPlaceholder("ty@przyklad.pl").fill("krowodrza@przyklad.pl");
+    await page.getByLabel(/Hasło/).fill("haslo123");
+    await page.locator(".modal").getByRole("button", { name: "Załóż konto", exact: true }).click();
     await page.getByRole("button", { name: /^Postaw/ }).first().waitFor({ timeout: 8000 });
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
@@ -430,7 +430,7 @@ async function main() {
     await zrzut(page2, "miasto");
     await ctx2.close();
 
-    console.log("8. /admin, /liczba, /qr");
+    console.log("8. /admin, /qr");
     await page.goto(`${ADRES}/admin`);
     await oczekuj(page, "Panel admina");
     await page.getByLabel("Hasło").fill("zle");
@@ -441,8 +441,6 @@ async function main() {
     await oczekuj(page, "Dodaj pytanie");
     await oczekuj(page, "wyniki sportowe");
     await zrzut(page, "admin");
-    await page.goto(`${ADRES}/liczba`);
-    await oczekuj(page, "Brak przeliczonych danych");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });
 
