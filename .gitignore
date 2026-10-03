@@ -1,47 +1,28 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# build
+/dist
 /.next/
 /out/
-
-# production
 /build
 
 # misc
 .DS_Store
 *.pem
+*.log
+*.tsbuildinfo
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
+# env files (przykładowa konfiguracja jest wersjonowana)
 .env*
+!.env.example
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# lokalne ustawienia Claude Code (ścieżki z tej maszyny)
+# lokalne ustawienia Claude Code
 /.claude
 
-# przykładowa konfiguracja jest wersjonowana
-!.env.example
+# pliki robocze skryptów (surowe odpowiedzi API, lokalna baza testowa)
+/data/surowe/
+/data/pglite/

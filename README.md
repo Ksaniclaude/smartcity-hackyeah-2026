@@ -1,99 +1,169 @@
-# zdążą?
+# Zdążą?
 
-**Zdążą czy nie zdążą?** Miejski rynek przewidywań: miasto obiecuje terminy, a mieszkańcy typują, czy zostaną
-dotrzymane. Gra się **cegiełkami**, czyli walutą, której nie da się kupić, wypłacić ani przelać. Miasto dostaje z tego
-„Puls miasta”: prawdopodobieństwa wyznaczone przez tłum.
+Mieszkańcy prognozują punktami sprawdzalne pytania o swoje miasto. Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
-Projekt na HackYeah 2026. **Wersja na żywo: https://zdaza-mauve.vercel.app**
+- **Demo (telefon):** https://zdaza.vercel.app
+- **Widok dla miasta (bez logowania):** https://zdaza.vercel.app/miasto
+- **Kod QR do zeskanowania na prezentacji:** https://zdaza.vercel.app/qr
+- **Panel admina:** https://zdaza.vercel.app/admin
+- **Liczba z zamówień publicznych:** https://zdaza.vercel.app/liczba
 
-## Zasady gry
+Dwie kategorie pytań:
 
-**Cegiełki**
-- Na start każdy dostaje 100, potem co tydzień +100 (w nocy z niedzieli na poniedziałek), ale przydział nie podnosi salda ponad 300.
-- Tuż przed przydziałem niewydane cegiełki **kruszą się o 10%**, więc opłaca się typować, a nie chomikować.
-- Nie ma kupowania, wypłat ani przelewów między kontami. Gra nie toczy się więc o pieniądze ani nagrody rzeczowe (to ważne przy ustawie hazardowej), a zbieranie cegiełek z wielu kont nic nie daje.
+- **miasto** – czy miejski termin zostanie dotrzymany (remonty, inwestycje, umowy). Gracz podaje też powód
+  (wykonawca, decyzja polityczna, pieniądze, formalności, inne). Z tych pytań miasto dostaje tabelę terminów,
+  w które mieszkańcy nie wierzą, z rozkładem powodów i polem na komentarz urzędu.
+- **na luzie** – lekkie pytania o życie miasta, jednoznacznie sprawdzalne w publicznym źródle (pogoda, powietrze,
+  komunikacja, ceny, frekwencja). Rozstrzygają się szybko i pokazują trafność prognoz.
 
-**Wydarzenie dnia** (główny sposób zdobywania cegiełek)
-- Codziennie każdy ma **jeden ruch**: zgłasza własne pytanie o miasto albo głosuje na cudzą propozycję.
-- Liczba głosów jest ukryta do północy, a kolejność propozycji losowa, żeby nikt nie dopisywał się do faworyta w ostatniej chwili.
-- O północy wygrywa propozycja z największą liczbą głosów (co najmniej 3, głos autora się liczy) i **staje się rynkiem**.
-- Autor zwycięskiej propozycji dostaje **+50**, a każdy, kto na nią głosował, **+20**.
+Tło: tramwaj do Mistrzejowic miał kilka kolejnych terminów, a urząd sam przyznał, że w jeden z nich nikt w Krakowie
+nie wierzył. Ta wiedza istniała, ale nie było gdzie jej zapisać.
 
-**Rynki (LMSR)**
-- Cenę ustala automatyczny animator rynku [LMSR](https://mason.gmu.edu/~rhanson/mktscore.pdf). Cena udziału TAK to szansa, którą daje tłum.
-- Kupujesz udziały TAK albo NIE za cegiełki, a każdy trafiony udział wypłaca 1 cegiełkę.
+To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udział jest darmowy, nagród nie ma.
 
-**Nos (reputacja)**
-- Za każdy typ w rozstrzygniętym rynku: trafiony daje `100 × (1 − cena)`, chybiony `−100 × cena`.
-- Typ „zgodny z tłumem” daje więc średnio zero. Punkty zbiera ten, kto wiedział lepiej niż rynek, niezależnie od wielkości stawki.
-- Poziomy: Mieszkaniec → Bywalec (100) → Wyrocznia Dzielnicy (300) → Wyrocznia Miasta (800).
+## Jak to działa
+
+- Gracz skanuje kod QR, podaje nick (bez e-maila i danych osobowych; sesja anonimowa Supabase zostaje w przeglądarce)
+  i dostaje 1000 punktów.
+- Każde pytanie ma 2 odpowiedzi („tak”, „nie”) albo 3 („w terminie”, „po terminie”, „wstrzymane lub anulowane”).
+  Kursy ustala automatyczny animator rynku LMSR (b = 1000). Po zapisie gracz widzi, jak przesunął kurs.
+- Na jedno pytanie gracz może wydać najwyżej 200 punktów. Kurs jest ukryty, dopóki pytanie ma mniej niż 10 prognoz.
+- Każdy udział trafionej odpowiedzi wypłaca 1 punkt. Unieważnienie zwraca wydane punkty.
+- Naraz otwarte są najwyżej 3 pytania „miasto” i 5 „na luzie”. Pytania „miasto” startują od odsetka umów wykonanych
+  w terminie (z Biuletynu Zamówień Publicznych), pytania „na luzie” od 50%.
+- Kursy odświeżają się odpytywaniem co 5 sekund, bez połączeń realtime.
+
+Każde pytanie musi mieć: treść, kategorię, odpowiedzi, kryterium rozstrzygnięcia, link do publicznego źródła i datę
+rozstrzygnięcia. Bez któregoś z nich admin nie otworzy pytania (sprawdza to i formularz, i baza). Tematy wykluczone:
+wyniki sportowe, wybory i kandydaci, konkretne osoby prywatne, wypadki i zgony.
+
+## Ścieżka wideo (90 s)
+
+1. `/liczba`: odsetek umów krakowskich jednostek miejskich wykonanych w pierwotnym terminie.
+2. `/qr` na ekranie, gracz skanuje, podaje nick, stawia prognozę na pytanie „na luzie”.
+3. Ekran: „Twoja prognoza przesunęła kurs z 41% na 44%”.
+4. Pytanie „miasto” (Oficjalnie: data. Mieszkańcy: X%, że zdążą) i `/miasto` z powodami.
+5. Lista „Rozstrzygnięte”: trafność prognoz, w tym pytanie, gdzie tłum się pomylił.
+
+## Stack
+
+React + Vite + TypeScript, Supabase (Postgres, logowanie anonimowe, funkcje RPC), Vercel. Bez osobnego backendu.
+Klient tylko czyta (RLS i widoki), każdy zapis idzie przez funkcję RPC `SECURITY DEFINER`, która sama sprawdza gracza
+po `auth.uid()` i trzyma blokadę wiersza pytania (`SELECT … FOR UPDATE`).
 
 ## Uruchomienie
 
-Potrzebny jest Node.js 24.
+Potrzebny Node.js 22+.
 
 ```bash
-cp .env.example .env.local
 npm install
+cp .env.example .env.local   # wpisz VITE_SUPABASE_URL i VITE_SUPABASE_KEY
 npm run dev
 ```
 
-Aplikacja działa pod http://localhost:3000 i od razu łączy się z bazą w Supabase (projekt `smartcity-hackyeah-2026`),
-w której są już dane demo: 24 konta, 15 rynków z historią cen, rozstrzygnięcia i propozycje dnia.
+### Baza (Supabase), jednorazowo
 
-Konto demo do pokazu: `kamienica_12` (gracz z historią); hasło kont demo jest w [`supabase/seed.sql`](supabase/seed.sql).
-Hasła konta `admin` nie ma w repo — zna je właściciel projektu. Zmiana hasła admina (SQL Editor Supabase):
+1. W SQL Editorze uruchom [`db/schema.sql`](db/schema.sql) (tabele, funkcje, widoki, RLS).
+2. Ustaw hasło admina (hash bcrypt, nic nie trafia do repo):
+   ```sql
+   insert into public.ustawienia (klucz, wartosc)
+   values ('haslo_admina', extensions.crypt('TU_WPISZ_HASLO', extensions.gen_salt('bf')))
+   on conflict (klucz) do update set wartosc = excluded.wartosc;
+   ```
+3. Włącz logowanie anonimowe: Authentication → Sign In / Providers → **Allow anonymous sign-ins**.
+   Domyślny limit to 30 anonimowych logowań na godzinę z jednego IP (Authentication → Rate Limits); na
+   prezentacji z jednej sieci Wi-Fi warto go podnieść.
+4. W projekcie Vercel ustaw `VITE_SUPABASE_URL` i `VITE_SUPABASE_KEY` (klucz publishable; jest publiczny z założenia).
 
-```sql
-update game.users set pass_hash = extensions.crypt('NOWE_HASLO', extensions.gen_salt('bf')) where nick = 'admin';
-update game.settings set value = (select pass_hash from game.users where nick = 'admin') where key = 'admin_hash';
+Admin loguje się na `/admin` hasłem; przeglądarka, w której to zrobił, dostaje prawa admina (`gracze.czy_admin`).
+
+### Pytania startowe
+
+Pytań, terminów i źródeł nie wymyślamy. Wypełnij [`data/pytania_startowe.csv`](data/pytania_startowe.csv)
+(pola `[UZUPEŁNIJ]`; wiersze z niewypełnionymi polami są pomijane) i wgraj przez te same funkcje RPC, których używa
+panel admina:
+
+```bash
+VITE_SUPABASE_URL=… VITE_SUPABASE_KEY=… ADMIN_HASLO=… npm run pytania -- --otworz
 ```
 
-## Scenariusz demo dla jury (3 minuty)
+Bez `--otworz` pytania trafiają do kolejki jako propozycje. Można je też dodać ręcznie w `/admin`.
 
-1. **Rynki:** pokaż listę i jeden rynek. Zmień stawkę w panelu „Twój typ”: wypłata i nowa cena liczą się na żywo.
-2. **Postaw typ** jako `kamienica_12`: saldo w nagłówku spada, rynek się przesuwa.
-3. **Wydarzenie dnia:** zagłosuj na propozycję i pokaż, że drugi głos jest zablokowany (jeden ruch dziennie).
-4. **Panel admina** (konto `admin`): „Zakończ dzisiejsze głosowanie”. Zwycięzca staje się rynkiem, a autor i głosujący dostają cegiełki.
-5. Rozstrzygnij rynek „kamery monitoringu”: wypłaty i punkty Nosa naliczają się automatycznie.
-6. „+7 dni” pokazuje kruszenie i tygodniowy przydział w Portfelu.
-7. **Puls miasta:** to dostaje urząd, czyli prognozy mieszkańców, inwestycje bez wiary w termin i eksport CSV.
-8. Na koniec „Reset danych demo” w panelu admina przywraca stan wyjściowy (i cofa czas gry).
+## Dane z zamówień publicznych
 
-## Architektura
+`scripts/zamowienia.ts` pobiera z publicznej wyszukiwarki Biuletynu Zamówień Publicznych
+(`https://ezamowienia.gov.pl/mo-board/api/v1/Board/Search`) ogłoszenia o wykonaniu umowy krakowskich jednostek
+miejskich, dociąga szczegóły każdego ogłoszenia i liczy odsetek umów wykonanych w pierwotnym terminie (ogółem i dla
+robót budowlanych) oraz tabelę wykonawców. Wynik trafia do `data/umowy.csv` (surowe odpowiedzi do `data/surowe/`)
+i do `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/liczba`, `/miasto` i jako kurs otwarcia
+pytań „miasto”.
 
-- **Next.js 16** (App Router, Server Actions) + **Tailwind CSS 4**
-- **Supabase (Postgres).** Cała logika gry działa w bazie, w funkcjach PL/pgSQL: salda, LMSR, rozliczenia dni i tygodni, Nos.
-  Każda operacja na cegiełkach to jedna transakcja z blokadą rynku i konta.
-- **Bezpieczeństwo.** Tabele siedzą w schemacie `game`, którego API Supabase nie wystawia. Aplikacja woła tylko funkcje
-  `public.app_*` (SECURITY DEFINER), a każda z nich sama sprawdza sesję. Dlatego wystarcza klucz publishable, a hasło
-  do bazy nie jest potrzebne. Hasła kont są hashowane bcryptem, tokeny sesji trzymane jako sha256.
-- **Bez crona.** Tygodnie i wyniki dnia rozliczają się „leniwie” przy pierwszym wejściu po północy, z poprawnymi datami w historii.
-- **Czas gry** (`game.now()`) admin może przesuwać do przodu, co przydaje się na demo.
+```bash
+npm run zamowienia -- --od=2024-01-01 --do=2025-12-31      # pełny przebieg
+npm run zamowienia -- --tylko-odkrywanie                     # tylko rozpoznanie API
+npm run terminowosc                                          # przelicz z ręcznie wypełnionego data/umowy.csv
+```
 
-| Plik | Co robi |
+Skrypt nie zakłada z góry nazw parametrów ani typu ogłoszenia: najpierw próbuje pobrać opis API, potem próbkę
+ogłoszeń, wypisuje spotkane typy i wybiera ten pasujący do „wykonanie umowy” (albo bierze `--typ=…`). Jeśli czegoś
+nie da się ustalić, mówi to wprost i kończy pracę; wiersze bez jednoznacznej odpowiedzi „w terminie” zostają puste
+i nie wchodzą do liczby. **Ważne:** środowisko, w którym powstał ten kod, nie miało dostępu do ezamowienia.gov.pl,
+więc skrypt nie był uruchomiony na prawdziwym API. Uruchom go lokalnie; gdy API nie odpowie, wypełnij
+`data/umowy.csv` ręcznie (kolumny: `numer_ogloszenia,data_publikacji,zamawiajacy,wykonawca,przedmiot,rodzaj,w_terminie,link`)
+i uruchom `npm run terminowosc`. Dopóki pliku nie ma, aplikacja pokazuje „brak danych”, a kurs otwarcia pytań
+„miasto” to 34/33/33.
+
+## Testy
+
+```bash
+npm run test:db     # lokalny Postgres: schemat, symulacja 100 graczy (2 i 3 odpowiedzi), 8 równoległych procesów
+npm run build && npm run test:ui   # Chromium: cała ścieżka z wideo na zamockowanym Supabase (bez sieci)
+```
+
+`db/test/symulacja.sql` sprawdza po każdym z 600 losowych zakładów, że kursy sumują się do 1, żadne saldo nie spada
+poniżej zera, koszt zakładu równa się różnicy funkcji kosztu LMSR, a po rozstrzygnięciu wypłaty zgadzają się
+z udziałami (i strata animatora nie przekracza b·ln n). Ten sam plik można wkleić w SQL Editorze Supabase: działa
+w transakcji, którą na końcu wycofuje. Test równoległy puszcza 8 procesów `psql` po 40 zakładów na jedno pytanie
+i sprawdza, że suma stawek równa się kosztowi LMSR od stanu otwarcia (żaden zakład nie zginął).
+
+## Struktura
+
+| Ścieżka | Co robi |
 | --- | --- |
-| `supabase/migrations/*_zdaza_core.sql` | Tabele i zasady gry (schemat `game`) |
-| `supabase/migrations/*_zdaza_api.sql` | Publiczne API: funkcje `app_*` |
-| `supabase/migrations/*_zdaza_demo.sql` | Generator danych demo i reset |
-| `supabase/seed.sql` | Wgranie danych demo (raz po migracjach) |
-| `src/lib/supabase.ts` | Klient Supabase i wywołania RPC |
-| `src/lib/queries.ts`, `src/lib/session.ts` | Odczyty dla stron i sesja |
-| `src/lib/lmsr.ts` | Matematyka rynku do podglądu na żywo w przeglądarce |
-| `src/app/actions.ts` | Server Actions (formularze) |
+| `db/schema.sql` | Tabele (`gracze`, `pytania`, `pozycje`, `transakcje`, `zmiany_terminow`, `ustawienia`), LMSR, RPC, widoki, RLS |
+| `db/test/` | Namiastka `auth` do lokalnego Postgresa i symulacja |
+| `src/api/` | Klient Supabase, wywołania RPC, sesja anonimowa, podgląd LMSR |
+| `src/pages/` | `Start`, `Lista`, `Pytanie`, `Profil`, `Miasto`, `Admin`, `Liczba`, `Qr`, `Zaproponuj` |
+| `src/dane/terminowosc.json` | Liczba z zamówień publicznych (generowana skryptem) |
+| `scripts/zamowienia.ts`, `scripts/terminowosc.ts` | Dane z BZP i przeliczenie z CSV |
+| `scripts/pytania_startowe.ts` | Wgranie pytań startowych przez RPC |
+| `scripts/test_db_local.sh`, `scripts/test_ui.ts` | Testy |
+| `data/pytania_startowe.csv`, `data/umowy.csv` | Szablony do wypełnienia |
 
-Liczby gry są w `game.cfg()` (baza) i w `src/lib/config.ts` (wyświetlanie). Zmieniając jedno, zmień też drugie.
+Pliki po poprzedniej wersji aplikacji (Next.js) nie są już używane i można je usunąć:
 
-## Wdrożenie
+```bash
+git rm -r src/app src/components src/lib supabase next.config.ts postcss.config.mjs eslint.config.mjs readme
+```
 
-Projekt Vercel `zdaza` (https://zdaza-mauve.vercel.app) jest podpięty do tego repo: push do `main` wdraża produkcję,
-każda inna gałąź i PR dostaje podgląd. Zmienne `NEXT_PUBLIC_SUPABASE_URL` i `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-są ustawione w Vercelu (wartości jak w `.env.example`).
-Nowa baza: uruchom migracje z `supabase/migrations/` w kolejności, a potem `supabase/seed.sql`.
+Stary schemat `game` w bazie też jest zbędny (`drop schema game cascade;` oraz funkcje `public.app_*`).
 
-## Co dalej
+## Użyte narzędzia AI
 
-- Weryfikacja „jeden mieszkaniec = jedno konto” (np. Supabase Auth z kodem SMS albo login.gov.pl). To najważniejsza ochrona przed farmą kont.
-- Moderacja propozycji przed publikacją i zgłaszanie wątpliwości co do rozstrzygnięć.
-- Sprzedaż udziałów przed terminem.
-- Przypomnienia o ruchu dnia i o kruszeniu.
+Kod, schemat bazy, testy i ten README powstały z pomocą Claude Code (Anthropic) w jednej sesji; decyzje
+projektowe (kategorie, LMSR, limity, zakres wideo) pochodzą z briefu zespołu.
+
+## Źródła danych
+
+- Biuletyn Zamówień Publicznych, ogłoszenia o wykonaniu umowy: https://ezamowienia.gov.pl/mo-client-board/bzp/list
+- Każde pytanie ma link do publicznego źródła i link do źródła rozstrzygnięcia (pola `link_zrodla`,
+  `link_rozstrzygniecia`); są widoczne dla graczy i w widoku dla miasta.
+
+## Ograniczenia
+
+- Liczba z zamówień publicznych wymaga uruchomienia skryptu lokalnie (patrz wyżej); bez tego na ekranie jest „brak danych”.
+- Jedno konto = jedna przeglądarka. Wyczyszczenie danych strony to utrata konta; nie ma odzyskiwania ani logowania.
+- Hasło admina jest wspólne dla zespołu; prawa admina dostaje przeglądarka, w której je wpisano.
+- Gracz poznaje ukryty kurs po własnej prognozie (komunikat o przesunięciu), tak jak w briefie.
+- Powody i komentarze graczy są widoczne publicznie w rozkładzie i liście komentarzy (bez nicków).
+- Supabase domyślnie limituje anonimowe logowania do 30 na godzinę z jednego IP.
