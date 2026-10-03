@@ -511,20 +511,20 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           </div>
           <p className="kupon-wygrana">
             Do wygrania{" "}
-            <LiczbaZywa className="cyfry" od={0} wartosc={wynik.udzialy} format={(n) => `${liczba(n, 1)} pkt`} czas={900} />
+            <LiczbaZywa className="cyfry" od={0} wartosc={wDol(wynik.udzialy, 0)} format={(n) => `${liczba(n)} pkt`} czas={900} />
           </p>
           {wynik.sprzedano.length > 0 ? (
             <p>
-              Sprzedano {wynik.sprzedano.map((z) => `${liczba(z.udzialy, 1)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
-              {liczba(wynik.zwrot_ze_sprzedazy, 1)} pkt.
+              Sprzedano {wynik.sprzedano.map((z) => `${udzialyTekst(z.udzialy)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
+              {liczba(wDol(wynik.zwrot_ze_sprzedazy, 0))} pkt.
             </p>
           ) : null}
           <p>
             Twój ruch przesunął kurs {procent(wynik.kurs_przed)} → {procent(wynik.kurs_po)}.
           </p>
           <p>
-            Masz <b>{liczba(wynik.udzialy, 1)} udz.</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz:{" "}
-            <b className="zysk">+{liczba(wynik.udzialy, 1)} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
+            Masz <b>{udzialyTekst(wynik.udzialy)} udz.</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz:{" "}
+            <b className="zysk">+{liczba(wDol(wynik.udzialy, 0))} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
           </p>
           <Awans przed={wynik.miejsce_przed} po={wynik.miejsce_po} graczy={wynik.graczy_w_rankingu} />
           <div className="kupon-akcje">
@@ -545,7 +545,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
         <div className="kupon" role="status" key={nrKuponu} ref={refKuponu}>
           <div className="kupon-gora">
             <IkPtaszek />
-            Sprzedano {liczba(wynikSprzedazy.udzialy, 1)} udz. za {liczba(wynikSprzedazy.zwrot, 1)} pkt
+            Sprzedano {udzialyTekst(wynikSprzedazy.udzialy)} udz. za {liczba(wDol(wynikSprzedazy.zwrot, 0))} pkt
           </div>
           <p>
             Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł {procent(wynikSprzedazy.kurs_przed)} → {procent(wynikSprzedazy.kurs_po)}.
@@ -652,7 +652,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
               Rynek ma jedną stronę na gracza. Masz{" "}
               {inne.map((z) => `${udzialyTekst(z.udzialy)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
               {p.odpowiedzi[odp - 1]}” najpierw je sprzeda
-              {p.kursy ? ` (≈ ${liczba(zwrotInne, 1)} pkt wraca na saldo)` : ""}.
+              {p.kursy ? ` (≈ ${liczba(wDol(zwrotInne, 0))} pkt wraca na saldo)` : ""}.
             </div>
           ) : null}
           {odp != null && stan !== "blad" && maks >= 1 ? (
@@ -661,7 +661,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 <>
                   <div className="wiersz-pod">
                     <span>Udziały</span>
-                    <b>≈ {liczba(podglad.udzialy, 1)}</b>
+                    <b>≈ {udzialyTekst(podglad.udzialy)}</b>
                   </div>
                   <div className="wiersz-pod">
                     <span>Kurs po transakcji</span>
@@ -672,14 +672,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                   <div className="wygrana-glowna">
                     <span>Jeśli trafisz</span>
                     <span className="cyfry zysk" ref={refWygranej}>
-                      <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `+${liczba(n, 1)}`} czas={220} />
+                      <LiczbaZywa wartosc={wDol(podglad.udzialy, 0)} format={(n) => `+${liczba(n)}`} czas={220} />
                       <small>pkt (×{liczba(mnoznik ?? 0, 2)})</small>
                     </span>
                   </div>
                   <div className="wiersz-pod">
                     <span>Zysk ponad stawkę</span>
                     <b className="zysk">
-                      +{liczba(podglad.udzialy - stawkaOk, 1)} pkt (+{Math.round((podglad.udzialy / stawkaOk - 1) * 100)}%)
+                      +{liczba(wDol(podglad.udzialy - stawkaOk, 0))} pkt (+{Math.floor((podglad.udzialy / stawkaOk - 1) * 100)}%)
                     </b>
                   </div>
                 </>
@@ -800,7 +800,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 <div className="wygrana-glowna">
                   <span>Zwrot</span>
                   <span className="cyfry">
-                    <LiczbaZywa wartosc={podgladS.zwrot} format={(n) => `≈ ${liczba(n, 1)}`} czas={220} />
+                    <LiczbaZywa wartosc={wDol(podgladS.zwrot, 0)} format={(n) => `≈ ${liczba(n)}`} czas={220} />
                     <small>pkt</small>
                   </span>
                 </div>

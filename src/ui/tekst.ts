@@ -15,7 +15,7 @@ export function poPrognozach(n: number): string {
 }
 
 export function punkty(n: number): string {
-  return odmien(Math.round(n), "punkt", "punkty", "punktów");
+  return odmien(Math.floor(n), "punkt", "punkty", "punktów");
 }
 
 /** Liczba z odstępem tysięcy, bez miejsc po przecinku: 1240 → "1 240". */

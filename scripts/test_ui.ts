@@ -413,9 +413,17 @@ async function main() {
     await page.getByRole("group", { name: "Szybka stawka" }).getByRole("button", { name: "50", exact: true }).click();
     await oczekuj(page, "Jeśli trafisz");
     await oczekuj(page, "(×");
+    // punkty i udziały przy kupnie w pełnych liczbach (mnożnik ×1,95 może mieć ułamek)
+    const zUlamkiem = (t: string) => /\d,\d+\s*(pkt|udz)|[≈+]\s?\d+,\d/.test(t);
+    const podgladKupna = await page.locator(".wygrana").first().innerText();
+    if (zUlamkiem(podgladKupna)) throw new Error(`Podgląd kupna z ułamkami: ${podgladKupna}`);
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
     await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await page.waitForTimeout(1000); // licznik „Do wygrania” dobiega do końca
+    const kuponKupna = await page.locator(".kupon").first().innerText();
+    if (zUlamkiem(kuponKupna)) throw new Error(`Kupon z ułamkami: ${kuponKupna}`);
+    console.log("  ✓ podgląd i kupon w pełnych punktach i udziałach");
     await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
     await page.getByRole("button", { name: "Udostępnij kartę" }).first().click();
@@ -429,7 +437,7 @@ async function main() {
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
     await oczekuj(page, "Rynek ma jedną stronę na gracza");
     await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
-    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await oczekuj(page, /Sprzedano 23 udz. „tak”/);
     await zrzut(page, "zmiana_strony");
 
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
