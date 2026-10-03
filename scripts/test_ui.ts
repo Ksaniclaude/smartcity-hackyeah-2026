@@ -216,6 +216,18 @@ async function mock(route: Route) {
     if (!stan.gracz) return json(route, { message: "Najpierw podaj nick" }, 400);
     if (body.p_pytanie === 1 && !body.p_powod) return json(route, { message: "Podaj powód" }, 400);
     stan.prognozy++;
+    // jedna strona rynku na gracza: inne odpowiedzi są sprzedawane przed zakupem
+    const sprzedano: { odpowiedz: number; odpowiedz_tekst: string; udzialy: number; zwrot: number }[] = [];
+    const pyt = pytania.find((x) => x.id === body.p_pytanie)!;
+    for (const z of stan.pozycje.values()) {
+      if (z.pytanie === body.p_pytanie && z.odpowiedz !== body.p_odpowiedz && z.udzialy > 0) {
+        const zwrot = Math.round(z.udzialy * 0.42 * 10000) / 10000;
+        sprzedano.push({ odpowiedz: z.odpowiedz, odpowiedz_tekst: pyt.odpowiedzi[z.odpowiedz - 1], udzialy: z.udzialy, zwrot });
+        stan.gracz.saldo += zwrot;
+        z.udzialy = 0;
+        z.wydane = 0;
+      }
+    }
     stan.gracz.saldo -= body.p_stawka;
     const klucz = `${body.p_pytanie}-${body.p_odpowiedz}`;
     const z = stan.pozycje.get(klucz) ?? { pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, udzialy: 0, wydane: 0 };
@@ -228,6 +240,7 @@ async function mock(route: Route) {
     return json(route, {
       pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, stawka: body.p_stawka, udzialy: 23.7,
       kurs_przed: 0.41, kurs_po: 0.44, kursy: q.odpowiedzi.length === 2 ? [0.44, 0.56] : [0.41, 0.47, 0.12], saldo: stan.gracz.saldo, liczba_prognoz: 12, obrot: q.obrot + body.p_stawka,
+      sprzedano, zwrot_ze_sprzedazy: sprzedano.reduce((s, x) => s + x.zwrot, 0),
     });
   }
   if (p === "/rest/v1/rpc/sprzedaj_udzialy") {
@@ -339,7 +352,8 @@ async function main() {
     await page.goto(`${ADRES}/`);
     await oczekuj(page, "Czy miasto zdąży?");
     await oczekuj(page, "41%");
-    await oczekuj(page, "pkt obrotu");
+    await oczekuj(page, "12 prognoz");
+    await oczekuj(page, "3/10 prognoz");
     await oczekuj(page, "tłum się pomylił");
     await zrzut(page, "rynki_gosc");
 
@@ -358,6 +372,13 @@ async function main() {
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
     await oczekuj(page, "przesunęła kurs z 41% na 44%");
     await zrzut(page, "prognoza_ok");
+
+    console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
+    await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
+    await oczekuj(page, "Rynek ma jedną stronę na gracza");
+    await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
+    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await zrzut(page, "zmiana_strony");
 
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
     await page.goto(`${ADRES}/pytanie/1?odp=2`);

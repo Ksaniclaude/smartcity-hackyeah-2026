@@ -11,9 +11,7 @@ export default function Start() {
   }, [konto, otworzModal]);
   return (
     <main className="ekran">
-      <h1 className="start-tytul">
-        Czy miasto zdąży<span>?</span>
-      </h1>
+      <h1 className="start-tytul">Czy miasto zdąży?</h1>
       <p className="mala">
         Rynek prognoz dla Krakowa. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
         wierzą.
@@ -22,7 +20,7 @@ export default function Start() {
         <h3>{konto ? "Jeszcze nick" : "Ten ekran wymaga konta"}</h3>
         <p className="mala">
           {konto
-            ? "Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach."
+            ? "Zalogowano. Nick zobaczą inni gracze przy Twoich prognozach."
             : "Załóż konto (nick, e-mail, hasło) i dostań 1000 punktów albo zaloguj się, jeśli już je masz."}
         </p>
         <div className="przyciski">
