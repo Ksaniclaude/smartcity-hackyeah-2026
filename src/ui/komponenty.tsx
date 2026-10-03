@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { Kategoria, Pytanie, Status } from "@/api/types";
+import type { Kategoria, Pytanie, Status, ZnalezionyGracz } from "@/api/types";
 import { ETYKIETY_STATUSU } from "@/api/types";
-import { pobierzGracza, zalogujEmailem, zarejestruj } from "@/api/api";
+import { pobierzGracza, pobierzPytania, szukajGraczy, zalogujEmailem, zarejestruj } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import { useAkcja } from "@/ui/hooks";
 import { inicjaly, kolorAwatara, liczba, odmien } from "@/ui/tekst";
@@ -140,16 +140,78 @@ export function useMotyw(): [string, () => void] {
   return [motyw, przelacz];
 }
 
-/* ---------- wyszukiwarka (parametr ?q= na stronie głównej) ---------- */
+/* ---------- wyszukiwarka: rynki i gracze (parametr ?q= na stronie głównej) ---------- */
 
-export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolean; poWyslaniu?: () => void }) {
+/** Rynki, których treść albo miasto zawiera frazę (bez wielkości liter). */
+export function pasujeDoFrazy(p: Pick<Pytanie, "tresc" | "miasto">, fraza: string): boolean {
+  const f = fraza.trim().toLowerCase();
+  if (!f) return true;
+  return p.tresc.toLowerCase().includes(f) || p.miasto.toLowerCase().includes(f);
+}
+
+/** Opóźnia wartość o `ms`, żeby nie odpytywać bazy po każdej literze. */
+function useOpoznione<T>(wartosc: T, ms: number): T {
+  const [opozniona, setOpozniona] = useState(wartosc);
+  useEffect(() => {
+    const id = window.setTimeout(() => setOpozniona(wartosc), ms);
+    return () => window.clearTimeout(id);
+  }, [wartosc, ms]);
+  return opozniona;
+}
+
+/**
+ * Pole szukania. Wpisywanie podpowiada rynki (z listy rynków) i graczy (po nicku, RPC `szukaj_graczy`);
+ * Enter przechodzi do listy rynków z `?q=`. Na stronie głównej lista filtruje się na żywo (bez podpowiedzi,
+ * bo wyniki są tuż pod polem). `plaska`: podpowiedzi jako zwykły blok pod polem (arkusz na telefonie),
+ * nie jako warstwa.
+ */
+export function Szukajka({ autoFocus = false, plaska = false, poWyslaniu }: { autoFocus?: boolean; plaska?: boolean; poWyslaniu?: () => void }) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [q, setQ] = useState(params.get("q") ?? "");
+  const [otwarte, setOtwarte] = useState(false);
+  const [rynki, setRynki] = useState<Pytanie[] | null>(null);
+  const [gracze, setGracze] = useState<{ fraza: string; lista: ZnalezionyGracz[] } | null>(null);
+  const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     setQ(params.get("q") ?? "");
   }, [params]);
+  const fraza = q.trim();
+  const podpowiedzi = (plaska || pathname !== "/") && otwarte && fraza.length > 0;
+  const opozniona = useOpoznione(podpowiedzi ? fraza : "", 250);
+
+  // Rynki pobierane raz, przy pierwszej literze; gracze z bazy po każdej (opóźnionej) zmianie frazy.
+  useEffect(() => {
+    if (!podpowiedzi || rynki) return;
+    let aktualne = true;
+    pobierzPytania()
+      .then((lista) => aktualne && setRynki(lista))
+      .catch(() => aktualne && setRynki([]));
+    return () => {
+      aktualne = false;
+    };
+  }, [podpowiedzi, rynki]);
+  useEffect(() => {
+    if (!opozniona) return;
+    let aktualne = true;
+    szukajGraczy(opozniona, 5)
+      .then((lista) => aktualne && setGracze({ fraza: opozniona, lista }))
+      .catch(() => aktualne && setGracze({ fraza: opozniona, lista: [] }));
+    return () => {
+      aktualne = false;
+    };
+  }, [opozniona]);
+  // Klik poza polem zamyka podpowiedzi.
+  useEffect(() => {
+    if (!podpowiedzi) return;
+    const naKlik = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOtwarte(false);
+    };
+    document.addEventListener("pointerdown", naKlik);
+    return () => document.removeEventListener("pointerdown", naKlik);
+  }, [podpowiedzi]);
+
   const zastosuj = (wartosc: string) => {
     const w = wartosc.trim();
     if (pathname === "/") {
@@ -161,28 +223,85 @@ export function Szukajka({ autoFocus = false, poWyslaniu }: { autoFocus?: boolea
       navigate(w ? `/?q=${encodeURIComponent(w)}` : "/");
     }
   };
+  const wybrano = () => {
+    setOtwarte(false);
+    poWyslaniu?.();
+  };
+
+  const znalezioneRynki = rynki ? rynki.filter((p) => p.status !== "propozycja" && pasujeDoFrazy(p, fraza)).slice(0, 5) : null;
+  const znalezieniGracze = gracze?.fraza === fraza ? gracze.lista : null;
+  const szukam = znalezioneRynki == null || znalezieniGracze == null;
+  const nic = !szukam && znalezioneRynki.length === 0 && znalezieniGracze.length === 0;
+
   return (
     <form
-      className="szukaj"
+      ref={ref}
+      className={`szukaj ${plaska ? "szukaj-plaska" : ""}`}
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
         zastosuj(q);
-        poWyslaniu?.();
+        wybrano();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOtwarte(false);
       }}
     >
       <IkSzukaj />
       <input
         type="search"
-        placeholder="Szukaj rynków"
-        aria-label="Szukaj rynków"
+        placeholder="Szukaj rynków lub graczy"
+        aria-label="Szukaj rynków lub graczy"
+        autoComplete="off"
         value={q}
         autoFocus={autoFocus}
+        onFocus={() => setOtwarte(true)}
         onChange={(e) => {
           setQ(e.target.value);
+          setOtwarte(true);
           if (pathname === "/") zastosuj(e.target.value);
         }}
       />
+      {podpowiedzi ? (
+        <div className="podpowiedzi" aria-label="Podpowiedzi">
+          {znalezioneRynki && znalezioneRynki.length > 0 ? (
+            <div className="podpowiedzi-grupa">
+              <h4>rynki</h4>
+              {znalezioneRynki.map((p) => (
+                <Link key={p.id} to={`/pytanie/${p.id}`} className="podpowiedz" onClick={wybrano}>
+                  <IkRynki />
+                  <span className="podpowiedz-tekst">
+                    <span className="podpowiedz-tytul">{p.tresc}</span>
+                    <small>{p.miasto}</small>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {znalezieniGracze && znalezieniGracze.length > 0 ? (
+            <div className="podpowiedzi-grupa">
+              <h4>gracze</h4>
+              {znalezieniGracze.map((g) => (
+                <Link key={g.nick} to={`/u/${encodeURIComponent(g.nick)}`} className="podpowiedz" onClick={wybrano}>
+                  <Awatar nick={g.nick} />
+                  <span className="podpowiedz-tekst">
+                    <span className="podpowiedz-tytul">
+                      {g.nick} <OdznakaMiejsca miejsce={g.miejsce} />
+                    </span>
+                    <small>{g.prognozy > 0 ? `${odmien(g.prognozy, "prognoza", "prognozy", "prognoz")} · ${liczba(Math.round(g.portfel))} pkt` : "bez prognoz"}</small>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {nic ? <p className="podpowiedzi-pusto">Brak rynków i graczy dla „{fraza}”</p> : null}
+          {szukam && !znalezioneRynki?.length && !znalezieniGracze?.length ? <p className="podpowiedzi-pusto">Szukam…</p> : null}
+          <Link to={`/?q=${encodeURIComponent(fraza)}`} className="podpowiedz podpowiedz-wszystkie" onClick={wybrano}>
+            <IkSzukaj />
+            <span className="podpowiedz-tekst">Wszystkie wyniki dla „{fraza}”</span>
+          </Link>
+        </div>
+      ) : null}
     </form>
   );
 }
@@ -432,7 +551,7 @@ function ModalJakToDziala() {
           <b>1</b>
           <div>
             <strong>Wybierz pytanie</strong>
-            <span>Od miejskich inwestycji po celebrytów. Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
+            <span>Od miejskich inwestycji po życie celebrytów. Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
           </div>
         </div>
         <div className="krok">
@@ -617,7 +736,7 @@ function ModalSzukaj() {
   return (
     <Modal onClose={zamknijModal}>
       <div className="uchwyt" />
-      <Szukajka autoFocus poWyslaniu={zamknijModal} />
+      <Szukajka autoFocus plaska poWyslaniu={zamknijModal} />
       <div className="przegladaj">
         <h4>Przeglądaj</h4>
         <div className="chipy">

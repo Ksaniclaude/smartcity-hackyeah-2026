@@ -1,7 +1,7 @@
 # Zdążą?
 
 Polski rynek prognoz w stylu giełd prognoz (Polymarket), ale o punkty zamiast złotówek. Gracze stawiają punkty na to,
-co wydarzy się w Polsce, od terminów miejskich inwestycji po celebrytów, a kurs pokazuje, ile w to wierzą.
+co wydarzy się w Polsce, od terminów miejskich inwestycji po życie celebrytów, a kurs pokazuje, jak bardzo w to wierzą.
 Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
 - **Demo:** https://zdaza.vercel.app

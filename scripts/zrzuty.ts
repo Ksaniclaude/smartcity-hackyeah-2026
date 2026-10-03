@@ -13,6 +13,7 @@
 //   npm run zrzuty -- --out=data/zrzuty_dev
 //   npm run zrzuty -- --strony=/ --klik="Jak to działa"                      # zrzut po kliknięciu przycisku (modal)
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^\+100$;;^Postaw"   # kilka kliknięć po kolei (;;)
+//   npm run zrzuty -- --strony=/pytanie/1 --wpisz=podg                       # podpowiedzi lupki po wpisaniu frazy (po --klik, gdy jest)
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw"   # kupon po przyjętej prognozie
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw" --klatki=150,450,750,1100
 //                                          # klatki animacji: zrzuty po tylu ms od kliknięcia (pliki …_k150.png)
@@ -40,6 +41,8 @@ const URZADZENIA = (arg("urzadzenia") ?? "desktop,tel").split(",").map((s) => s.
 const OUT = path.resolve(arg("out") ?? "data/zrzuty_dev");
 /** Wyrażenia regularne na nazwy przycisków klikanych po kolei po wczytaniu strony (stany po interakcji), rozdzielone „;;”. */
 const KLIKI = (arg("klik") ?? "").split(";;").map((x) => x.trim()).filter(Boolean);
+/** Fraza wpisywana w pole szukania po wczytaniu strony (i po kliknięciach z --klik), żeby zobaczyć podpowiedzi. */
+const WPISZ = arg("wpisz") ?? "";
 /** Po ilu milisekundach od kliknięcia zrobić zrzuty klatek animacji (sam ekran, bez przewijania). */
 const KLATKI = (arg("klatki") ?? "").split(",").map((x) => Number(x.trim())).filter((x) => x > 0);
 const PORT = 4175;
@@ -199,6 +202,12 @@ async function mock(route: Route) {
   if (p === "/rest/v1/rpc/komentarze_rynku") return json(route, DANE === "zywy" ? komentarze : []);
   if (p === "/rest/v1/rpc/najwieksi_gracze") return json(route, DANE === "zywy" ? najwieksi : []);
   if (p === "/rest/v1/rpc/ranking") return json(route, DANE === "zywy" ? ranking : []);
+  if (p === "/rest/v1/rpc/szukaj_graczy") {
+    const body = (req.postDataJSON() ?? {}) as { p_q?: string; p_limit?: number };
+    const fraza = (body.p_q ?? "").trim().toLowerCase();
+    const lista = DANE === "zywy" ? ranking : [].map((w, i) => ({ nick: w.nick, portfel: w.portfel, prognozy: w.prognozy, miejsce: i + 1 }));
+    return json(route, fraza ? lista.filter((w) => w.nick.toLowerCase().includes(fraza)).slice(0, body.p_limit ?? 8) : []);
+  }
   if (p === "/rest/v1/rpc/rozklad_powodow") return json(route, DANE === "zywy" ? powody : []);
   if (p === "/rest/v1/rpc/postaw_prognoze") {
     // Wynik liczony tym samym wzorem LMSR co podgląd w panelu (b = 1000), żeby kupon pokazywał spójne liczby.
@@ -323,6 +332,13 @@ async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: Brow
         await page.screenshot({ path: path.join(OUT, `${urzadzenie}_${slug(s)}_k${ms}.png`) });
       }
       await page.waitForTimeout(1500); // animacje wejścia modala albo kuponu
+    }
+    if (WPISZ) {
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      const pole = page.getByPlaceholder("Szukaj rynków lub graczy").locator("visible=true").first();
+      await pole.click({ timeout: 8000 });
+      await pole.fill(WPISZ);
+      await page.waitForTimeout(800); // opóźnienie odpytania graczy
     }
     strony.set(s, page);
   }

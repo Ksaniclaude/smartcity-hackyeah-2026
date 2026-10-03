@@ -89,6 +89,64 @@ export const IkStrzalka = (p: P) => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </svg>
 );
+/* ---------- udostępnianie ---------- */
+export const IkUdostepnij = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M12 15V3.5M7.5 8 12 3.5 16.5 8M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12" />
+  </svg>
+);
+/** Relacja (pionowa plansza 9:16): obiektyw w zaokrąglonym kwadracie. */
+export const IkRelacja = (p: P) => (
+  <svg {...baza} {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <path d="M17 7h.01" strokeWidth={2.4} />
+  </svg>
+);
+export const IkWhatsApp = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M12 3.5a8.5 8.5 0 0 0-7.3 12.85L3.5 20.5l4.3-1.15A8.5 8.5 0 1 0 12 3.5z" />
+    <path d="M9.3 8.3c-.5 1.1.2 2.9 1.7 4.4s3.3 2.2 4.4 1.7l.5-1.4-1.6-1-.9.7c-.7-.3-1.7-1.3-2-2l.7-.9-1-1.6z" fill="currentColor" strokeWidth={1} />
+  </svg>
+);
+export const IkX = (p: P) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
+    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+  </svg>
+);
+export const IkFacebook = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M17 3h-2.5A4.5 4.5 0 0 0 10 7.5V10H7v4h3v7h4v-7h2.8l.7-4H14V7.8a.8.8 0 0 1 .8-.8H17z" />
+  </svg>
+);
+export const IkTelegram = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M21 3.5 10.5 13.5M21 3.5l-6.5 17-4-7-7-4z" />
+  </svg>
+);
+export const IkKopiuj = (p: P) => (
+  <svg {...baza} {...p}>
+    <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" />
+    <path d="M15.5 5.5V5A1.5 1.5 0 0 0 14 3.5H5A1.5 1.5 0 0 0 3.5 5v9A1.5 1.5 0 0 0 5 15.5h.5" />
+  </svg>
+);
+export const IkPobierz = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </svg>
+);
+export const IkWiecej = (p: P) => (
+  <svg {...baza} strokeWidth={2.6} {...p}>
+    <path d="M5.5 12h.01M12 12h.01M18.5 12h.01" />
+  </svg>
+);
+
+/** Szewron w prawo; w lewo przez odbicie w arkuszu (.wstecz). */
+export const IkSzewron = (p: P) => (
+  <svg {...baza} strokeWidth={2.2} {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </svg>
+);
 export const IkInfo = (p: P) => (
   <svg {...baza} {...p}>
     <circle cx="12" cy="12" r="9" />

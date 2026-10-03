@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { pobierzMojeTransakcje } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import type { MojaPozycja, MojaTransakcja } from "@/api/types";
-import { IkAktywnosc, IkBudzet, IkDymek, IkGwiazdka, IkLuz, IkPlomien, IkPtaszek, IkRanking, IkRynki, IkStrzalka, IkZamiana } from "@/ui/ikony";
+import { IkAktywnosc, IkBudzet, IkDymek, IkGwiazdka, IkLuz, IkPlomien, IkPtaszek, IkRanking, IkRynki, IkStrzalka, IkUdostepnij, IkZamiana } from "@/ui/ikony";
 import { liczba, odmien } from "@/ui/tekst";
 import { fala, lecPunkty, podbij, uniesTekst, wibruj, wystrzel } from "@/ui/zywe";
 
@@ -46,14 +46,17 @@ function progPoziomu(l: number): number {
   return 15 * (l - 1) * l;
 }
 
-export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[], seria: number): Postep {
+export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[], seria: number, udostepnienia = 0): Postep {
   const kupna = transakcje.filter((t) => t.udzialy > 0);
   const rynki = new Set(kupna.map((t) => t.pytanie)).size;
-  const zKomentarzem = kupna.filter((t) => (t.komentarz ?? "").trim().length > 0).length;
+  // Bez nabijania kupnem i sprzedażą w kółko: prognoza liczy się raz na odpowiedź na rynku (zmiana zdania
+  // daje najwyżej tyle, ile rynek ma odpowiedzi), komentarz raz na rynek.
+  const prognozy = new Set(kupna.map((t) => `${t.pytanie}-${t.odpowiedz}`)).size;
+  const zKomentarzem = new Set(kupna.filter((t) => (t.komentarz ?? "").trim().length > 0).map((t) => t.pytanie)).size;
   const sprzedaze = transakcje.filter((t) => t.udzialy < 0).length;
   const trafione = pozycje.filter((p) => p.status === "rozstrzygniete" && p.trafione === true).length;
   const doswiadczenie =
-    kupna.length * DOSWIADCZENIE.prognoza +
+    prognozy * DOSWIADCZENIE.prognoza +
     rynki * DOSWIADCZENIE.nowyRynek +
     zKomentarzem * DOSWIADCZENIE.komentarz +
     trafione * DOSWIADCZENIE.trafiony;
@@ -75,7 +78,7 @@ export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[
   const odznaki = [
     odznaka("pierwsza", "Pierwsza prognoza", "Postaw pierwszą prognozę.", IkPtaszek, kupna.length),
     odznaka("trzy-rynki", "Trzy rynki", "Miej prognozy na trzech różnych rynkach.", IkRynki, rynki, 3),
-    odznaka("dziesiec", "Dziesięć prognoz", "Postaw dziesięć prognoz.", IkLuz, kupna.length, 10),
+    odznaka("dziesiec", "Dziesięć prognoz", "Postaw prognozy na dziesięć różnych odpowiedzi.", IkLuz, prognozy, 10),
     odznaka("pod-prad", "Pod prąd", "Postaw na odpowiedź, której tłum daje mniej niż 25%.", IkStrzalka, kupna.filter((t) => t.kurs_przed < 0.25).length),
     odznaka("gruba-stawka", "Gruba stawka", "Postaw co najmniej 100 punktów w jednej prognozie.", IkBudzet, kupna.filter((t) => t.stawka >= 100).length),
     odznaka("uzasadnienie", "Z uzasadnieniem", "Dodaj komentarz do prognozy.", IkDymek, zKomentarzem),
@@ -84,6 +87,7 @@ export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[
     odznaka("trafione", "Trafione", "Traf wynik rozstrzygniętego rynku.", IkRanking, trafione),
     odznaka("trzy-trafione", "Trzy trafione", "Traf wynik trzech rozstrzygniętych rynków.", IkGwiazdka, trafione, 3),
     odznaka("seria", "Trzy dni z rzędu", "Zajrzyj trzy dni z rzędu.", IkPlomien, seria, 3),
+    odznaka("dalej", "Podaj dalej", "Udostępnij prognozę, rynek albo profil.", IkUdostepnij, udostepnienia),
   ];
 
   return {
@@ -105,6 +109,8 @@ interface Zapis {
   odznaki: string[];
   dzien: string;
   seria: number;
+  /** Ile razy gracz podał coś dalej z tego urządzenia (odznaka „Podaj dalej”). */
+  udostepnienia?: number;
 }
 
 const KLUCZ = "zdaza.postep";
@@ -150,10 +156,12 @@ interface Kontekst {
   seria: number;
   /** Przelicza postęp od razu (panel woła to po przyjętej prognozie). */
   odswiez: () => Promise<void>;
+  /** Gracz coś udostępnił (link, relacja, komunikator): liczy się do odznaki „Podaj dalej”. */
+  zaliczUdostepnienie: () => void;
   nagroda: Nagroda | null;
 }
 
-const Ctx = createContext<Kontekst>({ postep: null, seria: 0, odswiez: async () => undefined, nagroda: null });
+const Ctx = createContext<Kontekst>({ postep: null, seria: 0, odswiez: async () => undefined, zaliczUdostepnienie: () => undefined, nagroda: null });
 
 export function usePostep(): Kontekst {
   return useContext(Ctx);
@@ -166,6 +174,7 @@ export function PostepProvider({ children }: { children: ReactNode }) {
   const nick = gracz?.nick ?? null;
   const [transakcje, setTransakcje] = useState<{ nick: string; lista: MojaTransakcja[] } | null>(null);
   const [seria, setSeria] = useState(0);
+  const [udostepnienia, setUdostepnienia] = useState(0);
   const [kolejka, setKolejka] = useState<Nagroda[]>([]);
 
   const odswiez = useCallback(async () => {
@@ -189,6 +198,13 @@ export function PostepProvider({ children }: { children: ReactNode }) {
     }, 20000);
     return () => window.clearInterval(id);
   }, [nick, odswiez]);
+
+  useEffect(() => {
+    setUdostepnienia(nick ? (czytajZapisy()[nick]?.udostepnienia ?? 0) : 0);
+  }, [nick]);
+  const zaliczUdostepnienie = useCallback(() => {
+    if (nick) setUdostepnienia((n) => n + 1);
+  }, [nick]);
 
   // Seria dni: liczona raz przy wejściu gracza; dzień po dniu rośnie, po przerwie zaczyna się od nowa.
   useEffect(() => {
@@ -215,8 +231,8 @@ export function PostepProvider({ children }: { children: ReactNode }) {
 
   const gotowe = nick != null && transakcje?.nick === nick && pozycje != null;
   const postep = useMemo(
-    () => (gotowe ? policzPostep(transakcje!.lista, pozycje!, seria) : null),
-    [gotowe, transakcje, pozycje, seria],
+    () => (gotowe ? policzPostep(transakcje!.lista, pozycje!, seria, udostepnienia) : null),
+    [gotowe, transakcje, pozycje, seria, udostepnienia],
   );
 
   // Porównanie z tym, co urządzenie już widziało: przyrost doświadczenia leci gwiazdkami do pierścienia przy
@@ -225,7 +241,7 @@ export function PostepProvider({ children }: { children: ReactNode }) {
     if (!nick || !postep) return;
     const zdobyte = postep.odznaki.filter((o) => o.zdobyta).map((o) => o.id);
     const zapis = czytajZapisy()[nick];
-    const nowyZapis: Zapis = { poziom: postep.poziom, doswiadczenie: postep.doswiadczenie, odznaki: zdobyte, dzien: zapis?.dzien ?? dzien(), seria: zapis?.seria ?? Math.max(1, seria) };
+    const nowyZapis: Zapis = { poziom: postep.poziom, doswiadczenie: postep.doswiadczenie, odznaki: zdobyte, dzien: zapis?.dzien ?? dzien(), seria: zapis?.seria ?? Math.max(1, seria), udostepnienia };
     if (!zapis) {
       zapiszZapis(nick, nowyZapis);
       return;
@@ -257,7 +273,7 @@ export function PostepProvider({ children }: { children: ReactNode }) {
       }
     }
     if (nowe.length > 0) setKolejka((k) => [...k, ...nowe.filter((n) => !k.some((x) => x.klucz === n.klucz))]);
-  }, [nick, postep, seria]);
+  }, [nick, postep, seria, udostepnienia]);
 
   // Nagrody pokazują się po kolei, każda przez chwilę.
   const nagroda = kolejka[0] ?? null;
@@ -268,7 +284,7 @@ export function PostepProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(id);
   }, [kluczNagrody]);
 
-  const wartosc = useMemo(() => ({ postep, seria, odswiez, nagroda }), [postep, seria, odswiez, nagroda]);
+  const wartosc = useMemo(() => ({ postep, seria, odswiez, zaliczUdostepnienie, nagroda }), [postep, seria, odswiez, zaliczUdostepnienie, nagroda]);
   return <Ctx.Provider value={wartosc}>{children}</Ctx.Provider>;
 }
 
@@ -324,8 +340,9 @@ export function PasPoziomu() {
         <i style={{ width: `${(postep.ulamek * 100).toFixed(1)}%` }} />
       </div>
       <p className="pomoc">
-        Doświadczenie rośnie z każdą prognozą (+{DOSWIADCZENIE.prognoza}), nowym rynkiem (+{DOSWIADCZENIE.nowyRynek}), komentarzem do
-        prognozy (+{DOSWIADCZENIE.komentarz}) i trafionym wynikiem (+{DOSWIADCZENIE.trafiony}). Nie da się go postawić ani wymienić.
+        Doświadczenie rośnie z prognozą na każdą nową odpowiedź (+{DOSWIADCZENIE.prognoza}), nowym rynkiem (+{DOSWIADCZENIE.nowyRynek}),
+        komentarzem na nowym rynku (+{DOSWIADCZENIE.komentarz}) i trafionym wynikiem (+{DOSWIADCZENIE.trafiony}). Ponowne kupno tych samych
+        udziałów nie dodaje doświadczenia. Nie da się go postawić ani wymienić.
       </p>
     </section>
   );

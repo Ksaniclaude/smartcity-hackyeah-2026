@@ -30,8 +30,8 @@ import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
-import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
+import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, udzialyTekst, wDol, zmianaPp } from "@/ui/tekst";
+import { PasekUdostepniania, PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { usePostep } from "@/ui/postep";
 import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
@@ -330,14 +330,21 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   const brakPowodu = miasto && !powod;
   const pozycjaSprzedaz = posiadane.find((z) => z.odpowiedz === odpSprzedaz) ?? posiadane[0] ?? null;
   const kursSprzedazy = pozycjaSprzedaz && p.kursy ? p.kursy[pozycjaSprzedaz.odpowiedz - 1] : null;
-  const uSprzedaz = pozycjaSprzedaz ? Math.max(0, Math.min(udzialySprzedaz, pozycjaSprzedaz.udzialy)) : 0;
+  // Pole, suwak i chipy liczą pełne udziały w dół, więc nigdy nie przekraczają posiadanych. Maksimum pola
+  // (posiadane w dół) znaczy „wszystko”: sprzedaż bierze całą pozycję razem z ułamkiem.
+  const maksSprzedaz = pozycjaSprzedaz ? wDol(pozycjaSprzedaz.udzialy, 0) : 0;
+  const uSprzedaz = pozycjaSprzedaz
+    ? udzialySprzedaz >= maksSprzedaz
+      ? pozycjaSprzedaz.udzialy
+      : Math.max(0, wDol(udzialySprzedaz, 0))
+    : 0;
   const podgladS = kursSprzedazy != null && uSprzedaz > 0 ? podgladSprzedazy(kursSprzedazy, uSprzedaz) : null;
 
   useEffect(() => {
     if (posiadane.length === 0 && tryb === "sprzedaj") setTryb("kup");
   }, [posiadane.length, tryb]);
   useEffect(() => {
-    if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * 10) / 10);
+    if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(wDol(pozycjaSprzedaz.udzialy, 0));
   }, [pozycjaSprzedaz, udzialySprzedaz]);
 
   // Stawka ma wagę: pole podskakuje przy każdej zmianie, wygrana przy wzroście, a co 50 punktów idzie fala.
@@ -445,7 +452,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   };
 
   const mojaPozycja = posiadane.length
-    ? posiadane.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(", ")
+    ? posiadane.map((z) => `${udzialyTekst(z.udzialy)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(", ")
     : null;
 
   if (!otwarte) {
@@ -504,41 +511,32 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           </div>
           <p className="kupon-wygrana">
             Do wygrania{" "}
-            <LiczbaZywa className="cyfry" od={0} wartosc={wynik.udzialy} format={(n) => `${liczba(n, 1)} pkt`} czas={900} />
+            <LiczbaZywa className="cyfry" od={0} wartosc={wDol(wynik.udzialy, 0)} format={(n) => `${liczba(n)} pkt`} czas={900} />
           </p>
           {wynik.sprzedano.length > 0 ? (
             <p>
-              Sprzedano {wynik.sprzedano.map((z) => `${liczba(z.udzialy, 1)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
-              {liczba(wynik.zwrot_ze_sprzedazy, 1)} pkt.
+              Sprzedano {wynik.sprzedano.map((z) => `${udzialyTekst(z.udzialy)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
+              {liczba(wDol(wynik.zwrot_ze_sprzedazy, 0))} pkt.
             </p>
           ) : null}
           <p>
             Twój ruch przesunął kurs {procent(wynik.kurs_przed)} → {procent(wynik.kurs_po)}.
           </p>
           <p>
-            Masz <b>{liczba(wynik.udzialy, 1)} udz.</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz:{" "}
-            <b className="zysk">+{liczba(wynik.udzialy, 1)} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
+            Masz <b>{udzialyTekst(wynik.udzialy)} udz.</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz:{" "}
+            <b className="zysk">+{liczba(wDol(wynik.udzialy, 0))} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
           </p>
           <Awans przed={wynik.miejsce_przed} po={wynik.miejsce_po} graczy={wynik.graczy_w_rankingu} />
-          <div className="kupon-akcje">
-            <PrzyciskUdostepnij
-              dane={{
-                tresc: p.tresc,
-                odpowiedz: p.odpowiedzi[wynik.odpowiedz - 1],
-                indeks: wynik.odpowiedz - 1,
-                kurs: wynik.kurs_po,
-                nick: gracz?.nick ?? null,
-                url,
-              }}
-            />
-          </div>
+          <PasekUdostepniania
+            dane={{ tresc: p.tresc, odpowiedz: p.odpowiedzi[wynik.odpowiedz - 1], indeks: wynik.odpowiedz - 1, kurs: wynik.kurs_po, url, rodzaj: "moja" }}
+          />
         </div>
       ) : null}
       {wynikSprzedazy ? (
         <div className="kupon" role="status" key={nrKuponu} ref={refKuponu}>
           <div className="kupon-gora">
             <IkPtaszek />
-            Sprzedano {liczba(wynikSprzedazy.udzialy, 1)} udz. za {liczba(wynikSprzedazy.zwrot, 1)} pkt
+            Sprzedano {udzialyTekst(wynikSprzedazy.udzialy)} udz. za {liczba(wDol(wynikSprzedazy.zwrot, 0))} pkt
           </div>
           <p>
             Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł {procent(wynikSprzedazy.kurs_przed)} → {procent(wynikSprzedazy.kurs_po)}.
@@ -643,9 +641,9 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           {odp != null && inne.length > 0 && gotowy ? (
             <div className="panel-info">
               Rynek ma jedną stronę na gracza. Masz{" "}
-              {inne.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
+              {inne.map((z) => `${udzialyTekst(z.udzialy)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
               {p.odpowiedzi[odp - 1]}” najpierw je sprzeda
-              {p.kursy ? ` (≈ ${liczba(zwrotInne, 1)} pkt wraca na saldo)` : ""}.
+              {p.kursy ? ` (≈ ${liczba(wDol(zwrotInne, 0))} pkt wraca na saldo)` : ""}.
             </div>
           ) : null}
           {odp != null && stan !== "blad" && maks >= 1 ? (
@@ -654,7 +652,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 <>
                   <div className="wiersz-pod">
                     <span>Udziały</span>
-                    <b>≈ {liczba(podglad.udzialy, 1)}</b>
+                    <b>≈ {udzialyTekst(podglad.udzialy)}</b>
                   </div>
                   <div className="wiersz-pod">
                     <span>Kurs po transakcji</span>
@@ -665,14 +663,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                   <div className="wygrana-glowna">
                     <span>Jeśli trafisz</span>
                     <span className="cyfry zysk" ref={refWygranej}>
-                      <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `+${liczba(n, 1)}`} czas={220} />
+                      <LiczbaZywa wartosc={wDol(podglad.udzialy, 0)} format={(n) => `+${liczba(n)}`} czas={220} />
                       <small>pkt (×{liczba(mnoznik ?? 0, 2)})</small>
                     </span>
                   </div>
                   <div className="wiersz-pod">
                     <span>Zysk ponad stawkę</span>
                     <b className="zysk">
-                      +{liczba(podglad.udzialy - stawkaOk, 1)} pkt (+{Math.round((podglad.udzialy / stawkaOk - 1) * 100)}%)
+                      +{liczba(wDol(podglad.udzialy - stawkaOk, 0))} pkt (+{Math.floor((podglad.udzialy / stawkaOk - 1) * 100)}%)
                     </b>
                   </div>
                 </>
@@ -740,11 +738,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 aria-pressed={pozycjaSprzedaz?.odpowiedz === z.odpowiedz}
                 onClick={() => {
                   setOdpSprzedaz(z.odpowiedz);
-                  setUdzialySprzedaz(Math.round(z.udzialy * 10) / 10);
+                  setUdzialySprzedaz(wDol(z.udzialy, 0));
                 }}
               >
                 <span className="nazwa">{p.odpowiedzi[z.odpowiedz - 1]}</span>
-                <small>{liczba(z.udzialy, 1)} udz.</small>
+                <small>{udzialyTekst(z.udzialy)} udz.</small>
               </button>
             ))}
           </div>
@@ -752,16 +750,16 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             <div className="stawka-pole">
               <div className="etykieta">
                 <span>Ile udziałów sprzedać</span>
-                <span>masz {liczba(pozycjaSprzedaz.udzialy, 1)}</span>
+                <span>masz {udzialyTekst(pozycjaSprzedaz.udzialy)}</span>
               </div>
               <div className="stawka-wejscie">
                 <input
                   type="number"
                   inputMode="decimal"
-                  min={0.1}
-                  step={0.1}
-                  max={pozycjaSprzedaz.udzialy}
-                  value={Math.round(uSprzedaz * 10) / 10}
+                  min={Math.min(1, maksSprzedaz)}
+                  step={1}
+                  max={maksSprzedaz}
+                  value={wDol(uSprzedaz, 0)}
                   aria-label="Liczba udziałów do sprzedania"
                   onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
                 />
@@ -769,19 +767,19 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
               </div>
               <div className="stawka-chipy">
                 {[25, 50, 75].map((proc) => (
-                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(((pozycjaSprzedaz.udzialy * proc) / 100) * 10) / 10)}>
+                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(wDol((pozycjaSprzedaz.udzialy * proc) / 100, 0))}>
                     {proc}%
                   </button>
                 ))}
-                <button type="button" onClick={() => setUdzialySprzedaz(pozycjaSprzedaz.udzialy)}>
+                <button type="button" onClick={() => setUdzialySprzedaz(maksSprzedaz)}>
                   Wszystko
                 </button>
               </div>
               <Suwak
-                min={0.1}
-                max={pozycjaSprzedaz.udzialy}
-                step={0.1}
-                wartosc={Math.min(uSprzedaz, pozycjaSprzedaz.udzialy)}
+                min={Math.min(1, maksSprzedaz)}
+                max={maksSprzedaz}
+                step={1}
+                wartosc={wDol(uSprzedaz, 0)}
                 etykieta="Suwak udziałów"
                 naZmiane={setUdzialySprzedaz}
               />
@@ -793,7 +791,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 <div className="wygrana-glowna">
                   <span>Zwrot</span>
                   <span className="cyfry">
-                    <LiczbaZywa wartosc={podgladS.zwrot} format={(n) => `≈ ${liczba(n, 1)}`} czas={220} />
+                    <LiczbaZywa wartosc={wDol(podgladS.zwrot, 0)} format={(n) => `≈ ${liczba(n)}`} czas={220} />
                     <small>pkt</small>
                   </span>
                 </div>
@@ -813,7 +811,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           </div>
           {sprzedaj.blad ? <Komunikat typ="blad">{sprzedaj.blad}</Komunikat> : null}
           <button type="submit" ref={refSprzedaj} className="przycisk-postaw" disabled={sprzedaj.trwa || !pozycjaSprzedaz || uSprzedaz < 0.01}>
-            {sprzedaj.trwa ? "Sprzedaję…" : `Sprzedaj ${liczba(uSprzedaz, 1)} udz.`}
+            {sprzedaj.trwa ? "Sprzedaję…" : `Sprzedaj ${udzialyTekst(uSprzedaz)} udz.`}
           </button>
           <p className="zastrzezenie">Sprzedaż po bieżącym kursie: zwrot = C(q) − C(q′). Punkty wracają na saldo.</p>
         </form>
@@ -847,7 +845,6 @@ export default function Pytanie() {
 
   const [odp, setOdp] = useState<number | null>(null);
   const [okres, setOkres] = useState<Okres>("all");
-  const [skopiowano, setSkopiowano] = useState(false);
   const [obserwowane, setObserwowane] = useState<number[]>(() => czytajObserwowane());
   const [refPanelu, panelWidoczny] = useWidoczny<HTMLElement>();
   const t = params.get("tab");
@@ -881,11 +878,11 @@ export default function Pytanie() {
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
   const url = `${window.location.origin}/pytanie/${pid}`;
-  // karta „Daję X%”: mój główny typ, a bez pozycji pierwsza odpowiedź
+  // plansza do udostępniania: z pozycją „Daję X%” na mój główny typ, bez pozycji „Rynek daje X%” na pierwszą odpowiedź
   const indeksKarty = moja ? moja.odpowiedz_glowna - 1 : 0;
   const kursKarty = p.kursy ? p.kursy[indeksKarty] : p.kursy_otwarcia ? p.kursy_otwarcia[indeksKarty] : null;
   const daneKarty: DaneKarty | null =
-    kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, nick: gracz?.nick ?? null, url } : null;
+    kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, url, rodzaj: moja ? "moja" : "rynek" } : null;
   const podobne = (wszystkie ?? []).filter((q) => q.id !== pid && q.kategoria === p.kategoria && q.status === "otwarte").slice(0, 3);
   const obserwowany = obserwowane.includes(pid);
 
@@ -898,15 +895,6 @@ export default function Pytanie() {
   const wybierz = (i: number) => {
     setOdp(i);
     if (window.innerWidth < 1000) document.getElementById("panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  const udostepnij = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setSkopiowano(true);
-      window.setTimeout(() => setSkopiowano(false), 2000);
-    } catch {
-      /* brak schowka */
-    }
   };
   const przelaczObserwowanie = (e: { currentTarget: Element }) => {
     if (!obserwowany) wystrzel(e.currentTarget, { ile: 8, moc: 0.45 });
@@ -945,21 +933,19 @@ export default function Pytanie() {
                   <b>{liczba(p.obrot)}</b> pkt obrotu
                 </span>
               ) : null}
-              <button type="button" className="przycisk-ikona" onClick={() => void udostepnij()} aria-label="Udostępnij" title="Skopiuj link">
-                <IkLink />
-              </button>
-              <button
-                type="button"
-                className="przycisk-ikona"
-                onClick={przelaczObserwowanie}
-                aria-label="Obserwuj"
-                aria-pressed={obserwowany}
-                title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-              >
-                <IkGwiazdka pelna={obserwowany} />
-              </button>
-              {skopiowano ? <span className="typ-tak">Skopiowano link</span> : null}
-              {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} etykieta="Karta „Daję X%”" klasa="przycisk-tekst" /> : null}
+              <span className="meta-akcje">
+                {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} /> : null}
+                <button
+                  type="button"
+                  className="przycisk-ikona"
+                  onClick={przelaczObserwowanie}
+                  aria-label="Obserwuj"
+                  aria-pressed={obserwowany}
+                  title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
+                >
+                  <IkGwiazdka pelna={obserwowany} />
+                </button>
+              </span>
             </div>
           </header>
 
@@ -1013,7 +999,7 @@ export default function Pytanie() {
                 <div className="nazwa">
                   {o}
                   {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
-                  {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {liczba(mojeU.udzialy, 1)} udz.</small> : null}
+                  {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {udzialyTekst(mojeU.udzialy)} udz.</small> : null}
                   {k == null && ko != null ? <small>kurs otwarcia</small> : null}
                 </div>
               );

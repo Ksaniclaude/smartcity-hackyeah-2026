@@ -6,6 +6,7 @@ import type { PozycjaPubliczna } from "@/api/types";
 import { usePolling } from "@/ui/hooks";
 import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate } from "@/ui/komponenty";
 import { liczba, odmien, pkt } from "@/ui/tekst";
+import { PrzyciskLinku } from "@/ui/udostepnij";
 import { WpisAktywnosci, klasaTypu } from "@/pages/Aktywnosc";
 
 type Tab = "pozycje" | "aktywnosc";
@@ -67,6 +68,13 @@ export default function ProfilPubliczny() {
                   </>
                 ) : null}
               </div>
+            </div>
+            <div className="akcje">
+              <PrzyciskLinku
+                etykieta="Udostępnij profil"
+                tekst={`${p.nick} w Zdążą?${p.miejsce != null ? `: ${p.miejsce}. miejsce w rankingu` : ""}. A Ty ile dajesz?`}
+                url={`${window.location.origin}/u/${encodeURIComponent(p.nick)}`}
+              />
             </div>
           </div>
 

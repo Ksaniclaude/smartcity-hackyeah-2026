@@ -26,6 +26,7 @@ select * from public.aktywnosc(null, 5) limit 1;
 select * from public.najwieksi_gracze(1, 5) limit 1;
 select * from public.ranking(5) limit 1;
 select public.profil_publiczny('nikt');
+select * from public.szukaj_graczy('a', 5) limit 1;
 select kursy_1h, gracze_rynku, prog_widocznosci from public.v_pytania limit 1;
 select public.kurs_widoczny(1), public.prog_pytania(1), public.kursy_godzine_temu(1), public.gracze_rynku(1);
 reset role;
@@ -133,7 +134,7 @@ declare r record; v_pyt bigint; v_w jsonb; v_b double precision; v_q1 double pre
         v_n int := 0; v_po double precision;
 begin
   select wartosc::bigint into v_pyt from public.ustawienia where klucz = 'test_pytanie';
-  for r in select z.gracz, z.odpowiedz, z.udzialy from public.pozycje z where z.pytanie = v_pyt and z.udzialy > 0.5 order by z.udzialy desc limit 6 loop
+  for r in select z.gracz, z.odpowiedz, z.udzialy from public.pozycje z where z.pytanie = v_pyt and z.udzialy >= 3 order by z.udzialy desc limit 6 loop
     perform set_config('request.jwt.claims', json_build_object('sub', r.gracz, 'role', 'authenticated')::text, true);
     select q, b into v_q1, v_b from public.pytania where id = v_pyt;
     select saldo into v_saldo1 from public.gracze where id = r.gracz;
@@ -258,6 +259,49 @@ begin
     raise exception 'Dwie strony: portfel %, ranking %, zwrot ze sprzedaży %', v_portfel, v_ranking, v_zwrot;
   end if;
   raise notice 'WYCENA DWÓCH STRON OK: wartość = %, zwrot z dwóch sprzedaży = %', round(v_portfel::numeric, 4), round(v_zwrot::numeric, 4);
+end $$;
+SQL
+
+echo "resztka poniżej 1 udziału przepada: zwrot tylko za sprzedane, q bez zmiany o resztkę, pozycja znika z profilu"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare v_admin uuid := gen_random_uuid(); v_g uuid := gen_random_uuid(); v_pyt bigint; v_w jsonb;
+        v_u double precision; v_sprzedaj double precision; v_q1 double precision[]; v_q2 double precision[]; v_b double precision;
+        v_c1 double precision; v_c2 double precision; v_saldo1 numeric; v_saldo2 numeric;
+begin
+  insert into auth.users (id) values (v_admin), (v_g);
+  insert into public.gracze (id, nick, czy_admin) values (v_admin, 'resz_admin', true), (v_g, 'resz_g', false);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  v_pyt := public.admin_dodaj_pytanie('TEST resztka', 'luz', null, 'k', 'https://example.invalid', current_date + 10, array[0.5, 0.5], true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_g, 'role', 'authenticated')::text, true);
+  perform public.postaw_prognoze(v_pyt, 1, 7, 'inne', null);
+  select udzialy into v_u from public.pozycje where gracz = v_g and pytanie = v_pyt and odpowiedz = 1;
+  v_sprzedaj := floor(v_u) - 0.5;            -- zostaje 1,5 + ułamek: pozycja zostaje
+  perform public.sprzedaj_udzialy(v_pyt, 1, v_sprzedaj);
+  if (select udzialy from public.pozycje where gracz = v_g and pytanie = v_pyt and odpowiedz = 1) < 1 then
+    raise exception 'Resztka >= 1 udziału nie może przepaść';
+  end if;
+  -- sprzedaż zostawiająca mniej niż 1 udział: zwrot tylko za sprzedane, resztka przepada
+  select udzialy into v_u from public.pozycje where gracz = v_g and pytanie = v_pyt and odpowiedz = 1;
+  v_sprzedaj := v_u - 0.4;
+  select q, b into v_q1, v_b from public.pytania where id = v_pyt;
+  select saldo into v_saldo1 from public.gracze where id = v_g;
+  v_w := public.sprzedaj_udzialy(v_pyt, 1, v_sprzedaj);
+  select q into v_q2 from public.pytania where id = v_pyt;
+  select saldo into v_saldo2 from public.gracze where id = v_g;
+  v_c1 := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q1) as x));
+  v_c2 := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q2) as x));
+  if abs((v_q1[1] - v_q2[1]) - v_sprzedaj) > 1e-9 then raise exception 'q zmalało o %, a sprzedano %', v_q1[1] - v_q2[1], v_sprzedaj; end if;
+  if abs((v_c1 - v_c2) - (v_w ->> 'zwrot')::double precision) > 2e-4 then raise exception 'Zwrot % <> C(q)-C(q'') %', v_w ->> 'zwrot', v_c1 - v_c2; end if;
+  if v_saldo2 - v_saldo1 <> (v_w ->> 'zwrot')::numeric then raise exception 'Saldo +% zamiast +%', v_saldo2 - v_saldo1, v_w ->> 'zwrot'; end if;
+  if abs((v_w ->> 'spalone')::double precision - 0.4) > 1e-9 or (v_w ->> 'udzialy_pozostale')::double precision <> 0 then
+    raise exception 'Resztka nie przepadła: %', v_w;
+  end if;
+  if exists (select 1 from public.pozycje where gracz = v_g and pytanie = v_pyt and (udzialy > 0 or wydane_punkty > 0)) then
+    raise exception 'Pozycja została po spaleniu resztki';
+  end if;
+  if exists (select 1 from public.v_moje_pozycje where pytanie = v_pyt) then raise exception 'Pozycja widoczna w profilu'; end if;
+  raise notice 'RESZTKA OK: sprzedano %, przepadło %, zwrot % = C(q) - C(q'')', round(v_sprzedaj::numeric, 4), v_w ->> 'spalone', v_w ->> 'zwrot';
 end $$;
 SQL
 

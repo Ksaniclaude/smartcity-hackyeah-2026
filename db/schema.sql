@@ -448,6 +448,7 @@ declare
   v_saldo numeric;
   v_wydane_po numeric;
   v_wszystko boolean;
+  v_spalone double precision;
   v_miejsce_przed integer;
 begin
   select * into p from public.pytania where id = p_pytanie for update;
@@ -461,9 +462,11 @@ begin
   if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
   v_udzialy := least(coalesce(p_udzialy, 0), z.udzialy);
   if v_udzialy <= 0 then raise exception 'Podaj liczbę udziałów'; end if;
-  -- resztka poniżej 0,05 udziału nie ma sensu (suwak i pole liczą co 0,1): sprzedajemy wszystko
-  if z.udzialy - v_udzialy < 0.05 then v_udzialy := z.udzialy; end if;
-  v_wszystko := (v_udzialy = z.udzialy);
+  -- resztka poniżej 1 udziału przepada bez zwrotu (pole sprzedaży liczy pełne udziały, a profil nie pokazuje
+  -- ułamków). q się nie zmienia: spalone udziały nie ruszają kursów, tylko nie zostaną wypłacone.
+  v_spalone := z.udzialy - v_udzialy;
+  if v_spalone >= 1 then v_spalone := 0; end if;
+  v_wszystko := (v_udzialy + v_spalone >= z.udzialy);
   if not v_wszystko and v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
   select saldo into v_saldo from public.gracze where id = v_gracz for update;
   v_miejsce_przed := public.miejsce_w_rankingu(v_gracz);
@@ -490,15 +493,15 @@ begin
     return jsonb_build_object(
       'pytanie', p_pytanie, 'odpowiedz', p_odpowiedz, 'udzialy', v_udzialy, 'zwrot', 0,
       'kurs_przed', v_kurs_przed, 'kurs_po', v_kurs_po, 'kursy', to_jsonb(v_kursy),
-      'saldo', v_saldo, 'udzialy_pozostale', 0,
+      'saldo', v_saldo, 'udzialy_pozostale', 0, 'spalone', v_spalone,
       'miejsce_przed', v_miejsce_przed, 'miejsce_po', public.miejsce_w_rankingu(v_gracz));
   end if;
-  v_wydane_po := case when z.udzialy - v_udzialy <= 0 then 0
+  v_wydane_po := case when v_wszystko then 0
                       else round(z.wydane_punkty * ((z.udzialy - v_udzialy) / z.udzialy)::numeric, 4) end;
 
   update public.pytania set q = v_q, obrot = obrot + v_zwrot where id = p_pytanie;
   update public.gracze set saldo = saldo + v_zwrot where id = v_gracz;
-  update public.pozycje set udzialy = z.udzialy - v_udzialy, wydane_punkty = v_wydane_po
+  update public.pozycje set udzialy = case when v_wszystko then 0 else z.udzialy - v_udzialy end, wydane_punkty = v_wydane_po
    where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz;
   insert into public.transakcje
     (gracz, pytanie, odpowiedz, stawka, udzialy, kurs_przed, kurs_po, kursy_rynku, typ)
@@ -514,7 +517,8 @@ begin
     'kurs_po', v_kurs_po,
     'kursy', to_jsonb(v_kursy),
     'saldo', v_saldo + v_zwrot,
-    'udzialy_pozostale', z.udzialy - v_udzialy,
+    'udzialy_pozostale', case when v_wszystko then 0 else z.udzialy - v_udzialy end,
+    'spalone', v_spalone,
     'miejsce_przed', v_miejsce_przed,
     'miejsce_po', public.miejsce_w_rankingu(v_gracz)
   );
@@ -1114,6 +1118,22 @@ language sql stable security definer set search_path = public, pg_temp as $$
   limit greatest(1, least(coalesce(p_limit, 50), 200))
 $$;
 
+-- Gracze, których nick zawiera frazę (bez rozróżniania wielkości liter). Najpierw nicki zaczynające się
+-- od frazy, potem według miejsca w rankingu. Gracze bez prognoz też się znajdą (miejsce null, portfel = saldo).
+-- Zwraca tylko dane już publiczne (nick, portfel i liczba prognoz są w rankingu i profilu publicznym).
+create or replace function public.szukaj_graczy(p_q text, p_limit integer default 8)
+returns table (nick text, portfel double precision, prognozy integer, miejsce integer)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with q as (select lower(btrim(coalesce(p_q, ''))) as fraza)
+  select g.nick, coalesce(r.portfel, g.saldo::double precision), coalesce(r.prognozy, 0), r.miejsce
+  from public.gracze g
+  cross join q
+  left join public.ranking_graczy() r on r.gracz = g.id
+  where q.fraza <> '' and position(q.fraza in lower(g.nick)) > 0
+  order by (position(q.fraza in lower(g.nick)) = 1) desc, r.miejsce nulls last, lower(g.nick)
+  limit greatest(1, least(coalesce(p_limit, 8), 50))
+$$;
+
 -- Publiczny profil gracza po nicku: statystyki, pozycje (wartość sprzedaży teraz, po koszcie
 -- gdy kurs ukryty), ostatnia aktywność. Null, gdy nie ma takiego nicku.
 create or replace function public.profil_publiczny(p_nick text)
@@ -1264,6 +1284,7 @@ grant execute on function public.dodaj_komentarz(bigint, text) to authenticated;
 grant execute on function public.najwieksi_gracze(bigint, integer) to anon, authenticated;
 grant execute on function public.ranking(integer) to anon, authenticated;
 grant execute on function public.profil_publiczny(text) to anon, authenticated;
+grant execute on function public.szukaj_graczy(text, integer) to anon, authenticated;
 
 -- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated).
 grant execute on function public.ustaw_nick(text) to authenticated;

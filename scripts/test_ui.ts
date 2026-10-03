@@ -47,6 +47,7 @@ const stan = {
   email: undefined as string | undefined,
   prognozy: 0,
   sprzedaze: 0,
+  ostatniaSprzedaz: 0,
   komentarze: [] as { id: number; nick: string; odpowiedz: number | null; odpowiedz_tekst: string | null; powod: string | null; komentarz: string; stawka: number; czas: string }[],
   pozycje: new Map<string, { pytanie: number; odpowiedz: number; udzialy: number; wydane: number }>(),
 };
@@ -215,6 +216,12 @@ async function mock(route: Route) {
   if (p === "/rest/v1/rpc/komentarze_rynku") return json(route, stan.komentarze);
   if (p === "/rest/v1/rpc/najwieksi_gracze") return json(route, najwieksi);
   if (p === "/rest/v1/rpc/ranking") return json(route, ranking);
+  if (p === "/rest/v1/rpc/szukaj_graczy") {
+    const body = (req.postDataJSON() ?? {}) as { p_q?: string; p_limit?: number };
+    const fraza = (body.p_q ?? "").trim().toLowerCase();
+    const lista = ranking.map((w, i) => ({ nick: w.nick, portfel: w.portfel, prognozy: w.prognozy, miejsce: i + 1 }));
+    return json(route, fraza ? lista.filter((w) => w.nick.toLowerCase().includes(fraza)).slice(0, body.p_limit ?? 8) : []);
+  }
   if (p === "/rest/v1/rpc/profil_publiczny") {
     const body = req.postDataJSON() as { p_nick: string };
     if (body.p_nick !== "podgorze_7") return json(route, null);
@@ -269,6 +276,7 @@ async function mock(route: Route) {
     const z = stan.pozycje.get(klucz);
     if (!stan.gracz || !z || z.udzialy <= 0) return json(route, { message: "Nie masz udziałów na tę odpowiedź" }, 400);
     const u = Math.min(body.p_udzialy, z.udzialy);
+    stan.ostatniaSprzedaz = body.p_udzialy;
     const zwrot = Math.round(u * 0.42 * 10000) / 10000;
     z.udzialy -= u;
     stan.gracz.saldo += zwrot;
@@ -405,23 +413,41 @@ async function main() {
     await page.getByRole("group", { name: "Szybka stawka" }).getByRole("button", { name: "50", exact: true }).click();
     await oczekuj(page, "Jeśli trafisz");
     await oczekuj(page, "(×");
+    // punkty i udziały przy kupnie w pełnych liczbach (mnożnik ×1,95 może mieć ułamek)
+    const zUlamkiem = (t: string) => /\d,\d+\s*(pkt|udz)|[≈+]\s?\d+,\d/.test(t);
+    const podgladKupna = await page.locator(".wygrana").first().innerText();
+    if (zUlamkiem(podgladKupna)) throw new Error(`Podgląd kupna z ułamkami: ${podgladKupna}`);
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
     await oczekuj(page, "Twój ruch przesunął kurs 41% → 44%");
+    await page.waitForTimeout(1000); // licznik „Do wygrania” dobiega do końca
+    const kuponKupna = await page.locator(".kupon").first().innerText();
+    if (zUlamkiem(kuponKupna)) throw new Error(`Kupon z ułamkami: ${kuponKupna}`);
+    console.log("  ✓ podgląd i kupon w pełnych punktach i udziałach");
     await oczekuj(page, "Wejście do rankingu: miejsce 3 z 4");
     await zrzut(page, "prognoza_ok");
-    await page.getByRole("button", { name: "Udostępnij kartę" }).first().click();
+    // udostępnianie: pasek na kuponie (relacja, komunikatory, link) i arkusz z planszą 9:16 pod „Więcej”
+    await oczekuj(page, "Pochwal się prognozą");
+    const pasek = page.locator(".kupon .pasek-udost");
+    await pasek.getByRole("button", { name: "Relacja" }).waitFor({ timeout: 5000 });
+    const whatsapp = await pasek.getByRole("link", { name: "WhatsApp" }).getAttribute("href");
+    if (!whatsapp?.startsWith("https://wa.me/?text=") || !/\/pytanie\/\d+$/.test(decodeURIComponent(whatsapp))) throw new Error(`Link WhatsApp bez adresu rynku: ${whatsapp}`);
+    await pasek.getByRole("button", { name: "Więcej" }).click();
     await oczekuj(page, "Udostępnij prognozę");
     await oczekuj(page, /Daję 44% na to, że kładka/);
-    await page.locator("img.karta-udostepniania").waitFor({ timeout: 5000 });
+    await page.locator("img.relacja-podglad").waitFor({ timeout: 5000 });
+    const plansza = await page.locator("img.relacja-podglad").evaluate((img: HTMLImageElement) => img.decode().then(() => `${img.naturalWidth}x${img.naturalHeight}`));
+    if (plansza !== "1080x1920") throw new Error(`Plansza do relacji ma ${plansza}, a powinna 1080x1920`);
+    await page.locator(".modal").getByRole("button", { name: "Kopiuj link" }).waitFor({ timeout: 3000 });
     await zrzut(page, "karta_udostepniania", false);
     await page.getByRole("button", { name: "Zamknij" }).click();
+    await page.locator(".naglowek-rynku").getByRole("button", { name: "Udostępnij", exact: true }).waitFor({ timeout: 3000 });
 
     console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
     await oczekuj(page, "Rynek ma jedną stronę na gracza");
     await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
-    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await oczekuj(page, /Sprzedano 23 udz. „tak”/);
     await zrzut(page, "zmiana_strony");
 
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
@@ -445,13 +471,54 @@ async function main() {
     await oczekuj(page, "Trzymam kciuki za ZDMK");
 
     console.log("5. Sprzedaż udziałów");
+    // pozycja z ułamkiem, który zaokrąglony normalnie wychodzi w górę (np. 23,7624 → 24, więcej niż jest)
+    const naRynku = Number(new URL(page.url()).pathname.split("/").pop());
+    const poz = [...stan.pozycje.values()].find((z) => z.pytanie === naRynku && z.udzialy > 1);
+    if (!poz) throw new Error("Brak pozycji do testu sprzedaży");
+    poz.udzialy = Math.floor(poz.udzialy) + 0.7624;
+    const pelna = poz.udzialy;
+    const wDol = (x: number) => Math.floor(x + 1e-9);
+    await page.reload();
     await page.getByRole("tab", { name: "Sprzedaj", exact: true }).first().click();
+    await oczekuj(page, `masz ${wDol(pelna)}`);
+    const poleSprzedazy = page.getByLabel("Liczba udziałów do sprzedania");
+    await page.getByRole("button", { name: "50%", exact: true }).click();
+    if (Number(await poleSprzedazy.inputValue()) !== wDol(pelna / 2)) throw new Error(`50%: ${await poleSprzedazy.inputValue()} zamiast ${wDol(pelna / 2)}`);
     await page.getByRole("button", { name: /Wszystko/ }).first().click();
+    if (Number(await poleSprzedazy.inputValue()) !== wDol(pelna)) throw new Error(`Wszystko: ${await poleSprzedazy.inputValue()} zamiast ${wDol(pelna)}`);
+    const walidacja = await poleSprzedazy.evaluate((el) => (el as HTMLInputElement).validationMessage);
+    if (walidacja) throw new Error(`Pole sprzedaży odrzucone przez przeglądarkę: ${walidacja}`);
+    console.log(`  ✓ ${pelna} udz.: pole ${wDol(pelna)}, 50% = ${wDol(pelna / 2)}, przeglądarka przyjmuje`);
+    await poleSprzedazy.scrollIntoViewIfNeeded();
+    await zrzut(page, "sprzedaz_pole", false);
     await page.getByRole("button", { name: /^Sprzedaj /i }).first().click();
     await oczekuj(page, /Sprzedano/);
+    if (stan.ostatniaSprzedaz !== pelna || poz.udzialy !== 0) throw new Error(`Sprzedano ${stan.ostatniaSprzedaz} z ${pelna}, zostało ${poz.udzialy}`);
+    console.log("  ✓ „Wszystko” sprzedało całą pozycję razem z ułamkiem");
     await zrzut(page, "sprzedaz");
 
+    console.log("5b. Kupno i sprzedaż w kółko nie nabijają doświadczenia");
+    const doswiadczenie = async () => {
+      const t = (await page.locator('[title^="Poziom "]').first().getAttribute("title")) ?? "";
+      const m = /(\d[\d\s\u00a0]*) z /.exec(t);
+      if (!m) throw new Error(`Brak doświadczenia w „${t}”`);
+      return Number(m[1].replace(/\D/g, ""));
+    };
+    await page.goto(`${ADRES}/pytanie/1?odp=2`);
+    await oczekuj(page, "Kryterium rozstrzygnięcia");
+    await page.waitForTimeout(1500);
+    const xpPrzed = await doswiadczenie();
+    await page.getByRole("button", { name: "wykonawca", exact: true }).click();
+    await page.getByRole("button", { name: /^Postaw/ }).first().click();
+    await oczekuj(page, "Prognoza przyjęta");
+    await page.waitForTimeout(1500);
+    const xpPo = await doswiadczenie();
+    if (xpPo !== xpPrzed) throw new Error(`Ponowne kupno tej samej odpowiedzi dało doświadczenie: ${xpPrzed} → ${xpPo}`);
+    console.log(`  ✓ ponowne kupno „po terminie”: doświadczenie bez zmian (${xpPo})`);
+
     console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
+    // resztka poniżej 1 udziału (np. sprzed zmiany reguł) nie pokazuje się na liście pozycji
+    stan.pozycje.set("4-1", { pytanie: 4, odpowiedz: 1, udzialy: 0.6, wydane: 0.3 });
     await page.goto(`${ADRES}/profil`);
     await oczekuj(page, "Rynek rozstrzygnięty");
     await oczekuj(page, "Twój typ był lepszy niż 75% graczy", 6000);
@@ -460,6 +527,11 @@ async function main() {
     await oczekuj(page, "Wartość portfela");
     await oczekuj(page, "Otwarte pozycje");
     await oczekuj(page, "krowodrza_42");
+    const listaPozycji = page.locator(".tabela-pozycje");
+    if ((await listaPozycji.locator("tbody tr").count()) === 0) throw new Error("Pusta lista pozycji w profilu");
+    if (await listaPozycji.getByText(/Budżetu Obywatelskiego/).count()) throw new Error("Pozycja poniżej 1 udziału widoczna w profilu");
+    console.log("  ✓ pozycja poniżej 1 udziału ukryta w profilu, reszta widoczna");
+    stan.pozycje.delete("4-1");
     await zrzut(page, "profil");
     await page.reload();
     await oczekuj(page, "Wartość portfela");
@@ -490,6 +562,16 @@ async function main() {
     await page2.goto(`${ADRES}/pytanie/1`);
     await oczekuj(page2, "Zasady");
     await zrzut(page2, "rynek_desktop", false);
+    console.log("7a. Lupka: podpowiedzi rynków i graczy, wyniki z graczami");
+    await page2.getByPlaceholder("Szukaj rynków lub graczy").fill("podg");
+    await page2.locator(".podpowiedzi").getByRole("link", { name: /podgorze_7/ }).waitFor({ timeout: 8000 });
+    await zrzut(page2, "szukaj_podpowiedzi", false);
+    await page2.getByPlaceholder("Szukaj rynków lub graczy").fill("kładka");
+    await page2.locator(".podpowiedzi").getByRole("link", { name: /Kazimierz–Ludwinów/ }).waitFor({ timeout: 8000 });
+    await page2.goto(`${ADRES}/?q=nowa`);
+    await oczekuj(page2, "Wyniki dla „nowa”: 1 gracz");
+    await page2.locator(".gracze-znalezieni").getByRole("link", { name: /nowa_huta/ }).waitFor({ timeout: 8000 });
+    await zrzut(page2, "szukaj_wyniki", false);
     await page2.evaluate(() => {
       document.documentElement.dataset.motyw = "jasny";
       localStorage.setItem("motyw", "jasny");
