@@ -4,7 +4,7 @@
 dotrzymane. Gra się **cegiełkami**, czyli walutą, której nie da się kupić, wypłacić ani przelać. Miasto dostaje z tego
 „Puls miasta”: prawdopodobieństwa wyznaczone przez tłum.
 
-Projekt na HackYeah 2026.
+Projekt na HackYeah 2026. **Wersja na żywo: https://zdaza-mauve.vercel.app**
 
 ## Zasady gry
 
@@ -85,7 +85,9 @@ Liczby gry są w `game.cfg()` (baza) i w `src/lib/config.ts` (wyświetlanie). Zm
 
 ## Wdrożenie
 
-Działa na Vercelu bez zmian: ustaw `NEXT_PUBLIC_SUPABASE_URL` i `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (wartości są w `.env.example`).
+Projekt Vercel `zdaza` (https://zdaza-mauve.vercel.app) jest podpięty do tego repo: push do `main` wdraża produkcję,
+każda inna gałąź i PR dostaje podgląd. Zmienne `NEXT_PUBLIC_SUPABASE_URL` i `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+są ustawione w Vercelu (wartości jak w `.env.example`).
 Nowa baza: uruchom migracje z `supabase/migrations/` w kolejności, a potem `supabase/seed.sql`.
 
 ## Co dalej
