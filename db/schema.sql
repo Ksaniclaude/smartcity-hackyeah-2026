@@ -122,8 +122,6 @@ create or replace function public.limit_na_pytanie() returns numeric
   language sql immutable set search_path = public, pg_temp as $$ select 200::numeric $$;
 create or replace function public.prog_widocznosci_kursu() returns integer
   language sql immutable set search_path = public, pg_temp as $$ select 10 $$;
-create or replace function public.limit_otwartych(p_kategoria public.kategoria) returns integer
-  language sql immutable set search_path = public, pg_temp as $$ select case p_kategoria when 'miasto' then 3 else 5 end $$;
 
 -- ---------------------------------------------------------------------------
 -- LMSR
@@ -629,26 +627,19 @@ begin
    where id = p_pytanie;
 end $$;
 
--- Otwarcie: wymaga kompletu pól i pilnuje limitu otwartych pytań na kategorię.
+-- Otwarcie: wymaga kompletu pól. Liczba otwartych pytań nie jest ograniczona.
 create or replace function public.admin_otworz(p_pytanie bigint, p_kurs_otwarcia double precision[] default null)
 returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_admin uuid := public.biezacy_admin();
   p public.pytania;
-  v_otwarte integer;
 begin
   select * into p from public.pytania where id = p_pytanie for update;
   if not found then raise exception 'Nie ma takiego pytania'; end if;
   if p.status <> 'propozycja' then raise exception 'Otworzyć można tylko propozycję'; end if;
   perform public.sprawdz_komplet(p);
   if p.termin < current_date then raise exception 'Data rozstrzygnięcia już minęła'; end if;
-  select count(*) into v_otwarte from public.pytania
-   where status = 'otwarte' and kategoria = p.kategoria;
-  if v_otwarte >= public.limit_otwartych(p.kategoria) then
-    raise exception 'Naraz może być otwartych najwyżej % pytań w kategorii %',
-      public.limit_otwartych(p.kategoria), p.kategoria;
-  end if;
   if p_kurs_otwarcia is not null then
     if array_length(p_kurs_otwarcia, 1) <> array_length(p.odpowiedzi, 1) then
       raise exception 'Kurs otwarcia musi mieć tyle wartości, ile odpowiedzi';
@@ -1124,7 +1115,6 @@ grant select on public.v_moje_pozycje to authenticated;
 grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
 grant execute on function public.prog_widocznosci_kursu() to anon, authenticated;
 grant execute on function public.limit_na_pytanie() to anon, authenticated;
-grant execute on function public.limit_otwartych(public.kategoria) to anon, authenticated;
 grant execute on function public.rozklad_powodow() to anon, authenticated;
 grant execute on function public.komentarze_pytania(bigint, integer) to anon, authenticated;
 grant execute on function public.historia_kursu(bigint) to anon, authenticated;
