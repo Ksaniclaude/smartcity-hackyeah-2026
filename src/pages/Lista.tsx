@@ -206,12 +206,8 @@ function Tasma() {
       <span className="tasma-etykieta">
         <i className="puls" />
         Na żywo
-        {ostatnie10 > 0 ? (
-          <>
-            <small className="tasma-licznik cyfry">{ostatnie10}</small>
-            <small className="tasma-opis">{ostatnie10 === 1 ? "prognoza" : ostatnie10 >= 2 && ostatnie10 <= 4 ? "prognozy" : "prognoz"} w 10 min</small>
-          </>
-        ) : null}
+        <small className="tasma-licznik cyfry">{ostatnie10}</small>
+        <small className="tasma-opis">{ostatnie10 === 1 ? "prognoza" : ostatnie10 >= 2 && ostatnie10 <= 4 ? "prognozy" : "prognoz"} w 10 min</small>
       </span>
       <div className="tasma-wpisy">
         {wpisy.map((a) => (
