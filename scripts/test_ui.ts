@@ -215,6 +215,12 @@ async function mock(route: Route) {
   if (p === "/rest/v1/rpc/komentarze_rynku") return json(route, stan.komentarze);
   if (p === "/rest/v1/rpc/najwieksi_gracze") return json(route, najwieksi);
   if (p === "/rest/v1/rpc/ranking") return json(route, ranking);
+  if (p === "/rest/v1/rpc/szukaj_graczy") {
+    const body = (req.postDataJSON() ?? {}) as { p_q?: string; p_limit?: number };
+    const fraza = (body.p_q ?? "").trim().toLowerCase();
+    const lista = ranking.map((w, i) => ({ nick: w.nick, portfel: w.portfel, prognozy: w.prognozy, miejsce: i + 1 }));
+    return json(route, fraza ? lista.filter((w) => w.nick.toLowerCase().includes(fraza)).slice(0, body.p_limit ?? 8) : []);
+  }
   if (p === "/rest/v1/rpc/profil_publiczny") {
     const body = req.postDataJSON() as { p_nick: string };
     if (body.p_nick !== "podgorze_7") return json(route, null);
@@ -490,6 +496,16 @@ async function main() {
     await page2.goto(`${ADRES}/pytanie/1`);
     await oczekuj(page2, "Zasady");
     await zrzut(page2, "rynek_desktop", false);
+    console.log("7a. Lupka: podpowiedzi rynków i graczy, wyniki z graczami");
+    await page2.getByPlaceholder("Szukaj rynków lub graczy").fill("podg");
+    await page2.locator(".podpowiedzi").getByRole("link", { name: /podgorze_7/ }).waitFor({ timeout: 8000 });
+    await zrzut(page2, "szukaj_podpowiedzi", false);
+    await page2.getByPlaceholder("Szukaj rynków lub graczy").fill("kładka");
+    await page2.locator(".podpowiedzi").getByRole("link", { name: /Kazimierz–Ludwinów/ }).waitFor({ timeout: 8000 });
+    await page2.goto(`${ADRES}/?q=nowa`);
+    await oczekuj(page2, "Wyniki dla „nowa”: 1 gracz");
+    await page2.locator(".gracze-znalezieni").getByRole("link", { name: /nowa_huta/ }).waitFor({ timeout: 8000 });
+    await zrzut(page2, "szukaj_wyniki", false);
     await page2.evaluate(() => {
       document.documentElement.dataset.motyw = "jasny";
       localStorage.setItem("motyw", "jasny");

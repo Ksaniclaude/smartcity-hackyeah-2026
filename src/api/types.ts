@@ -251,6 +251,14 @@ export interface NajwiekszyGracz {
 }
 
 /** Wiersz RPC ranking (wiersze w kolejności miejsc: miejsce = indeks + 1). */
+/** Wynik wyszukiwania graczy po nicku (szukaj_graczy); miejsce null, gdy gracz nic nie postawił. */
+export interface ZnalezionyGracz {
+  nick: string;
+  portfel: number;
+  prognozy: number;
+  miejsce: number | null;
+}
+
 export interface WpisRankingu {
   nick: string;
   saldo: number;

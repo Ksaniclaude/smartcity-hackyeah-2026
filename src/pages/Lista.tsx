@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { pobierzAktywnosc, pobierzHistorie, pobierzPytania } from "@/api/api";
+import { pobierzAktywnosc, pobierzHistorie, pobierzPytania, szukajGraczy } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
 import { IkPlomien } from "@/ui/ikony";
-import { Awatar, Komunikat, Szkielet, Szukajka, opisPrognoz } from "@/ui/komponenty";
+import { Awatar, Komunikat, OdznakaMiejsca, Szkielet, Szukajka, opisPrognoz, pasujeDoFrazy } from "@/ui/komponenty";
 import { KartaRynku, Odpowiedzi, Odsloniecie, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, liczba, odmien, pkt, zmianaPp } from "@/ui/tekst";
 import { Wykres } from "@/ui/wykres";
@@ -351,6 +351,9 @@ export default function Lista() {
   const miastoParam = (params.get("m") ?? "").trim();
   // Ruch z ostatniej doby do sekcji „Hot” (tylko strona główna, odpytywane rzadziej niż rynki).
   const { dane: ruch } = usePolling(() => (filtr === "wszystkie" && !q ? pobierzAktywnosc(null, 100) : Promise.resolve([])), 15000, `${filtr}|${q}`);
+  // Szukanie obejmuje też graczy (po nicku); lista rynków filtruje się lokalnie, gracze idą z bazy.
+  const { dane: graczeZnalezieni } = usePolling(() => (q ? szukajGraczy(q, 12) : Promise.resolve([])), 30000, q);
+  const liczbaGraczy = q ? (graczeZnalezieni ?? []).length : 0;
 
   const ustawParam = (klucz: "f" | "s" | "m", wartosc: string, domyslna: string) => {
     const nowe = new URLSearchParams(params);
@@ -374,7 +377,7 @@ export default function Lista() {
 
   const teraz = Date.now();
   const pytania = dane ?? [];
-  const szukane = q ? pytania.filter((p) => p.tresc.toLowerCase().includes(q.toLowerCase())) : pytania;
+  const szukane = q ? pytania.filter((p) => pasujeDoFrazy(p, q)) : pytania;
   const pasuje = (p: Pytanie): boolean => {
     switch (filtr) {
       case "miasto":
@@ -410,7 +413,7 @@ export default function Lista() {
   if (dane) {
     const pustoAktywne = filtr === "obserwowane" ? PUSTO_OBSERWOWANE : PUSTO_OTWARTE;
     if (q && liczbaWidocznych === 0) {
-      zawartosc = <p className="pusto">Nic nie znaleziono dla „{q}”</p>;
+      zawartosc = <p className="pusto">{liczbaGraczy > 0 ? `Brak rynków dla „${q}”` : `Nic nie znaleziono dla „${q}”`}</p>;
     } else if (filtr === "wszystkie" && q) {
       zawartosc = (
         <>
@@ -559,8 +562,31 @@ export default function Lista() {
 
         {q && dane ? (
           <p className="wynik-szukania">
-            Wyniki dla „{q}”: {odmien(liczbaWidocznych, "rynek", "rynki", "rynków")}
+            Wyniki dla „{q}”:{" "}
+            {[
+              liczbaWidocznych > 0 ? odmien(liczbaWidocznych, "rynek", "rynki", "rynków") : "",
+              liczbaGraczy > 0 ? odmien(liczbaGraczy, "gracz", "graczy", "graczy") : "",
+            ]
+              .filter(Boolean)
+              .join(" i ") || "nic nie znaleziono"}
           </p>
+        ) : null}
+        {q && graczeZnalezieni && graczeZnalezieni.length > 0 ? (
+          <section aria-label="Znalezieni gracze">
+            <h2 className="sekcja-tytul">
+              Gracze <span className="licznik cyfry">{graczeZnalezieni.length}</span>
+            </h2>
+            <div className="gracze-znalezieni">
+              {graczeZnalezieni.map((g) => (
+                <Link key={g.nick} to={`/u/${encodeURIComponent(g.nick)}`} className="gracz-znaleziony">
+                  <Awatar nick={g.nick} />
+                  {g.nick}
+                  <OdznakaMiejsca miejsce={g.miejsce} />
+                  <small>{g.prognozy > 0 ? odmien(g.prognozy, "prognoza", "prognozy", "prognoz") : "bez prognoz"}</small>
+                </Link>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
