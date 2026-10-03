@@ -11,6 +11,7 @@ import {
   adminZaloguj,
   adminZamknij,
   adminZmienTermin,
+  komunikatBledu,
 } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja } from "@/api/sesja";
@@ -18,6 +19,7 @@ import { ETYKIETY_STATUSU, TEMATY_WYKLUCZONE, type Kategoria, type PytanieAdmin 
 import { terminowosc } from "@/dane/terminowosc";
 import { useAkcja, usePolling } from "@/ui/hooks";
 import { Komunikat, Ladowanie, Odznaka, formatujDate } from "@/ui/komponenty";
+import { odmien } from "@/ui/tekst";
 
 const ODPOWIEDZI: Record<Kategoria, string[]> = {
   miasto: ["w terminie", "po terminie", "wstrzymane lub anulowane"],
@@ -465,11 +467,60 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
 
 // ---------------------------------------------------------------------------
 
+/** Otwiera po kolei wszystkie propozycje z kryterium i linkiem, z kursem zapisanym w propozycji. */
+function OtworzWszystkie({ propozycje, odswiez }: { propozycje: PytanieAdmin[]; odswiez: () => Promise<void> }) {
+  const gotowe = propozycje.filter((p) => p.kryterium.trim() && p.link_zrodla.trim());
+  const pominiete = propozycje.length - gotowe.length;
+  const [postep, setPostep] = useState<string | null>(null);
+  const [wynik, setWynik] = useState<{ otwarte: number; bledy: string[] } | null>(null);
+
+  const otworz = async () => {
+    const lista = gotowe;
+    if (!window.confirm(`Otworzyć ${odmien(lista.length, "propozycję", "propozycje", "propozycji")}? Rynki będą widoczne dla wszystkich.`)) return;
+    setWynik(null);
+    let otwarte = 0;
+    const bledy: string[] = [];
+    for (const [i, p] of lista.entries()) {
+      setPostep(`Otwieram ${i + 1} z ${lista.length}…`);
+      try {
+        await adminOtworz(p.id, null);
+        otwarte++;
+      } catch (e) {
+        bledy.push(`nr ${p.id}: ${komunikatBledu(e)}`);
+      }
+    }
+    setPostep(null);
+    setWynik({ otwarte, bledy });
+    await odswiez();
+  };
+
+  return (
+    <>
+      {gotowe.length > 0 ? (
+        <div className="przyciski">
+          <button type="button" className="przycisk przycisk-maly" disabled={postep != null} onClick={() => void otworz()}>
+            {postep ?? `Otwórz wszystkie (${gotowe.length})`}
+          </button>
+        </div>
+      ) : null}
+      {pominiete > 0 ? <p className="pomoc">Bez kryterium lub linku, do uzupełnienia przed otwarciem: {pominiete}</p> : null}
+      {wynik ? (
+        <Komunikat typ={wynik.bledy.length > 0 ? "ostrz" : "ok"}>
+          Otwarto {wynik.otwarte} z {wynik.otwarte + wynik.bledy.length}.
+          {wynik.bledy.map((b) => (
+            <div key={b}>{b}</div>
+          ))}
+        </Komunikat>
+      ) : null}
+    </>
+  );
+}
+
 function PanelAdmina() {
   const { dane, blad, laduje, odswiez } = usePolling(adminPytania, 5000);
   const pytania = dane ?? [];
-  const grupy: { tytul: string; filtr: (p: PytanieAdmin) => boolean }[] = [
-    { tytul: "Propozycje (kolejka)", filtr: (p) => p.status === "propozycja" },
+  const grupy: { tytul: string; filtr: (p: PytanieAdmin) => boolean; propozycje?: boolean }[] = [
+    { tytul: "Propozycje (kolejka)", filtr: (p) => p.status === "propozycja", propozycje: true },
     { tytul: "Otwarte", filtr: (p) => p.status === "otwarte" },
     { tytul: "Zamknięte, czekają na rozstrzygnięcie", filtr: (p) => p.status === "zamkniete" },
     { tytul: "Zakończone", filtr: (p) => p.status === "rozstrzygniete" || p.status === "uniewaznione" },
@@ -490,6 +541,7 @@ function PanelAdmina() {
             <h2>
               {g.tytul} ({lista.length})
             </h2>
+            {g.propozycje ? <OtworzWszystkie propozycje={lista} odswiez={odswiez} /> : null}
             {lista.length === 0 ? <p className="pusto">brak</p> : null}
             {lista.map((p) => (
               <KartaPytania key={p.id} p={p} odswiez={odswiez} />
