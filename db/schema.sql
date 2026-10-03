@@ -104,11 +104,11 @@ create table public.ustawienia (
 -- Stałe gry
 -- ---------------------------------------------------------------------------
 create or replace function public.limit_na_pytanie() returns numeric
-  language sql immutable as $$ select 200::numeric $$;
+  language sql immutable set search_path = public, pg_temp as $$ select 200::numeric $$;
 create or replace function public.prog_widocznosci_kursu() returns integer
-  language sql immutable as $$ select 10 $$;
+  language sql immutable set search_path = public, pg_temp as $$ select 10 $$;
 create or replace function public.limit_otwartych(p_kategoria public.kategoria) returns integer
-  language sql immutable as $$ select case p_kategoria when 'miasto' then 3 else 5 end $$;
+  language sql immutable set search_path = public, pg_temp as $$ select case p_kategoria when 'miasto' then 3 else 5 end $$;
 
 -- ---------------------------------------------------------------------------
 -- LMSR
@@ -116,7 +116,7 @@ create or replace function public.limit_otwartych(p_kategoria public.kategoria) 
 -- Kurs odpowiedzi i = e^(q_i/b) / Σ e^(q_j/b), liczony przez log-sum-exp.
 create or replace function public.kursy(p_q double precision[], p_b double precision)
 returns double precision[]
-language plpgsql immutable as $$
+language plpgsql immutable set search_path = public, pg_temp as $$
 declare
   n integer := array_length(p_q, 1);
   m double precision;
@@ -141,7 +141,7 @@ end $$;
 -- Kurs otwarcia p (prawdopodobieństwa sumujące się do 1) -> q_i = b*ln(p_i).
 create or replace function public.q_z_kursu(p_kurs double precision[], p_b double precision)
 returns double precision[]
-language plpgsql immutable as $$
+language plpgsql immutable set search_path = public, pg_temp as $$
 declare
   n integer := array_length(p_kurs, 1);
   suma double precision := 0;
@@ -399,7 +399,7 @@ end $$;
 -- Sprawdza, czy pytanie ma komplet pól wymaganych do otwarcia.
 create or replace function public.sprawdz_komplet(p public.pytania)
 returns void
-language plpgsql immutable as $$
+language plpgsql immutable set search_path = public, pg_temp as $$
 begin
   if btrim(p.tresc) = '' then raise exception 'Brak treści pytania'; end if;
   if array_length(p.odpowiedzi, 1) not between 2 and 3 then raise exception 'Potrzeba 2 lub 3 odpowiedzi'; end if;
@@ -634,40 +634,60 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Widoki (SECURITY DEFINER: klient nie czyta tabeli pytania, więc q i kurs
--- poniżej progu prognoz zostają ukryte).
+-- Odczyt: widoki z RLS (security_invoker). Kolumna q nie jest dostępna dla
+-- klienta (uprawnienia kolumnowe), a kursy liczy funkcja SECURITY DEFINER,
+-- która pilnuje progu widoczności.
 -- ---------------------------------------------------------------------------
-create or replace view public.v_pytania with (security_invoker = false) as
+-- Kursy pytania widoczne dla graczy: null, dopóki pytanie ma za mało prognoz.
+create or replace function public.kursy_pytania(p_id bigint)
+returns double precision[]
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when p.status <> 'propozycja'
+               and (p.liczba_prognoz >= public.prog_widocznosci_kursu()
+                    or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
+         then public.kursy(p.q, p.b) end
+  from public.pytania p
+  where p.id = p_id
+$$;
+
+create view public.v_pytania with (security_invoker = true) as
 select
   p.id, p.tresc, p.kategoria, p.odpowiedzi, p.kryterium, p.link_zrodla, p.termin, p.status,
   p.wynik, p.link_rozstrzygniecia, p.komentarz_urzedu, p.liczba_prognoz, p.utworzono, p.rozstrzygnieto,
   (p.liczba_prognoz >= public.prog_widocznosci_kursu()
      or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')) as kurs_widoczny,
-  case when p.liczba_prognoz >= public.prog_widocznosci_kursu()
-         or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')
-       then public.kursy(p.q, p.b) end as kursy,
+  public.kursy_pytania(p.id) as kursy,
   public.prog_widocznosci_kursu() as prog_widocznosci,
   (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu
 from public.pytania p
 where p.status <> 'propozycja';
 
--- Rozkład powodów (tylko kategoria "miasto"), do tabeli dla miasta.
-create or replace view public.v_powody with (security_invoker = false) as
-select t.pytanie, t.powod, count(*)::integer as liczba, sum(t.stawka)::numeric as punkty
-from public.transakcje t
-join public.pytania p on p.id = t.pytanie
-where t.powod is not null and p.kategoria = 'miasto'
-group by t.pytanie, t.powod;
+-- Rozkład powodów (tylko kategoria "miasto"), do tabeli dla miasta. Agreguje
+-- transakcje wszystkich graczy, więc musi być SECURITY DEFINER (bez nicków).
+create or replace function public.rozklad_powodow()
+returns table (pytanie bigint, powod public.powod, liczba integer, punkty numeric)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select t.pytanie, t.powod, count(*)::integer, sum(t.stawka)::numeric
+  from public.transakcje t
+  join public.pytania p on p.id = t.pytanie
+  where t.powod is not null and p.kategoria = 'miasto' and p.status <> 'propozycja'
+  group by t.pytanie, t.powod
+$$;
 
 -- Ostatnie komentarze graczy przy pytaniu (bez nicków — tylko treść).
-create or replace view public.v_komentarze with (security_invoker = false) as
-select t.pytanie, t.odpowiedz, t.powod, t.komentarz, t.czas
-from public.transakcje t
-join public.pytania p on p.id = t.pytanie
-where t.komentarz is not null and p.status <> 'propozycja';
+create or replace function public.komentarze_pytania(p_pytanie bigint, p_limit integer default 20)
+returns table (odpowiedz smallint, powod public.powod, komentarz text, czas timestamptz)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select t.odpowiedz, t.powod, t.komentarz, t.czas
+  from public.transakcje t
+  join public.pytania p on p.id = t.pytanie
+  where t.pytanie = p_pytanie and t.komentarz is not null and p.status <> 'propozycja'
+  order by t.czas desc
+  limit greatest(1, least(coalesce(p_limit, 20), 100))
+$$;
 
--- Moje pozycje i wyniki (gracz widzi tylko swoje).
-create or replace view public.v_moje_pozycje with (security_invoker = false) as
+-- Moje pozycje i wyniki: RLS na pozycje ogranicza do własnych wierszy.
+create view public.v_moje_pozycje with (security_invoker = true) as
 with moje as (
   select z.pytanie, z.odpowiedz, z.udzialy, z.wydane_punkty
   from public.pozycje z
@@ -676,8 +696,7 @@ with moje as (
 wybor as (
   select pytanie,
          (array_agg(odpowiedz order by wydane_punkty desc, odpowiedz))[1] as odpowiedz_glowna,
-         sum(wydane_punkty) as wydane,
-         sum(udzialy) as udzialy_razem
+         sum(wydane_punkty) as wydane
   from moje group by pytanie
 )
 select
@@ -685,9 +704,7 @@ select
   w.odpowiedz_glowna, w.wydane,
   coalesce((select m.udzialy from moje m where m.pytanie = p.id and m.odpowiedz = p.wynik), 0) as wyplata,
   case when p.status = 'rozstrzygniete' then (w.odpowiedz_glowna = p.wynik) end as trafione,
-  case when p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')
-         or p.liczba_prognoz >= public.prog_widocznosci_kursu()
-       then public.kursy(p.q, p.b) end as kursy
+  public.kursy_pytania(p.id) as kursy
 from wybor w
 join public.pytania p on p.id = w.pytanie;
 
@@ -714,9 +731,20 @@ create policy pozycje_wlasne on public.pozycje for select to authenticated using
 create policy transakcje_wlasne on public.transakcje for select to authenticated using (gracz = auth.uid());
 create policy zmiany_publiczne on public.zmiany_terminow for select to anon, authenticated using (true);
 
+-- Pytania: publiczne poza propozycjami, ale bez kolumny q (stan rynku) —
+-- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
+grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
+              wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto)
+  on public.pytania to anon, authenticated;
+create policy pytania_publiczne on public.pytania for select to anon, authenticated
+  using (status <> 'propozycja');
+
 -- Widoki publiczne (/miasto działa bez logowania).
-grant select on public.v_pytania, public.v_powody, public.v_komentarze to anon, authenticated;
+grant select on public.v_pytania to anon, authenticated;
 grant select on public.v_moje_pozycje to authenticated;
+grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
+grant execute on function public.rozklad_powodow() to anon, authenticated;
+grant execute on function public.komentarze_pytania(bigint, integer) to anon, authenticated;
 
 -- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated).
 grant execute on function public.ustaw_nick(text) to authenticated;

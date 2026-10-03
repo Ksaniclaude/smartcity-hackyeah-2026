@@ -70,18 +70,13 @@ export async function pobierzPytanie(id: number): Promise<Pytanie | null> {
 }
 
 export async function pobierzPowody(): Promise<RozkladPowodu[]> {
-  const r = await supabase.from("v_powody").select("*");
+  const r = await supabase.rpc("rozklad_powodow");
   return (sprawdz<RozkladPowodu[]>(r) ?? []).map((p) => ({ ...p, punkty: Number(p.punkty) }));
 }
 
 export async function pobierzKomentarze(pytanie: number, limit = 20): Promise<Komentarz[]> {
-  const r = await supabase
-    .from("v_komentarze")
-    .select("*")
-    .eq("pytanie", pytanie)
-    .order("czas", { ascending: false })
-    .limit(limit);
-  return sprawdz<Komentarz[]>(r) ?? [];
+  const r = await supabase.rpc("komentarze_pytania", { p_pytanie: pytanie, p_limit: limit });
+  return (sprawdz<Omit<Komentarz, "pytanie">[]>(r) ?? []).map((k) => ({ ...k, pytanie }));
 }
 
 export async function pobierzZmianyTerminow(): Promise<ZmianaTerminu[]> {

@@ -88,8 +88,8 @@ async function mock(route: Route) {
     if (req.headers()["accept"]?.includes("application/vnd.pgrst.object+json")) return json(route, lista[0] ?? null);
     return json(route, lista);
   }
-  if (p === "/rest/v1/v_powody") return json(route, powody);
-  if (p === "/rest/v1/v_komentarze") return json(route, []);
+  if (p === "/rest/v1/rpc/rozklad_powodow") return json(route, powody);
+  if (p === "/rest/v1/rpc/komentarze_pytania") return json(route, []);
   if (p === "/rest/v1/v_moje_pozycje") return json(route, []);
   if (p === "/rest/v1/zmiany_terminow") return json(route, []);
   if (p === "/rest/v1/rpc/postaw_prognoze") {
