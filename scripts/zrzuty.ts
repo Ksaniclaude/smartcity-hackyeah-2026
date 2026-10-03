@@ -13,6 +13,8 @@
 //   npm run zrzuty -- --out=data/zrzuty_dev
 //   npm run zrzuty -- --strony=/ --klik="Jak to działa"                      # zrzut po kliknięciu przycisku (modal)
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw"   # kupon po przyjętej prognozie
+//   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw" --klatki=150,450,750,1100
+//                                          # klatki animacji: zrzuty po tylu ms od kliknięcia (pliki …_k150.png)
 //
 // Pliki: <out>/<urzadzenie>_<strona>.png, np. data/zrzuty_dev/desktop_rynki.png (nadpisywane).
 
@@ -37,6 +39,8 @@ const URZADZENIA = (arg("urzadzenia") ?? "desktop,tel").split(",").map((s) => s.
 const OUT = path.resolve(arg("out") ?? "data/zrzuty_dev");
 /** Wyrażenie regularne na nazwę przycisku, który ma zostać kliknięty po wczytaniu strony (stany po interakcji). */
 const KLIK = arg("klik") ?? "";
+/** Po ilu milisekundach od kliknięcia zrobić zrzuty klatek animacji (sam ekran, bez przewijania). */
+const KLATKI = (arg("klatki") ?? "").split(",").map((x) => Number(x.trim())).filter((x) => x > 0);
 const PORT = 4175;
 const ADRES = `http://127.0.0.1:${PORT}`;
 const SUPABASE = "https://test.supabase.local";
@@ -204,9 +208,13 @@ async function mock(route: Route) {
     const kurs = q?.kursy?.[i] ?? 0.5;
     const e = Math.exp(stawka / 1000);
     const kursPo = (e - 1 + kurs) / e;
+    // pozostałe odpowiedzi tracą proporcjonalnie; rynek w mocku pamięta nowy kurs
+    const noweKursy = q?.kursy ? q.kursy.map((k, j) => (j === i ? kursPo : (k * (1 - kursPo)) / (1 - kurs))) : null;
+    if (q && noweKursy) q.kursy = noweKursy;
+    gracz.saldo -= stawka;
     return json(route, {
       pytanie: body.p_pytanie, odpowiedz: i + 1, stawka, udzialy: 1000 * Math.log((e - 1 + kurs) / kurs),
-      kurs_przed: kurs, kurs_po: kursPo, kursy: q?.kursy ?? null, saldo: gracz.saldo - stawka,
+      kurs_przed: kurs, kurs_po: kursPo, kursy: noweKursy, saldo: gracz.saldo,
       liczba_prognoz: (q?.liczba_prognoz ?? 0) + 1, obrot: (q?.obrot ?? 0) + stawka,
       sprzedano: [], zwrot_ze_sprzedazy: 0,
     });
@@ -295,7 +303,14 @@ async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: Brow
     });
     await page.goto(`${ADRES}${s}`);
     if (KLIK) {
+      await page.waitForLoadState("networkidle").catch(() => undefined);
       await page.getByRole("button", { name: new RegExp(KLIK) }).first().click({ timeout: 8000 });
+      const start = Date.now();
+      fs.mkdirSync(OUT, { recursive: true });
+      for (const ms of KLATKI) {
+        await page.waitForTimeout(Math.max(0, ms - (Date.now() - start)));
+        await page.screenshot({ path: path.join(OUT, `${urzadzenie}_${slug(s)}_k${ms}.png`) });
+      }
       await page.waitForTimeout(1500); // animacje wejścia modala albo kuponu
     }
     strony.set(s, page);

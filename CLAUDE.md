@@ -50,6 +50,8 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   je gracz).
 - Stany po interakcji: `--klik="Jak to działa"` klika przycisk o tej nazwie i dopiero wtedy robi zrzut (modale),
   a `--gracz --strony="/pytanie/4?odp=1" --klik="^Postaw"` pokazuje kupon po przyjętej prognozie.
+- Animacje ogląda się klatka po klatce: `--klatki=330,620,760,950` robi zrzuty po tylu milisekundach od kliknięcia
+  (pliki `…_k330.png`), np. lot monet, uderzenie kuponu, ruch dużego kursu.
 - Sprawdzaj oba stany danych (`zywy` i `pusty`) i oba urządzenia: większość błędów z pierwszego dnia (zera na
   każdej karcie, stopka łamana na trzy linie, ściśnięte karty) była widoczna tylko w stanie pustym albo w wąskiej
   kolumnie.
@@ -72,6 +74,10 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   oddzielaj odstępem i linią, nie pudełkiem. Etykiety małymi literami, bez wersalików.
 - Ruch tylko jako odpowiedź: na akcję gracza (wciśnięcie, kupon po prognozie) albo na zmianę danych
   (`LiczbaZywa` z `src/ui/zywe.tsx` przelicza kurs i saldo po odpytaniu). Bez animacji wejścia sekcji.
+- Kliknięcia, które kosztują albo dają punkty, mają wagę. Efekty są w `src/ui/zywe.tsx`: `lecPunkty` (monety
+  między saldem a zakładem), `fala`, `wystrzel`, `podbij`, `wstrzasnij`, `uniesTekst`, `wibruj`, a plusk pod palcem
+  dostaje każdy przycisk z listy `DOTYKALNE`. Siła efektu rośnie ze stawką; przy `prefers-reduced-motion` efekty
+  są pomijane. Nowe miejsce z wartością (np. wypłata po rozstrzygnięciu) podpinaj do tych funkcji, nie pisz osobnych.
 - Karta rynku, piktogram tematu, termin, licznik odsłonięcia i przyciski odpowiedzi są w `src/ui/rynek.tsx`;
   używaj ich zamiast składać kartę od nowa.
 - Siatki kart liczone z szerokości kontenera (`auto-fill`), nie z breakpointów okna, bo karty leżą też w wąskich

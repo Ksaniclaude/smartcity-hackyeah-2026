@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { Kategoria, Pytanie, Status } from "@/api/types";
 import { ETYKIETY_STATUSU } from "@/api/types";
@@ -6,7 +6,7 @@ import { pobierzGracza, zalogujEmailem, zarejestruj } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import { useAkcja } from "@/ui/hooks";
 import { inicjaly, kolorAwatara, liczba, odmien } from "@/ui/tekst";
-import { LiczbaZywa } from "@/ui/zywe";
+import { LiczbaZywa, fala, lecPunkty, podbij, wibruj } from "@/ui/zywe";
 import {
   IkAktywnosc,
   IkInfo,
@@ -169,6 +169,24 @@ export function Naglowek() {
   const { gracz, konto, stan, otworzModal } = useSesja();
   const [motyw, przelaczMotyw] = useMotyw();
   const klasa = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "aktywny" : ""}`;
+  // Kto w tej wizycie założył konto albo się zalogował (a nie wrócił z zapisaną sesją), widzi, jak punkty
+  // wpadają na saldo: monety lecą ze środka ekranu, a liczba rośnie od zera.
+  const refPortfela = useRef<HTMLAnchorElement>(null);
+  const bylGosciem = useRef(false);
+  const powitany = useRef(false);
+  useEffect(() => {
+    if (stan === "brak_nicku") bylGosciem.current = true;
+  }, [stan]);
+  useEffect(() => {
+    const portfel = refPortfela.current;
+    if (!gracz || !portfel || !bylGosciem.current || powitany.current) return;
+    powitany.current = true;
+    void lecPunkty({ x: window.innerWidth / 2, y: window.innerHeight * 0.55 }, portfel, 18).then(() => {
+      podbij(portfel, 2);
+      fala(portfel, "", 90);
+      wibruj([12, 40, 18]);
+    });
+  }, [gracz]);
   return (
     <header className="naglowek">
       <div className="naglowek-wnetrze">
@@ -208,9 +226,15 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Twoje punkty i profil">
+            <Link to="/profil" className="portfel" title="Twoje punkty i profil" ref={refPortfela}>
               <span className="portfel-saldo">
-                <LiczbaZywa className="cyfry" wartosc={Math.floor(gracz.saldo)} format={(n) => liczba(Math.round(n))} />
+                <LiczbaZywa
+                  className="cyfry"
+                  wartosc={Math.floor(gracz.saldo)}
+                  od={bylGosciem.current ? 0 : undefined}
+                  czas={bylGosciem.current ? 1100 : 450}
+                  format={(n) => liczba(Math.round(n))}
+                />
                 <small>pkt</small>
               </span>
               <Awatar nick={gracz.nick} />

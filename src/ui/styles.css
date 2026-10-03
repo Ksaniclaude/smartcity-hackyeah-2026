@@ -134,7 +134,6 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 @keyframes wjazd-arkusza { from { transform: translateY(32px); } to { transform: none; } }
 /* przyciemnienie wchodzi kolorem tła, nie kryciem, żeby wjeżdżający arkusz był od razu nieprzezroczysty */
 @keyframes zaslona { from { background-color: transparent; } }
-@keyframes iskra { 0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--obrot)) scale(0.4); opacity: 0; } }
 @keyframes pieczec { 0% { transform: scale(0.6); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @keyframes szkielet { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 .zywa { display: inline-block; }
@@ -142,28 +141,33 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .zywa.dol { animation: blysk-dol 1.1s ease-out; }
 .puls { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--nie); flex: none; }
 .puls::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--nie); animation: puls 1.6s ease-out infinite; }
-.iskry { position: absolute; left: 50%; top: 18px; width: 0; height: 0; pointer-events: none; }
-.iskry i { position: absolute; width: 7px; height: 11px; border-radius: 2px; background: var(--tak); animation: iskra 0.9s cubic-bezier(0.1, 0.7, 0.3, 1) forwards; }
-.iskry i:nth-child(3n + 1) { background: var(--akcent); }
-.iskry i:nth-child(3n + 2) { background: var(--tekst); width: 5px; height: 5px; border-radius: 50%; }
-.iskry i:nth-child(1) { --dx: -120px; --dy: -34px; --obrot: -200deg; }
-.iskry i:nth-child(2) { --dx: -92px; --dy: -78px; --obrot: 160deg; }
-.iskry i:nth-child(3) { --dx: -60px; --dy: -104px; --obrot: -120deg; }
-.iskry i:nth-child(4) { --dx: -26px; --dy: -122px; --obrot: 220deg; }
-.iskry i:nth-child(5) { --dx: 12px; --dy: -126px; --obrot: -180deg; }
-.iskry i:nth-child(6) { --dx: 48px; --dy: -110px; --obrot: 140deg; }
-.iskry i:nth-child(7) { --dx: 84px; --dy: -84px; --obrot: -240deg; }
-.iskry i:nth-child(8) { --dx: 118px; --dy: -42px; --obrot: 200deg; }
-.iskry i:nth-child(9) { --dx: -140px; --dy: 6px; --obrot: 120deg; }
-.iskry i:nth-child(10) { --dx: 138px; --dy: 2px; --obrot: -140deg; }
-.iskry i:nth-child(11) { --dx: -74px; --dy: -46px; --obrot: 260deg; }
-.iskry i:nth-child(12) { --dx: 70px; --dy: -52px; --obrot: -220deg; }
-.iskry i:nth-child(13) { --dx: -18px; --dy: -74px; --obrot: 180deg; }
-.iskry i:nth-child(14) { --dx: 30px; --dy: -66px; --obrot: -160deg; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  .iskry { display: none; }
 }
+
+/* ---------- efekty wartości (src/ui/zywe.tsx): warstwa nad stroną, na której lądują monety, fale i drobiny ---------- */
+.efekty { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; }
+.efekty > * { position: absolute; }
+/* plusk: krąg rozchodzący się spod palca w dotkniętym przycisku */
+.plusk { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: currentColor; opacity: 0.28; transform: scale(0); pointer-events: none; animation: plusk 0.55s ease-out forwards; }
+@keyframes plusk { to { transform: scale(30); opacity: 0; } }
+.fala { border-radius: 50%; border: 3px solid var(--akcent); }
+.fala.tak { border-color: var(--tak); }
+.fala.nie { border-color: var(--nie); }
+.fala.trzeci { border-color: var(--trzeci); }
+.drobina { width: 8px; height: 12px; margin: -6px 0 0 -4px; border-radius: 2px; background: var(--akcent); }
+.drobina.okragla { width: 7px; height: 7px; margin: -3px 0 0 -3px; border-radius: 50%; }
+.drobina.tak { background: var(--tak); }
+.drobina.nie { background: var(--nie); }
+.drobina.trzeci { background: var(--trzeci); }
+.drobina.jasna { background: var(--tekst); }
+.moneta { left: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--akcent); box-shadow: inset 0 0 0 3px var(--akcent-hover), 0 0 0 1.5px var(--na-akcencie); }
+.unoszony { font-size: 22px; color: var(--akcent-tekst); white-space: nowrap; text-shadow: 0 1px 0 var(--tlo), 0 0 8px var(--tlo); }
+.unoszony.gora { color: var(--tak-tekst); }
+.unoszony.dol { color: var(--nie-tekst); }
+@keyframes wydruk { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes stempel { 0% { transform: scale(2.8) rotate(-20deg); opacity: 0; } 55% { transform: scale(0.88) rotate(5deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); } }
+@keyframes odsloniecie { 0% { filter: blur(8px); transform: scale(1.5); } 100% { filter: blur(0); transform: scale(1); } }
 
 /* ---------- układ ---------- */
 .aplikacja { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -195,7 +199,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .nav-link:hover { color: var(--tekst); background: var(--tlo-2); }
 .nav-link.aktywny { color: var(--tekst); background: var(--tlo-2); }
 .naglowek-akcje { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.pigulka { height: 36px; padding: 0 16px; border-radius: 18px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border: 0; background: var(--tlo-2); color: var(--tekst); transition: background var(--szybko), transform var(--szybko); }
+.pigulka { position: relative; overflow: hidden; height: 36px; padding: 0 16px; border-radius: 18px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border: 0; background: var(--tlo-2); color: var(--tekst); transition: background var(--szybko), transform var(--szybko); }
 .pigulka:hover { background: var(--tlo-3); }
 .pigulka:active { transform: scale(0.96); }
 .pigulka-pelna { background: var(--akcent); color: var(--na-akcencie); }
@@ -231,7 +235,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .kategorie-wnetrze { max-width: 1320px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .kategorie-wnetrze::-webkit-scrollbar { display: none; }
 @media (min-width: 900px) { .kategorie-wnetrze { padding: 10px 24px; } }
-.zakladka { font: inherit; font-weight: 600; font-size: 14px; color: var(--mute); background: none; border: 0; border-radius: 17px; height: 34px; padding: 0 14px; cursor: pointer; white-space: nowrap; text-decoration: none; flex: none; transition: color var(--szybko), background var(--szybko), transform var(--szybko); }
+.zakladka { position: relative; overflow: hidden; font: inherit; font-weight: 600; font-size: 14px; color: var(--mute); background: none; border: 0; border-radius: 17px; height: 34px; padding: 0 14px; cursor: pointer; white-space: nowrap; text-decoration: none; flex: none; transition: color var(--szybko), background var(--szybko), transform var(--szybko); }
 .zakladka:hover { color: var(--tekst); background: var(--tlo-2); }
 .zakladka:active { transform: scale(0.96); }
 .zakladka.aktywna { color: var(--tlo); background: var(--tekst); }
@@ -302,7 +306,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .podzial .tak { background: var(--tak); }
 .podzial .nie { background: var(--nie); }
 .rynek-przyciski { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.kup { font: inherit; font-weight: 700; font-size: 15px; height: 54px; border-radius: var(--r-m); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; white-space: nowrap; min-width: 0; transition: background var(--szybko), color var(--szybko), transform var(--szybko); }
+.kup { position: relative; overflow: hidden; font: inherit; font-weight: 700; font-size: 15px; height: 54px; border-radius: var(--r-m); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; white-space: nowrap; min-width: 0; transition: background var(--szybko), color var(--szybko), transform var(--szybko); }
 .kup .nazwa { display: inline-block; overflow: hidden; text-overflow: ellipsis; }
 .kup .nazwa::first-letter { text-transform: uppercase; }
 .kup .nazwa small, .wynik .nazwa small { font-size: 11px; font-weight: 600; opacity: 0.8; }
@@ -360,6 +364,8 @@ button.wynik:active { transform: scale(0.98); }
 .odsloniecie { display: inline-flex; gap: 2px; flex: none; }
 .odsloniecie i { width: 5px; height: 11px; border-radius: 2px; background: var(--tlo-3); }
 .odsloniecie i.pelny { background: var(--akcent); }
+.odsloniecie i.swiezy { animation: stempel 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.2); }
+.odsloniete .kurs { animation: odsloniecie 0.7s ease-out; }
 .zmiana { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 .zmiana svg { width: 8px; height: 7px; }
 .zmiana.gora { color: var(--tak-tekst); }
@@ -534,12 +540,12 @@ button.pojedynek-strona:hover .nazwa { text-decoration: underline; text-underlin
 .panel-naglowek { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--wyswietlana); font-stretch: 88%; font-size: 20px; font-weight: 700; margin-bottom: 12px; gap: 8px; }
 .panel-naglowek span { font-family: var(--tekstowa); font-stretch: normal; color: var(--mute); font-weight: 500; font-size: 13px; text-align: right; }
 .przelacznik { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--r-m); background: var(--tlo-2); margin: 0 0 14px; }
-.przelacznik button { font: inherit; font-weight: 700; font-size: 14px; height: 34px; border: 0; border-radius: 7px; background: none; color: var(--mute); cursor: pointer; }
+.przelacznik button { position: relative; overflow: hidden; font: inherit; font-weight: 700; font-size: 14px; height: 34px; border: 0; border-radius: 7px; background: none; color: var(--mute); cursor: pointer; }
 .przelacznik button.aktywna { background: var(--karta); color: var(--tekst); box-shadow: var(--cien); }
 .wybor-odp { display: grid; gap: 6px; margin-bottom: 14px; }
 .wybor-odp:not(.o2) .odp-przycisk { min-height: 46px; }
 .wybor-odp.o2 { grid-template-columns: 1fr 1fr; }
-.odp-przycisk { font: inherit; font-weight: 700; font-size: 15px; min-height: 52px; border-radius: var(--r-m); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 14px; text-align: left; line-height: 1.2; transition: background var(--szybko), color var(--szybko), transform var(--szybko), box-shadow var(--szybko); }
+.odp-przycisk { position: relative; overflow: hidden; font: inherit; font-weight: 700; font-size: 15px; min-height: 52px; border-radius: var(--r-m); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 14px; text-align: left; line-height: 1.2; transition: background var(--szybko), color var(--szybko), transform var(--szybko), box-shadow var(--szybko); }
 .odp-przycisk .nazwa::first-letter { text-transform: uppercase; }
 .odp-przycisk .nazwa { display: inline-block; }
 .odp-przycisk .cyfry { font-size: 24px; }
@@ -563,7 +569,7 @@ button.pojedynek-strona:hover .nazwa { text-decoration: underline; text-underlin
 .stawka-wejscie input::-webkit-outer-spin-button, .stawka-wejscie input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .stawka-wejscie span { color: var(--mute); font-weight: 600; }
 .stawka-chipy { display: flex; gap: 6px; margin-top: 8px; }
-.stawka-chipy button { flex: 1; font: inherit; font-size: 13px; font-weight: 700; height: 32px; border-radius: 16px; border: 0; background: var(--tlo-2); color: var(--tekst-2); cursor: pointer; padding: 0 4px; transition: background var(--szybko), transform var(--szybko); }
+.stawka-chipy button { position: relative; overflow: hidden; flex: 1; font: inherit; font-size: 13px; font-weight: 700; height: 32px; border-radius: 16px; border: 0; background: var(--tlo-2); color: var(--tekst-2); cursor: pointer; padding: 0 4px; transition: background var(--szybko), transform var(--szybko); }
 .stawka-chipy button:hover { background: var(--tlo-3); color: var(--tekst); }
 .stawka-chipy button:active { transform: scale(0.94); }
 .stawka-chipy button:disabled { opacity: 0.45; cursor: default; }
@@ -577,18 +583,18 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22p
 input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--akcent); border: 3px solid var(--karta); box-shadow: 0 0 0 1px var(--linia-2); }
 input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .powody { display: flex; flex-wrap: wrap; gap: 6px; }
-.powody button { font: inherit; font-size: 13px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--tlo-2); color: var(--tekst-2); cursor: pointer; transition: background var(--szybko), transform var(--szybko); }
+.powody button { position: relative; overflow: hidden; font: inherit; font-size: 13px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--tlo-2); color: var(--tekst-2); cursor: pointer; transition: background var(--szybko), transform var(--szybko); }
 .powody button:hover { background: var(--tlo-3); color: var(--tekst); }
 .powody button:active { transform: scale(0.94); }
 .powody button.wybrany { background: var(--tekst); color: var(--tlo); }
 .wygrana { border-radius: var(--r-m); background: var(--tlo-2); padding: 12px 14px; margin: 12px 0 4px; display: grid; gap: 6px; font-size: 14px; }
 .wygrana-glowna { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--tekst-2); }
-.wygrana-glowna .cyfry { font-size: 34px; color: var(--tak-tekst); }
+.wygrana-glowna .cyfry { display: inline-block; font-size: calc(34px + 12px * var(--waga, 0)); color: var(--tak-tekst); transform-origin: 100% 60%; }
 .wygrana-glowna .cyfry small { font-family: var(--tekstowa); font-stretch: normal; font-size: 14px; font-weight: 600; margin-left: 4px; }
 .wiersz-pod { display: flex; justify-content: space-between; gap: 10px; color: var(--mute); font-size: 13px; }
 .wiersz-pod b { color: var(--tekst); font-variant-numeric: tabular-nums; font-weight: 600; }
 .wiersz-pod b.zysk { color: var(--tak-tekst); }
-.przycisk-postaw { width: 100%; min-height: 54px; border-radius: 12px; border: 0; font: inherit; font-weight: 800; font-size: 16px; padding: 8px 14px; color: var(--na-akcencie); background: var(--akcent); cursor: pointer; transition: background var(--szybko), transform var(--szybko); }
+.przycisk-postaw { position: relative; overflow: hidden; width: 100%; min-height: 54px; border-radius: 12px; border: 0; font: inherit; font-weight: 800; font-size: 16px; padding: 8px 14px; color: var(--na-akcencie); background: var(--akcent); cursor: pointer; transition: background var(--szybko), transform var(--szybko); }
 .przycisk-postaw:hover { background: var(--akcent-hover); }
 .przycisk-postaw:active { transform: scale(0.98); }
 .przycisk-postaw.tak { background: var(--tak); color: var(--na-tak); }
@@ -603,9 +609,12 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 @media (min-width: 1000px) { .panel-stopka { position: sticky; bottom: 0; padding: 10px 0 18px; margin-bottom: -18px; } }
 .zastrzezenie { font-size: 12px; color: var(--mute); text-align: center; margin: 10px 0 0; }
 /* kupon: potwierdzenie przyjętej prognozy albo sprzedaży */
-.kupon { position: relative; border: 1.5px dashed var(--tak); background: var(--tak-tlo); border-radius: var(--r-m); padding: 14px; margin-bottom: 14px; font-size: 14px; color: var(--tekst-2); animation: pieczec 0.4s var(--sprezyscie); transform-origin: 50% 0; }
+.kupon { position: relative; border: 1.5px dashed var(--tak); background: var(--tak-tlo); border-radius: var(--r-m); padding: 14px; margin-bottom: 14px; font-size: 14px; color: var(--tekst-2); animation: wydruk 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .kupon-gora { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--tak-tekst); margin-bottom: 6px; }
-.kupon-gora svg { width: 22px; height: 22px; padding: 4px; border-radius: 50%; background: var(--tak); color: var(--na-tak); animation: pieczec 0.45s var(--sprezyscie); }
+.kupon-gora svg { width: 22px; height: 22px; padding: 4px; border-radius: 50%; background: var(--tak); color: var(--na-tak); animation: stempel 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.2); }
+.kupon { scroll-margin-top: calc(var(--naglowek-h) + 12px); }
+.kupon .kupon-wygrana { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px; padding: 8px 0; border-top: 1px dashed var(--tak); border-bottom: 1px dashed var(--tak); color: var(--tekst-2); }
+.kupon .kupon-wygrana .cyfry { font-size: 30px; color: var(--tak-tekst); }
 .kupon-kurs { display: flex; align-items: baseline; gap: 10px; font-size: 40px; color: var(--tekst); margin: 2px 0 8px; }
 .kupon-kurs .przed { font-size: 24px; color: var(--mute); }
 .kupon-kurs svg { width: 18px; height: 18px; color: var(--mute); align-self: center; }
@@ -696,7 +705,7 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .komunikat-ostrz { background: var(--ostrz-tlo); color: var(--ostrz); }
 .komunikat b { color: var(--tekst); }
 .komunikat big { font-size: 17px; font-weight: 800; display: block; margin-bottom: 4px; letter-spacing: -0.01em; }
-.przycisk { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 8px 20px; border-radius: var(--r-m); border: 0; background: var(--akcent); color: var(--na-akcencie); font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; text-decoration: none; font-family: inherit; transition: background var(--szybko), transform var(--szybko); }
+.przycisk { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 8px 20px; border-radius: var(--r-m); border: 0; background: var(--akcent); color: var(--na-akcencie); font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; text-decoration: none; font-family: inherit; transition: background var(--szybko), transform var(--szybko); }
 .przycisk:hover { background: var(--akcent-hover); }
 .przycisk:active { transform: scale(0.98); }
 .przycisk:disabled, .przycisk:disabled:hover { background: var(--tlo-3); color: var(--mute); cursor: default; transform: none; }
@@ -762,7 +771,7 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .przegladaj { margin-top: 16px; }
 .przegladaj h4 { font-size: 13px; color: var(--mute); font-weight: 500; margin: 0 0 8px; }
 .chipy { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
-.chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 600; color: var(--tekst-2); background: var(--tlo-2); text-decoration: none; border: 0; cursor: pointer; font-family: inherit; transition: background var(--szybko), transform var(--szybko); }
+.chip { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 600; color: var(--tekst-2); background: var(--tlo-2); text-decoration: none; border: 0; cursor: pointer; font-family: inherit; transition: background var(--szybko), transform var(--szybko); }
 .chip:hover { color: var(--tekst); background: var(--tlo-3); }
 .chip:active { transform: scale(0.96); }
 .chip.aktywny { color: var(--tlo); background: var(--tekst); }
@@ -778,7 +787,7 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .lub { display: flex; align-items: center; gap: 12px; color: var(--mute); font-size: 13px; margin: 14px 0; }
 .lub::before, .lub::after { content: ""; flex: 1; height: 1px; background: var(--linia); }
 .modal-zakladki { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--r-m); background: var(--tlo-2); margin: 0 0 14px; }
-.modal-zakladki button { font: inherit; font-weight: 700; font-size: 14px; height: 36px; border: 0; border-radius: 7px; background: none; color: var(--mute); cursor: pointer; }
+.modal-zakladki button { position: relative; overflow: hidden; font: inherit; font-weight: 700; font-size: 14px; height: 36px; border: 0; border-radius: 7px; background: none; color: var(--mute); cursor: pointer; }
 .modal-zakladki button.aktywna { background: var(--karta); color: var(--tekst); box-shadow: var(--cien); }
 
 /* ---------- stopka i dolna nawigacja ---------- */
