@@ -30,7 +30,7 @@ import { useAkcja, usePolling } from "@/ui/hooks";
 import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaStatusu, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, punkty, zmianaPp } from "@/ui/tekst";
+import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
 import { Wykres } from "@/ui/wykres";
 import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
 
@@ -947,7 +947,7 @@ export default function Pytanie() {
             <p className="odsloniecie-opis">
               <Odsloniecie p={p} />
               <span>
-                Kurs tłumu odsłoni się po {p.prog_widocznosci} prognozach.{" "}
+                Kurs tłumu odsłoni się {poPrognozach(p.prog_widocznosci)}.{" "}
                 {p.liczba_prognoz === 0 ? "Na razie bez prognoz." : `Brakuje ${brakuje}.`}
               </span>
             </p>

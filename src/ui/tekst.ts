@@ -9,6 +9,11 @@ export function odmien(n: number, jeden: string, kilka: string, wiele: string): 
   return `${n} ${forma}`;
 }
 
+/** Próg odsłonięcia kursu słowami: „po pierwszej prognozie”, „po 10 prognozach”. */
+export function poPrognozach(n: number): string {
+  return n === 1 ? "po pierwszej prognozie" : `po ${n} prognozach`;
+}
+
 export function punkty(n: number): string {
   return odmien(Math.round(n), "punkt", "punkty", "punktów");
 }

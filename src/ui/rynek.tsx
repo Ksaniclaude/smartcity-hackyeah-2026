@@ -19,7 +19,7 @@ import {
   IkZegar,
 } from "@/ui/ikony";
 import { formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
-import { koniecTerminu, odliczanie, opisTerminu, ulamekCzasu, zmianaPp } from "@/ui/tekst";
+import { koniecTerminu, odliczanie, opisTerminu, poPrognozach, ulamekCzasu, zmianaPp } from "@/ui/tekst";
 import { LiczbaZywa, useTeraz, wystrzel } from "@/ui/zywe";
 
 const DZIEN = 24 * 60 * 60 * 1000;
@@ -109,7 +109,7 @@ export function Odsloniecie({ p }: { p: Pick<Pytanie, "liczba_prognoz" | "prog_w
     poprzednie.current = pelne;
   }, [pelne]);
   return (
-    <span className="odsloniecie" title={`Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach`}>
+    <span className="odsloniecie" title={`Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}`}>
       {Array.from({ length: kropki }, (_, i) => (
         <i key={i} className={i < pelne ? (i >= odKtorej ? "pelny swiezy" : "pelny") : ""} />
       ))}
@@ -257,7 +257,7 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
         {nowy ? <span className="znacznik znacznik-nowy">nowy</span> : null}
         {p.status === "zamkniete" ? <span className="znacznik znacznik-zamkniety">zamknięte</span> : null}
         {ukryty ? <Odsloniecie p={p} /> : null}
-        <span className="rynek-meta" title={ukryty ? `Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach` : undefined}>
+        <span className="rynek-meta" title={ukryty ? `Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}` : undefined}>
           {opisPrognoz(p)}
         </span>
         {otwarte ? <Zmiana pp={zmianaPp(kursy?.[0], p.kursy_otwarcia?.[0])} /> : null}
