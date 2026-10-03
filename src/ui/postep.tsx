@@ -49,11 +49,14 @@ function progPoziomu(l: number): number {
 export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[], seria: number, udostepnienia = 0): Postep {
   const kupna = transakcje.filter((t) => t.udzialy > 0);
   const rynki = new Set(kupna.map((t) => t.pytanie)).size;
-  const zKomentarzem = kupna.filter((t) => (t.komentarz ?? "").trim().length > 0).length;
+  // Bez nabijania kupnem i sprzedażą w kółko: prognoza liczy się raz na odpowiedź na rynku (zmiana zdania
+  // daje najwyżej tyle, ile rynek ma odpowiedzi), komentarz raz na rynek.
+  const prognozy = new Set(kupna.map((t) => `${t.pytanie}-${t.odpowiedz}`)).size;
+  const zKomentarzem = new Set(kupna.filter((t) => (t.komentarz ?? "").trim().length > 0).map((t) => t.pytanie)).size;
   const sprzedaze = transakcje.filter((t) => t.udzialy < 0).length;
   const trafione = pozycje.filter((p) => p.status === "rozstrzygniete" && p.trafione === true).length;
   const doswiadczenie =
-    kupna.length * DOSWIADCZENIE.prognoza +
+    prognozy * DOSWIADCZENIE.prognoza +
     rynki * DOSWIADCZENIE.nowyRynek +
     zKomentarzem * DOSWIADCZENIE.komentarz +
     trafione * DOSWIADCZENIE.trafiony;
@@ -75,7 +78,7 @@ export function policzPostep(transakcje: MojaTransakcja[], pozycje: MojaPozycja[
   const odznaki = [
     odznaka("pierwsza", "Pierwsza prognoza", "Postaw pierwszą prognozę.", IkPtaszek, kupna.length),
     odznaka("trzy-rynki", "Trzy rynki", "Miej prognozy na trzech różnych rynkach.", IkRynki, rynki, 3),
-    odznaka("dziesiec", "Dziesięć prognoz", "Postaw dziesięć prognoz.", IkLuz, kupna.length, 10),
+    odznaka("dziesiec", "Dziesięć prognoz", "Postaw prognozy na dziesięć różnych odpowiedzi.", IkLuz, prognozy, 10),
     odznaka("pod-prad", "Pod prąd", "Postaw na odpowiedź, której tłum daje mniej niż 25%.", IkStrzalka, kupna.filter((t) => t.kurs_przed < 0.25).length),
     odznaka("gruba-stawka", "Gruba stawka", "Postaw co najmniej 100 punktów w jednej prognozie.", IkBudzet, kupna.filter((t) => t.stawka >= 100).length),
     odznaka("uzasadnienie", "Z uzasadnieniem", "Dodaj komentarz do prognozy.", IkDymek, zKomentarzem),
@@ -337,8 +340,9 @@ export function PasPoziomu() {
         <i style={{ width: `${(postep.ulamek * 100).toFixed(1)}%` }} />
       </div>
       <p className="pomoc">
-        Doświadczenie rośnie z każdą prognozą (+{DOSWIADCZENIE.prognoza}), nowym rynkiem (+{DOSWIADCZENIE.nowyRynek}), komentarzem do
-        prognozy (+{DOSWIADCZENIE.komentarz}) i trafionym wynikiem (+{DOSWIADCZENIE.trafiony}). Nie da się go postawić ani wymienić.
+        Doświadczenie rośnie z prognozą na każdą nową odpowiedź (+{DOSWIADCZENIE.prognoza}), nowym rynkiem (+{DOSWIADCZENIE.nowyRynek}),
+        komentarzem na nowym rynku (+{DOSWIADCZENIE.komentarz}) i trafionym wynikiem (+{DOSWIADCZENIE.trafiony}). Ponowne kupno tych samych
+        udziałów nie dodaje doświadczenia. Nie da się go postawić ani wymienić.
       </p>
     </section>
   );

@@ -497,6 +497,25 @@ async function main() {
     console.log("  ✓ „Wszystko” sprzedało całą pozycję razem z ułamkiem");
     await zrzut(page, "sprzedaz");
 
+    console.log("5b. Kupno i sprzedaż w kółko nie nabijają doświadczenia");
+    const doswiadczenie = async () => {
+      const t = (await page.locator('[title^="Poziom "]').first().getAttribute("title")) ?? "";
+      const m = /(\d[\d\s\u00a0]*) z /.exec(t);
+      if (!m) throw new Error(`Brak doświadczenia w „${t}”`);
+      return Number(m[1].replace(/\D/g, ""));
+    };
+    await page.goto(`${ADRES}/pytanie/1?odp=2`);
+    await oczekuj(page, "Kryterium rozstrzygnięcia");
+    await page.waitForTimeout(1500);
+    const xpPrzed = await doswiadczenie();
+    await page.getByRole("button", { name: "wykonawca", exact: true }).click();
+    await page.getByRole("button", { name: /^Postaw/ }).first().click();
+    await oczekuj(page, "Prognoza przyjęta");
+    await page.waitForTimeout(1500);
+    const xpPo = await doswiadczenie();
+    if (xpPo !== xpPrzed) throw new Error(`Ponowne kupno tej samej odpowiedzi dało doświadczenie: ${xpPrzed} → ${xpPo}`);
+    console.log(`  ✓ ponowne kupno „po terminie”: doświadczenie bez zmian (${xpPo})`);
+
     console.log("6. Profil: ekran „Rynek rozstrzygnięty” (raz), portfel na żywo; ranking, aktywność, profil publiczny");
     // resztka poniżej 1 udziału (np. sprzed zmiany reguł) nie pokazuje się na liście pozycji
     stan.pozycje.set("4-1", { pytanie: 4, odpowiedz: 1, udzialy: 0.6, wydane: 0.3 });
