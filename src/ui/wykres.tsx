@@ -3,6 +3,8 @@ import type { PunktHistorii } from "@/api/types";
 
 const KLASY = ["tak", "nie", "trzeci"];
 const GODZINA = 60 * 60 * 1000;
+/** Krok wykresu: kurs w przedziałach co 15 minut. */
+const KROK = 15 * 60 * 1000;
 
 interface Props {
   historia: PunktHistorii[];
@@ -16,6 +18,27 @@ interface Props {
   kompakt?: boolean;
   /** Kurs otwarcia: przy braku historii rysowany przerywaną linią zamiast pustego pola. */
   otwarcie?: number[] | null;
+}
+
+type Punkt = { t: number; kursy: number[] };
+
+const takieSame = (a: number[], b: number[]) => a.length === b.length && a.every((k, i) => k === b[i]);
+
+/**
+ * Próbkowanie co KROK: na końcu każdego kwadransu ostatni kurs sprzed tej chwili (zmiany w środku kwadransu
+ * zlewają się w jeden schodek). Bieżący kwadrans pokazuje ostatnią transakcję od razu.
+ */
+export function wKrokach(pkt: Punkt[]): Punkt[] {
+  if (pkt.length < 2) return pkt;
+  const wynik = [pkt[0]];
+  const ostatni = pkt[pkt.length - 1];
+  let j = 0;
+  for (let g = Math.ceil(pkt[0].t / KROK) * KROK; g <= ostatni.t; g += KROK) {
+    while (j + 1 < pkt.length && pkt[j + 1].t <= g) j++;
+    if (!takieSame(pkt[j].kursy, wynik[wynik.length - 1].kursy)) wynik.push({ t: g, kursy: pkt[j].kursy });
+  }
+  if (!takieSame(ostatni.kursy, wynik[wynik.length - 1].kursy)) wynik.push(ostatni);
+  return wynik;
 }
 
 function formatujCzas(t: number): string {
@@ -71,9 +94,12 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
   }, [historia.length]);
 
   const { punkty, t0, t1 } = useMemo(() => {
-    const pkt = historia
-      .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
-      .filter((h) => Number.isFinite(h.t));
+    const pkt = wKrokach(
+      historia
+        .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
+        .filter((h) => Number.isFinite(h.t))
+        .sort((a, b) => a.t - b.t),
+    );
     if (pkt.length === 0) return { punkty: pkt, t0: 0, t1: 1 };
     const a = pkt[0].t;
     let b = pkt[pkt.length - 1].t;
