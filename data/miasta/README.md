@@ -8,6 +8,11 @@ Notatki z researchu każdego miasta są w pliku `.md` obok CSV.
 
 ## Zasady treści
 
+**Nie dublujemy bukmacherów.** Wyniki meczów, walk (FAME, Prime, UFC), tenisa, skoków, żużla, MLS, esportu oraz
+rynki rozrywkowe z oferty Betclic/STS (Taniec z Gwiazdami, The Voice, Eurowizja, Oscary) są wycięte i leżą w
+`odrzucone_bukmacher.csv`. Zostaje to, czego u bukmachera nie ma: afery, dymisje, weta, sondaże, celebryci
+(publiczne działania), premiery, decyzje urzędów i spółek, dane GIOŚ/IMGW/GUS, frekwencja i bilety, kurioza.
+
 Tematy nie są ograniczone (zob. `ZASADY_PYTANIA` w `src/api/types.ts`). Rynki o osobach publicznych dotyczą ich
 publicznych działań (występ, walka, decyzja, publikacja), nie życia prywatnego ani zdrowia. Rynki polityczne
 (dymisje, weta, sondaże) są dozwolone.
