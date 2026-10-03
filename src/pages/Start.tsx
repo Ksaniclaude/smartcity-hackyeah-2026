@@ -11,10 +11,9 @@ export default function Start() {
   }, [konto, otworzModal]);
   return (
     <main className="ekran">
-      <h1 className="start-tytul">Czy miasto zdąży?</h1>
+      <h1 className="start-tytul">Polski rynek prognoz</h1>
       <p className="mala">
-        Rynek prognoz dla polskich miast. Mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs pokazuje, ile w to
-        wierzą.
+        Bez złotówek: stawiasz punkty na to, co wydarzy się w Polsce, a kurs pokazuje, ile ludzie w to wierzą.
       </p>
       <div className="karta">
         <h3>{konto ? "Jeszcze nick" : "Ten ekran wymaga konta"}</h3>

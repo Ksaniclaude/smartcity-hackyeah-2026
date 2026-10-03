@@ -4,7 +4,7 @@ import { procent } from "@/api/lmsr";
 import { POWODY, type Aktywnosc as WpisAkt, type Kategoria } from "@/api/types";
 import { useMiejsca, usePolling } from "@/ui/hooks";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca } from "@/ui/komponenty";
-import { czasTemu, liczba } from "@/ui/tekst";
+import { czasTemu, liczba, odmien } from "@/ui/tekst";
 
 const KLASY_TYPU = ["typ-tak", "typ-nie", "typ-trzeci"];
 
@@ -49,6 +49,26 @@ export function WpisAktywnosci({ wpis, miejsce }: { wpis: WpisAkt; miejsce?: num
   );
 }
 
+/** Zestawienie z listy: na których rynkach i u których graczy jest najwięcej ruchów (liczone z tych samych wpisów). */
+function zestawienie(wpisy: WpisAkt[]) {
+  const rynki = new Map<number, { pytanie: number; tresc: string; ruchy: number; gracze: Set<string> }>();
+  const gracze = new Map<string, { nick: string; ruchy: number; postawione: number }>();
+  for (const w of wpisy) {
+    const r = rynki.get(w.pytanie) ?? { pytanie: w.pytanie, tresc: w.tresc, ruchy: 0, gracze: new Set<string>() };
+    r.ruchy++;
+    r.gracze.add(w.nick);
+    rynki.set(w.pytanie, r);
+    const g = gracze.get(w.nick) ?? { nick: w.nick, ruchy: 0, postawione: 0 };
+    g.ruchy++;
+    if (w.udzialy > 0) g.postawione += w.stawka;
+    gracze.set(w.nick, g);
+  }
+  return {
+    rynki: [...rynki.values()].sort((a, b) => b.ruchy - a.ruchy).slice(0, 5),
+    gracze: [...gracze.values()].sort((a, b) => b.ruchy - a.ruchy || b.postawione - a.postawione).slice(0, 5),
+  };
+}
+
 type Filtr = "wszystko" | Kategoria;
 const FILTRY: { klucz: Filtr; etykieta: string }[] = [
   { klucz: "wszystko", etykieta: "Wszystko" },
@@ -65,6 +85,7 @@ export default function Aktywnosc() {
   const miejsca = useMiejsca();
   const wszystkie = dane ?? [];
   const wpisy = filtr === "wszystko" ? wszystkie : wszystkie.filter((w) => w.kategoria === filtr);
+  const zestaw = zestawienie(wpisy);
 
   const ustawFiltr = (k: Filtr) => {
     const nowe = new URLSearchParams(params);
@@ -75,36 +96,71 @@ export default function Aktywnosc() {
 
   return (
     <main className="kontener">
-      <div className="waska">
-        <h1>Aktywność</h1>
-        <p className="mala">Ostatnie prognozy i sprzedaże udziałów wszystkich graczy. Lista odświeża się co 5 sekund.</p>
-        <div className="chipy" role="tablist" aria-label="Kategoria">
-          {FILTRY.map((x) => (
-            <button
-              type="button"
-              role="tab"
-              key={x.klucz}
-              aria-selected={filtr === x.klucz}
-              className={`chip ${filtr === x.klucz ? "aktywny" : ""}`}
-              onClick={() => ustawFiltr(x.klucz)}
-            >
-              {x.etykieta}
-            </button>
+      <h1>Aktywność</h1>
+      <p className="mala">Ostatnie prognozy i sprzedaże udziałów wszystkich graczy. Lista odświeża się co 5 sekund.</p>
+      <div className="chipy" role="tablist" aria-label="Kategoria">
+        {FILTRY.map((x) => (
+          <button
+            type="button"
+            role="tab"
+            key={x.klucz}
+            aria-selected={filtr === x.klucz}
+            className={`chip ${filtr === x.klucz ? "aktywny" : ""}`}
+            onClick={() => ustawFiltr(x.klucz)}
+          >
+            {x.etykieta}
+          </button>
+        ))}
+      </div>
+
+      {/* Na szerokim ekranie lista zajmuje główną kolumnę, a obok stoi zestawienie: gdzie i kto gra najwięcej. */}
+      <div className="aktywnosc-uklad">
+        <div>
+          {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
+          {laduje && !dane ? <Ladowanie /> : null}
+          {dane && wszystkie.length === 0 ? <p className="pusto">Jeszcze nikt nie postawił punktów.</p> : null}
+          {dane && wszystkie.length > 0 && wpisy.length === 0 ? <p className="pusto">Brak aktywności w tej kategorii.</p> : null}
+          {wpisy.map((w) => (
+            <WpisAktywnosci key={w.id} wpis={w} miejsce={miejsca.get(w.nick)} />
           ))}
         </div>
-
-        {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
-        {laduje && !dane ? <Ladowanie /> : null}
-        {dane && wszystkie.length === 0 ? <p className="pusto">Jeszcze nikt nie postawił punktów.</p> : null}
-        {dane && wszystkie.length > 0 && wpisy.length === 0 ? (
-          <p className="pusto">Brak aktywności w tej kategorii.</p>
-        ) : null}
         {wpisy.length > 0 ? (
-          <div>
-            {wpisy.map((w) => (
-              <WpisAktywnosci key={w.id} wpis={w} miejsce={miejsca.get(w.nick)} />
-            ))}
-          </div>
+          <aside className="aktywnosc-bok">
+            <section>
+              <h2>Najwięcej ruchu</h2>
+              <ol className="bok-lista">
+                {zestaw.rynki.map((r) => (
+                  <li key={r.pytanie}>
+                    <Link to={`/pytanie/${r.pytanie}`} title={r.tresc}>
+                      {r.tresc}
+                    </Link>
+                    <span>
+                      {odmien(r.ruchy, "ruch", "ruchy", "ruchów")}, {odmien(r.gracze.size, "gracz", "graczy", "graczy")}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section>
+              <h2>Najaktywniejsi</h2>
+              <ol className="bok-lista">
+                {zestaw.gracze.map((g) => (
+                  <li key={g.nick}>
+                    <Link to={`/u/${encodeURIComponent(g.nick)}`} className="gracz-kom">
+                      <Awatar nick={g.nick} />
+                      <span>{g.nick}</span>
+                      <OdznakaMiejsca miejsce={miejsca.get(g.nick)} />
+                    </Link>
+                    <span>
+                      {odmien(g.ruchy, "ruch", "ruchy", "ruchów")}
+                      {g.postawione > 0 ? `, postawione ${liczba(g.postawione)} pkt` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <p className="pomoc">Liczone z {odmien(wpisy.length, "ostatniego ruchu", "ostatnich ruchów", "ostatnich ruchów")} na liście.</p>
+          </aside>
         ) : null}
       </div>
     </main>

@@ -153,7 +153,7 @@ export default function ProfilPubliczny() {
           ) : p.aktywnosc.length === 0 ? (
             <p className="pusto">Ten gracz nie postawił jeszcze punktów.</p>
           ) : (
-            <div className="waska">
+            <div>
               {p.aktywnosc.map((a) => (
                 <WpisAktywnosci key={a.id} wpis={a} />
               ))}

@@ -6,6 +6,7 @@ import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
+import { IkPlomien } from "@/ui/ikony";
 import { Awatar, Komunikat, Szkielet, Szukajka, opisPrognoz } from "@/ui/komponenty";
 import { KartaRynku, Odpowiedzi, Odsloniecie, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, liczba, odmien, pkt, zmianaPp } from "@/ui/tekst";
@@ -428,8 +429,9 @@ export default function Lista() {
             <Rzad
               tytul={
                 <>
+                  {/* płomień, nie pulsująca kropka: kropka oznacza taśmę „Na żywo” tuż nad tym rzędem */}
                   <span className="hot-ikona" aria-hidden="true">
-                    <i className="puls" />
+                    <IkPlomien />
                   </span>
                   Hot
                 </>
@@ -521,10 +523,10 @@ export default function Lista() {
           <section className={`czolowka ${gosc ? "z-haslem" : ""}`}>
             {gosc ? (
               <div className="czolowka-haslo">
-                <h1>Czy miasto zdąży?</h1>
+                <h1>Polski rynek prognoz</h1>
                 <p>
-                  Rynek prognoz dla polskich miast: mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs
-                  pokazuje, ile w to wierzą.
+                  Bez złotówek: stawiasz punkty na to, co wydarzy się w Polsce, od miejskich inwestycji po celebrytów,
+                  a kurs pokazuje, ile ludzie w to wierzą.
                 </p>
                 {odsetek != null ? (
                   <p className="czolowka-liczba">

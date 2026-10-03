@@ -33,6 +33,7 @@ import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGo
 import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
 import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
+import { usePostep } from "@/ui/postep";
 import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
 
 const LIMIT_NA_PYTANIE = 200;
@@ -279,6 +280,7 @@ function KursPoZmianie({ przed, po }: { przed: number; po: number }) {
 
 function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: PanelProps) {
   const { gracz, konto, stan, otworzModal, uruchom, odswiezGracza } = useSesja();
+  const { odswiez: odswiezPostep } = usePostep();
   const [tryb, setTryb] = useState<"kup" | "sprzedaj">("kup");
   const [stawka, setStawka] = useState(SZYBKIE_STAWKI[0]);
   const [powod, setPowod] = useState<Powod | null>(null);
@@ -417,6 +419,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
       const obok = { x: duzyKurs.right + 70, y: duzyKurs.top + duzyKurs.height * 0.55 };
       uniesTekst(obok, `${ruch > 0 ? "+" : "−"}${Math.abs(ruch)} pkt proc.`, ruch > 0 ? "gora" : "dol");
     }
+    void odswiezPostep(); // doświadczenie za prognozę leci do pierścienia przy awatarze zaraz po kuponie
     await poZmianie();
   };
   const wyslijSprzedaz = async (e: FormEvent) => {
@@ -437,6 +440,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
       fala(portfel!, "tak", 80);
       wibruj([10, 30, 16]);
     }
+    void odswiezPostep();
     await Promise.all([odswiezGracza(), poZmianie()]);
   };
 
@@ -1055,7 +1059,7 @@ export default function Pytanie() {
 
           {p.status === "rozstrzygniete" && p.wynik ? (
             <Komunikat typ="info">
-              Rozstrzygnięte: <b>{p.odpowiedzi[p.wynik - 1]}</b>. Mieszkańcy dawali na to <b>{procent(p.kursy ? p.kursy[p.wynik - 1] : null)}</b>.{" "}
+              Rozstrzygnięte: <b>{p.odpowiedzi[p.wynik - 1]}</b>. Gracze dawali na to <b>{procent(p.kursy ? p.kursy[p.wynik - 1] : null)}</b>.{" "}
               {p.link_rozstrzygniecia ? (
                 <a href={p.link_rozstrzygniecia} target="_blank" rel="noreferrer">
                   Źródło rozstrzygnięcia

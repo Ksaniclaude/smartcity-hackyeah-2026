@@ -6,6 +6,7 @@ import { pobierzGracza, zalogujEmailem, zarejestruj } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import { useAkcja } from "@/ui/hooks";
 import { inicjaly, kolorAwatara, liczba, odmien } from "@/ui/tekst";
+import { PierscienPoziomu, Seria } from "@/ui/postep";
 import { LiczbaZywa, fala, lecPunkty, podbij, wibruj } from "@/ui/zywe";
 import {
   IkAktywnosc,
@@ -258,7 +259,10 @@ export function Naglowek() {
                 <small>pkt</small>
                 {portfel ? <ZyskStrata wartosc={Math.round(portfel.zysk)} sufiks="" /> : null}
               </span>
-              <Awatar nick={gracz.nick} />
+              <Seria />
+              <PierscienPoziomu>
+                <Awatar nick={gracz.nick} />
+              </PierscienPoziomu>
             </Link>
           ) : stan === "laduje" ? (
             <span className="szkielet szkielet-przycisk" />
@@ -422,20 +426,20 @@ function ModalJakToDziala() {
   const { zamknijModal, otworzModal, gracz, konto } = useSesja();
   return (
     <Modal tytul="Jak to działa" onClose={zamknijModal}>
-      <p className="pod">Zdążą? to rynek prognoz o terminach w polskich miastach. Zamiast pieniędzy są punkty, zamiast sondażu kurs.</p>
+      <p className="pod">Zdążą? to polski rynek prognoz. Zamiast złotówek są punkty, zamiast sondażu kurs.</p>
       <div className="kroki">
         <div className="krok">
           <b>1</b>
           <div>
             <strong>Wybierz pytanie</strong>
-            <span>Czy miasto dotrzyma terminu? Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
+            <span>Od miejskich inwestycji po celebrytów. Każde pytanie ma kryterium rozstrzygnięcia i publiczne źródło.</span>
           </div>
         </div>
         <div className="krok">
           <b>2</b>
           <div>
             <strong>Postaw punkty</strong>
-            <span>Dostajesz 1000 punktów. Stawiasz na odpowiedź, a kurs przesuwa się tak, jak myślą mieszkańcy.</span>
+            <span>Dostajesz 1000 punktów. Stawiasz na odpowiedź, a kurs przesuwa się tak, jak myślą gracze.</span>
           </div>
         </div>
         <div className="krok">

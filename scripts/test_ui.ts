@@ -382,7 +382,7 @@ async function main() {
 
     console.log("1. Strona główna jako gość (rynki bez nicku)");
     await page.goto(`${ADRES}/`);
-    await oczekuj(page, "Czy miasto zdąży?");
+    await oczekuj(page, "Polski rynek prognoz");
     await oczekuj(page, "41%");
     await oczekuj(page, "12 prognoz");
     await oczekuj(page, "3/10 prognoz");
