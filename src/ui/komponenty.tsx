@@ -469,7 +469,7 @@ function ModalKonta() {
     const w = await zarejestruj(email.trim(), haslo);
     if (w.wymagaPotwierdzenia) {
       // Supabase ma włączone potwierdzanie e-maila: sesja powstanie po kliknięciu w link z poczty.
-      setInfo("Wysłaliśmy link potwierdzający na podany adres. Kliknij w niego, a potem zaloguj się i podaj nick.");
+      setInfo("Wysłaliśmy link potwierdzający na podany adres. Kliknij w niego (otworzy stronę zalogowaną), a potem podaj nick.");
       return;
     }
     if (nick.trim().length >= 2) await ustawNick(nick.trim());

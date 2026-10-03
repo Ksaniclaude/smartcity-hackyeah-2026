@@ -88,11 +88,12 @@ npm run dev
    values ('haslo_admina', extensions.crypt('TU_WPISZ_HASLO', extensions.gen_salt('bf')))
    on conflict (klucz) do update set wartosc = excluded.wartosc;
    ```
-3. Authentication → Sign In / Providers: włącz **Email** (rejestracja i logowanie). Na demo wyłącz
-   **Confirm email**, inaczej rejestracja wymaga kliknięcia w link z poczty (Supabase bez własnego SMTP wysyła
-   tylko kilka maili na godzinę). Logowanie anonimowe nie jest już potrzebne (sesje anonimowe z poprzedniej
-   wersji są podnoszone do konta przy rejestracji). Sprawdź limity w Authentication → Rate Limits (rejestracje
-   i logowania z jednego IP) przed prezentacją z jednej sieci Wi-Fi.
+3. Authentication → Sign In / Providers: włącz **Email** (rejestracja i logowanie) i **wyłącz Confirm email**.
+   Przy włączonym potwierdzaniu każda rejestracja wysyła mail, a Supabase bez własnego SMTP pozwala na ok. 2 maile
+   na godzinę: trzecia osoba zobaczy „limit wysyłki e-maili”. Jeśli potwierdzanie ma zostać, skonfiguruj własny
+   SMTP (Authentication → Emails → SMTP Settings) i ustaw Site URL na adres aplikacji (Authentication → URL
+   Configuration), żeby link z maila wracał na stronę, a nie na localhost. Logowanie anonimowe nie jest potrzebne.
+   Sprawdź limity w Authentication → Rate Limits przed prezentacją z jednej sieci Wi-Fi.
 4. W projekcie Vercel ustaw `VITE_SUPABASE_URL` i `VITE_SUPABASE_KEY` (klucz publishable, publiczny z założenia).
 
 Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje prawa admina (`gracze.czy_admin`).

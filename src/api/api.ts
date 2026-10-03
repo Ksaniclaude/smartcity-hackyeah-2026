@@ -32,7 +32,9 @@ export function komunikatBledu(e: unknown): string {
   if (/User already registered|already been registered/i.test(msg)) return "Ten e-mail ma już konto. Zaloguj się.";
   if (/Password should be at least/i.test(msg)) return "Hasło musi mieć co najmniej 6 znaków";
   if (/Unable to validate email|invalid format/i.test(msg)) return "Nieprawidłowy adres e-mail";
-  if (/rate limit|Email rate limit/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
+  if (/email rate limit|over_email_send_rate_limit/i.test(msg))
+    return "Supabase wyczerpał limit wysyłki e-maili (bez własnego SMTP to ok. 2 maile na godzinę). Admin: wyłącz „Confirm email” w Authentication → Sign In / Providers → Email albo ustaw własny SMTP.";
+  if (/rate limit|too many requests/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
   if (/Signups not allowed/i.test(msg)) return "Rejestracja e-mailem jest wyłączona w Supabase";
   return msg;
 }

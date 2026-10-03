@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SesjaProvider, useSesja, useUruchomSesje } from "@/api/sesja";
 import Admin from "@/pages/Admin";
@@ -35,7 +35,16 @@ function WymagaGracza({ children }: { children: ReactNode }) {
 
 function Uklad() {
   const { pathname } = useLocation();
+  const { stan, konto, gracz, modal, otworzModal } = useSesja();
   const pelnyEkran = pathname === "/qr";
+  // Konto e-mail bez nicku (np. zaraz po kliknięciu w link potwierdzający): raz otwieramy okno nicku.
+  const pytanoONick = useRef(false);
+  useEffect(() => {
+    if (stan === "brak_nicku" && konto && !gracz && modal === null && !pytanoONick.current) {
+      pytanoONick.current = true;
+      otworzModal("nick");
+    }
+  }, [stan, konto, gracz, modal, otworzModal]);
   return (
     <div className="aplikacja">
       {!pelnyEkran ? <Naglowek /> : null}
