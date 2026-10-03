@@ -201,9 +201,6 @@ export function Naglowek() {
           <NavLink to="/" end className={klasa}>
             Rynki
           </NavLink>
-          <NavLink to="/miasto" className={klasa}>
-            Dla miasta
-          </NavLink>
           <NavLink to="/aktywnosc" className={klasa}>
             Aktywność
           </NavLink>
@@ -294,7 +291,6 @@ export function StopkaStrony() {
   return (
     <footer className="stopka-strony">
       <div className="stopka-wnetrze">
-        <Link to="/miasto">Widok dla miasta</Link>
         <Link to="/zaproponuj">Zaproponuj pytanie</Link>
         <span className="prawy">Gra o punkty. Punktów nie da się kupić ani wymienić.</span>
       </div>
@@ -627,12 +623,6 @@ function ModalWiecej() {
         </div>
       ) : null}
       <ul className="menu-lista">
-        <li>
-          <Link to="/miasto" onClick={zamknijModal}>
-            <IkMiasto />
-            Widok dla miasta
-          </Link>
-        </li>
         <li>
           <Link to="/ranking" onClick={zamknijModal}>
             <IkRanking />

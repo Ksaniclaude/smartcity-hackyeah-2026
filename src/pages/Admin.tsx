@@ -15,7 +15,7 @@ import {
 } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja } from "@/api/sesja";
-import { ETYKIETY_STATUSU, ZASADY_PYTANIA, type Kategoria, type PytanieAdmin } from "@/api/types";
+import { ETYKIETY_STATUSU, MIASTA_PODPOWIEDZI, MIASTO_DOMYSLNE, ZASADY_PYTANIA, type Kategoria, type PytanieAdmin } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { useAkcja, usePolling } from "@/ui/hooks";
 import { Komunikat, Ladowanie, Odznaka, formatujDate } from "@/ui/komponenty";
@@ -127,6 +127,7 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
   const [kryterium, setKryterium] = useState("");
   const [link, setLink] = useState("");
   const [termin, setTermin] = useState("");
+  const [miasto, setMiasto] = useState(MIASTO_DOMYSLNE);
   const [proc, setProc] = useState<number[]>(() => domyslnyKurs("miasto"));
   const [otworz, setOtworz] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
@@ -151,6 +152,7 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
       termin,
       kurs_otwarcia: kursyZProcentow(proc),
       otworz,
+      miasto: miasto.trim() || MIASTO_DOMYSLNE,
     });
     if (id) {
       setOk(`Dodano pytanie nr ${id}${otworz ? " i otwarto" : " (propozycja)"}.`);
@@ -176,6 +178,15 @@ function FormularzDodawania({ poDodaniu }: { poDodaniu: () => Promise<void> }) {
           </button>
         </div>
       </div>
+      <label className="pole">
+        <span className="etykieta">Miasto („Polska” dla rynków ogólnokrajowych)</span>
+        <input type="text" list="miasta-podpowiedzi-admin" value={miasto} onChange={(e) => setMiasto(e.target.value)} maxLength={40} required />
+        <datalist id="miasta-podpowiedzi-admin">
+          {MIASTA_PODPOWIEDZI.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+      </label>
       <label className="pole">
         <span className="etykieta">Treść · szablon: {SZABLON[kategoria]}</span>
         <input type="text" value={tresc} onChange={(e) => setTresc(e.target.value)} placeholder={SZABLON[kategoria]} maxLength={200} required />
@@ -235,6 +246,7 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
     kryterium: p.kryterium,
     link_zrodla: p.link_zrodla,
     termin: p.termin,
+    miasto: p.miasto ?? MIASTO_DOMYSLNE,
   });
   const [info, setInfo] = useState<string | null>(null);
   const [blad, setBlad] = useState<string | null>(null);
@@ -262,7 +274,8 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
     <div className="karta">
       <div className="wiersz" style={{ justifyContent: "space-between" }}>
         <span style={{ flex: "0 0 auto" }}>
-          <Odznaka kategoria={p.kategoria} /> <span className="odznaka odznaka-status">{ETYKIETY_STATUSU[p.status]}</span>
+          <Odznaka kategoria={p.kategoria} /> <span className="odznaka odznaka-status">{p.miasto}</span>{" "}
+            <span className="odznaka odznaka-status">{ETYKIETY_STATUSU[p.status]}</span>
         </span>
         <span className="pomoc" style={{ flex: "0 0 auto" }}>
           nr {p.id}
@@ -315,6 +328,10 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
               <span className="etykieta">Data rozstrzygnięcia</span>
               <input type="date" value={edycja.termin} onChange={(e) => setEdycja({ ...edycja, termin: e.target.value })} />
             </label>
+            <label className="pole">
+              <span className="etykieta">Miasto</span>
+              <input type="text" list="miasta-podpowiedzi-admin" value={edycja.miasto} onChange={(e) => setEdycja({ ...edycja, miasto: e.target.value })} maxLength={40} />
+            </label>
             <PoleKursu kategoria={p.kategoria} proc={proc} onChange={setProc} />
             <div className="przyciski">
               <button
@@ -330,6 +347,7 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
                       kryterium: edycja.kryterium,
                       link_zrodla: edycja.link_zrodla,
                       termin: edycja.termin,
+                      miasto: edycja.miasto,
                     }),
                   )
                 }
@@ -529,7 +547,7 @@ function PanelAdmina() {
     <main className="ekran">
       <h1>Panel admina</h1>
       <p className="mala">
-        Rozstrzygnięcie wymaga linku do źródła. <Link to="/miasto">Widok dla miasta</Link>
+        Rozstrzygnięcie wymaga linku do źródła.
       </p>
       <FormularzDodawania poDodaniu={odswiez} />
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}

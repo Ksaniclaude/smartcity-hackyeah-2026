@@ -2,7 +2,7 @@
 // których używa panel admina (więc działają te same sprawdzenia).
 //
 // Użycie:
-//   VITE_SUPABASE_URL=... VITE_SUPABASE_KEY=... ADMIN_HASLO=... npx tsx scripts/pytania_startowe.ts [--otworz]
+//   VITE_SUPABASE_URL=... VITE_SUPABASE_KEY=... ADMIN_HASLO=... npx tsx scripts/pytania_startowe.ts [--otworz] [--plik=data/miasta/polska.csv]
 //
 // Wiersze z „[UZUPEŁNIJ” są pomijane, żeby nie wgrać wymyślonych pytań.
 // Kolumna kurs_otwarcia: procenty rozdzielone średnikiem (np. 41;44;15); pusta =
@@ -21,6 +21,8 @@ if (!url || !key || !haslo) {
   process.exit(1);
 }
 const otworz = process.argv.includes("--otworz");
+/** Inny plik CSV (np. data/miasta/polska.csv): --plik=ścieżka. Kolumna `miasto` jest opcjonalna (domyślnie Kraków). */
+const plikArg = process.argv.find((a) => a.startsWith("--plik="))?.slice(7);
 
 const ODPOWIEDZI: Record<string, string[]> = {
   miasto: ["w terminie", "po terminie", "wstrzymane lub anulowane"],
@@ -42,7 +44,7 @@ function kursOtwarcia(kategoria: string, tekst: string): number[] {
 }
 
 async function main() {
-  const plik = path.resolve("data/pytania_startowe.csv");
+  const plik = path.resolve(plikArg ?? "data/pytania_startowe.csv");
   const [naglowek, ...wiersze] = parsujCsv(fs.readFileSync(plik, "utf8"));
   const idx = new Map(naglowek.map((k, i) => [k.trim(), i]));
   const pole = (w: string[], k: string) => (w[idx.get(k) ?? -1] ?? "").trim();
@@ -72,6 +74,7 @@ async function main() {
       p_termin: pole(w, "termin"),
       p_kurs_otwarcia: kursOtwarcia(kategoria, pole(w, "kurs_otwarcia")),
       p_otworz: otworz,
+      p_miasto: pole(w, "miasto") || "Kraków",
     });
     if (r.error) {
       console.error(`BŁĄD przy „${tresc}”: ${r.error.message}`);

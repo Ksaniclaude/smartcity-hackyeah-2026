@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { MIASTO_DOMYSLNE } from "./types";
 import type {
   Aktywnosc,
   Gracz,
@@ -115,7 +116,7 @@ export async function ustawNick(nick: string): Promise<Gracz> {
 // --- pytania ---------------------------------------------------------------
 
 function normalizujPytanie(p: Pytanie): Pytanie {
-  return { ...p, obrot: Number(p.obrot ?? 0) };
+  return { ...p, obrot: Number(p.obrot ?? 0), miasto: p.miasto || MIASTO_DOMYSLNE };
 }
 
 export async function pobierzPytania(): Promise<Pytanie[]> {
@@ -262,12 +263,14 @@ export async function zaproponujPytanie(args: {
   kategoria: Kategoria;
   termin: string;
   link: string;
+  miasto: string;
 }): Promise<number> {
   const r = await supabase.rpc("zaproponuj_pytanie", {
     p_tresc: args.tresc,
     p_kategoria: args.kategoria,
     p_termin: args.termin,
     p_link: args.link,
+    p_miasto: args.miasto,
   });
   return sprawdz<number>(r);
 }
@@ -293,6 +296,7 @@ export async function adminDodajPytanie(args: {
   termin: string;
   kurs_otwarcia: number[];
   otworz: boolean;
+  miasto: string;
 }): Promise<number> {
   const r = await supabase.rpc("admin_dodaj_pytanie", {
     p_tresc: args.tresc,
@@ -303,6 +307,7 @@ export async function adminDodajPytanie(args: {
     p_termin: args.termin,
     p_kurs_otwarcia: args.kurs_otwarcia,
     p_otworz: args.otworz,
+    p_miasto: args.miasto,
   });
   return sprawdz<number>(r);
 }
@@ -314,6 +319,7 @@ export async function adminEdytujPytanie(args: {
   kryterium: string;
   link_zrodla: string;
   termin: string;
+  miasto?: string | null;
 }): Promise<void> {
   const r = await supabase.rpc("admin_edytuj_pytanie", {
     p_pytanie: args.pytanie,
@@ -322,6 +328,7 @@ export async function adminEdytujPytanie(args: {
     p_kryterium: args.kryterium,
     p_link_zrodla: args.link_zrodla,
     p_termin: args.termin,
+    p_miasto: args.miasto ?? null,
   });
   sprawdz(r);
 }

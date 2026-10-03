@@ -1,6 +1,6 @@
 // Test ścieżki gracza w prawdziwym Chromium (playwright-core) na zamockowanym Supabase:
 // rynki jako gość → prognoza (nick w modalu) → rynek „miasto” z powodem → komentarz → sprzedaż →
-// profil, ranking, aktywność, profil publiczny, /miasto, /admin, /qr. Zrzuty: telefon,
+// profil, ranking, aktywność, profil publiczny, /admin, /qr. Zrzuty: telefon,
 // desktop, jasny motyw. Nie potrzebuje sieci.
 //
 // Użycie: npm run build && npm run test:ui   (build z VITE_SUPABASE_URL=https://test.supabase.local VITE_SUPABASE_KEY=test)
@@ -446,7 +446,7 @@ async function main() {
     await oczekuj(page, "Największa wygrana");
     await zrzut(page, "profil_publiczny");
 
-    console.log("7. Desktop: strona główna, rynek, jasny motyw, /miasto");
+    console.log("7. Desktop: strona główna, rynek, jasny motyw");
     const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "pl-PL", colorScheme: "dark" });
     await ctx2.route(`${SUPABASE}/**`, mock);
     await ctx2.route("https://fonts.googleapis.com/**", (r) => r.abort());
@@ -467,11 +467,6 @@ async function main() {
     await page2.goto(`${ADRES}/`);
     await oczekuj(page2, "41%");
     await zrzut(page2, "rynki_desktop_jasny", false);
-    await page2.goto(`${ADRES}/miasto`);
-    await oczekuj(page2, "Termin oficjalny");
-    await oczekuj(page2, "Trwa procedura odbiorowa");
-    await oczekuj(page2, "wykonawca");
-    await zrzut(page2, "miasto");
     await ctx2.close();
 
     console.log("8. /admin, /qr");

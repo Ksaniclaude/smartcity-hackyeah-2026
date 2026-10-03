@@ -54,6 +54,7 @@ create table public.pytania (
   obrot                 numeric(14, 4) not null default 0 check (obrot >= 0),
   kursy_otwarcia        double precision[],
   otwarto               timestamptz,
+  miasto                text not null default 'Kraków' check (char_length(btrim(miasto)) between 2 and 40),
   constraint odpowiedzi_2_3 check (array_length(odpowiedzi, 1) between 2 and 3),
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
   constraint wynik_zakres check (wynik is null or wynik between 1 and array_length(odpowiedzi, 1)),
@@ -61,6 +62,7 @@ create table public.pytania (
     (status <> 'rozstrzygniete' or (wynik is not null and link_rozstrzygniecia is not null))
 );
 create index pytania_status on public.pytania (status, kategoria);
+create index pytania_miasto on public.pytania (miasto);
 
 create table public.pozycje (
   gracz          uuid not null references public.gracze (id) on delete cascade,
@@ -478,7 +480,8 @@ create or replace function public.zaproponuj_pytanie(
   p_tresc text,
   p_kategoria public.kategoria,
   p_termin date,
-  p_link text
+  p_link text,
+  p_miasto text default 'Kraków'
 )
 returns bigint
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -487,6 +490,7 @@ declare
   v_id bigint;
   v_odp text[];
   v_q double precision[];
+  v_miasto text := coalesce(nullif(btrim(p_miasto), ''), 'Kraków');
 begin
   if btrim(coalesce(p_tresc, '')) = '' or btrim(coalesce(p_link, '')) = '' or p_termin is null then
     raise exception 'Podaj treść, termin i link do źródła';
@@ -504,8 +508,8 @@ begin
     v_odp := array['tak', 'nie'];
     v_q := public.q_z_kursu(array[0.5, 0.5], 1000);
   end if;
-  insert into public.pytania (tresc, kategoria, odpowiedzi, termin, link_zrodla, q, zaproponowal)
-  values (btrim(p_tresc), p_kategoria, v_odp, p_termin, btrim(p_link), v_q, v_gracz)
+  insert into public.pytania (tresc, kategoria, odpowiedzi, termin, link_zrodla, q, zaproponowal, miasto)
+  values (btrim(p_tresc), p_kategoria, v_odp, p_termin, btrim(p_link), v_q, v_gracz, v_miasto)
   returning id into v_id;
   return v_id;
 end $$;
@@ -553,7 +557,8 @@ create or replace function public.admin_dodaj_pytanie(
   p_link_zrodla text,
   p_termin date,
   p_kurs_otwarcia double precision[],
-  p_otworz boolean default true
+  p_otworz boolean default true,
+  p_miasto text default 'Kraków'
 )
 returns bigint
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -562,6 +567,7 @@ declare
   v_id bigint;
   v_odp text[] := p_odpowiedzi;
   v_kurs double precision[] := p_kurs_otwarcia;
+  v_miasto text := coalesce(nullif(btrim(p_miasto), ''), 'Kraków');
   p public.pytania;
 begin
   if v_odp is null or array_length(v_odp, 1) is null then
@@ -578,10 +584,10 @@ begin
     raise exception 'Kurs otwarcia musi mieć tyle wartości, ile odpowiedzi';
   end if;
   insert into public.pytania
-    (tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, q)
+    (tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, q, miasto)
   values
     (btrim(coalesce(p_tresc, '')), p_kategoria, v_odp, btrim(coalesce(p_kryterium, '')),
-     btrim(coalesce(p_link_zrodla, '')), p_termin, public.q_z_kursu(v_kurs, 1000))
+     btrim(coalesce(p_link_zrodla, '')), p_termin, public.q_z_kursu(v_kurs, 1000), v_miasto)
   returning * into p;
   v_id := p.id;
   if p_otworz then
@@ -597,7 +603,8 @@ create or replace function public.admin_edytuj_pytanie(
   p_odpowiedzi text[],
   p_kryterium text,
   p_link_zrodla text,
-  p_termin date
+  p_termin date,
+  p_miasto text default null
 )
 returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -623,7 +630,8 @@ begin
                   else q end,
          kryterium = coalesce(nullif(btrim(p_kryterium), ''), kryterium),
          link_zrodla = coalesce(nullif(btrim(p_link_zrodla), ''), link_zrodla),
-         termin = coalesce(p_termin, termin)
+         termin = coalesce(p_termin, termin),
+         miasto = coalesce(nullif(btrim(p_miasto), ''), miasto)
    where id = p_pytanie;
 end $$;
 
@@ -791,7 +799,8 @@ select
   public.kursy_pytania(p.id) as kursy,
   public.prog_widocznosci_kursu() as prog_widocznosci,
   (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu,
-  p.obrot, p.otwarto, p.kursy_otwarcia
+  p.obrot, p.otwarto, p.kursy_otwarcia,
+  p.miasto
 from public.pytania p
 where p.status <> 'propozycja';
 
@@ -1104,7 +1113,7 @@ create policy zmiany_publiczne on public.zmiany_terminow for select to anon, aut
 -- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
 grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
               wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto, obrot, otwarto,
-              kursy_otwarcia)
+              kursy_otwarcia, miasto)
   on public.pytania to anon, authenticated;
 create policy pytania_publiczne on public.pytania for select to anon, authenticated
   using (status <> 'propozycja');
@@ -1129,10 +1138,10 @@ grant execute on function public.profil_publiczny(text) to anon, authenticated;
 grant execute on function public.ustaw_nick(text) to authenticated;
 grant execute on function public.postaw_prognoze(bigint, integer, integer, public.powod, text) to authenticated;
 grant execute on function public.sprzedaj_udzialy(bigint, integer, double precision) to authenticated;
-grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date, text) to authenticated;
+grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date, text, text) to authenticated;
 grant execute on function public.admin_zaloguj(text) to authenticated;
-grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean) to authenticated;
-grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date) to authenticated;
+grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean, text) to authenticated;
+grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date, text) to authenticated;
 grant execute on function public.admin_otworz(bigint, double precision[]) to authenticated;
 grant execute on function public.admin_zamknij(bigint) to authenticated;
 grant execute on function public.admin_rozstrzygnij(bigint, integer, text) to authenticated;

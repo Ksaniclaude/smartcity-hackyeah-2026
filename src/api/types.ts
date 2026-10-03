@@ -1,4 +1,11 @@
 export type Kategoria = "miasto" | "luz";
+
+/** Miasto domyślne dla starych rynków i formularzy. */
+export const MIASTO_DOMYSLNE = "Kraków";
+/** Rynki ogólnopolskie (bez konkretnego miasta). */
+export const MIASTO_POLSKA = "Polska";
+/** Podpowiedzi w formularzach; wpisać można dowolne inne miasto. */
+export const MIASTA_PODPOWIEDZI = ["Kraków", "Polska", "Warszawa", "Wrocław", "Łódź", "Poznań", "Gdańsk", "Katowice"];
 export type Status = "propozycja" | "otwarte" | "zamkniete" | "rozstrzygniete" | "uniewaznione";
 export type Powod = "wykonawca" | "decyzja_polityczna" | "pieniadze" | "formalnosci" | "inne";
 
@@ -50,6 +57,8 @@ export interface Pytanie {
   otwarto: string | null;
   /** Kurs otwarcia ustawiony przez admina (widoczny zawsze, bo nie mówi nic o tłumie). */
   kursy_otwarcia: number[] | null;
+  /** Miasto rynku („Polska” dla rynków ogólnokrajowych). */
+  miasto: string;
 }
 
 /** Wiersz tabeli pytania (tylko admin, przez RPC admin_pytania). */
@@ -71,6 +80,7 @@ export interface PytanieAdmin {
   zaproponowal: string | null;
   utworzono: string;
   rozstrzygnieto: string | null;
+  miasto: string;
 }
 
 export interface Gracz {

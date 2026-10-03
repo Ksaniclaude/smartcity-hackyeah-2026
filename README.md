@@ -4,7 +4,6 @@ Rynek prognoz o Krakowie, w stylu giełd prognoz (Polymarket), ale o punkty. Mie
 czy miasto dotrzyma terminu, a kurs pokazuje, ile w to wierzą. Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
 - **Demo:** https://zdaza.vercel.app
-- **Widok dla miasta (bez logowania):** https://zdaza.vercel.app/miasto
 - **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
 - **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
 
@@ -22,7 +21,7 @@ To nie jest hazard: punktów nie da się kupić, wymienić ani przekazać, udzia
 | Polymarket | Zdążą? |
 | --- | --- |
 | Sign up / Log in (e-mail) | Rejestracja (nick, e-mail, hasło) i logowanie przez Supabase Auth. Bez konta można tylko przeglądać rynki; każde „Zacznij grać” prowadzi do rejestracji. Stare sesje anonimowe z poprzedniej wersji są porzucane. |
-| Markets, search, categories, sort | Strona główna: karty rynków z półkolistym wskaźnikiem i przyciskami Tak/Nie, wyszukiwarka, zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane, sortowanie (termin, obrót, nowe, liczba prognoz). |
+| Markets, search, categories, sort | Strona główna: sekcja „Hot” (rynki z największym ruchem w ostatniej dobie), potem Miasto, Na luzie i Rozstrzygnięte, każda jako jeden rząd kart przewijany w prawo. Zakładki Wszystkie / Miasto / Na luzie / Nowe / Rozstrzygnięte / Obserwowane; w Miasto i Na luzie podział po miastach (chipy, rząd na miasto; „Polska” dla rynków ogólnokrajowych). Wyszukiwarka, sortowanie (termin, obrót, nowe, liczba prognoz). |
 | Market page: chart, outcomes, rules, comments, top holders, activity, related | Strona rynku: wykres kursu (historia od otwarcia), tabela odpowiedzi, zasady (kryterium, źródło, komentarz urzędu), komentarze (z zakładem albo bez), najwięksi gracze, moje pozycje, aktywność, podobne rynki, udostępnianie linku, obserwowanie. |
 | Buy / Sell | Kup: stawka w punktach, podgląd udziałów i kursu po prognozie (LMSR). Sprzedaj: zwrot = C(q) − C(q′), punkty wracają na saldo. Jedna strona rynku na gracza: kupno innej odpowiedzi najpierw sprzedaje posiadane udziały (w tej samej transakcji, z zapowiedzią w panelu), więc nie da się trzymać „tak” i „nie” naraz. |
 | Portfolio | /profil: wartość portfela (punkty + udziały po kursie), zysk/strata, trafność, pozycje, historia transakcji, ustawienia (nick, konto, motyw). |
@@ -108,7 +107,7 @@ Admin loguje się na `/admin` hasłem; konto, w którym to zrobił, dostaje praw
 `scripts/zamowienia.ts` pobiera z publicznej wyszukiwarki Biuletynu Zamówień Publicznych
 (`https://ezamowienia.gov.pl/mo-board/api/v1/Board/Search`) ogłoszenia o wykonaniu umowy krakowskich jednostek
 miejskich, dociąga szczegóły i liczy odsetek umów wykonanych w pierwotnym terminie (ogółem i dla robót budowlanych).
-Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na `/miasto`,
+Wynik trafia do `data/umowy.csv` i `src/dane/terminowosc.json`, z którego aplikacja bierze liczbę na stronie głównej,
 na stronę główną i jako kurs otwarcia rynków „miasto”.
 
 ```bash
