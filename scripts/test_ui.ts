@@ -85,6 +85,20 @@ const pytania = [
     kursy_1h: null, gracze_rynku: null,
   },
 ];
+// Propozycje widzi tylko admin: 21 i 22 się otworzą, 23 odrzuci serwer (minięta data), 24 nie ma kryterium.
+const propozycja = (id: number, kategoria: "miasto" | "luz", kryterium: string) => ({
+  id, tresc: `Propozycja testowa nr ${id}?`, kategoria,
+  odpowiedzi: kategoria === "miasto" ? ["w terminie", "po terminie", "wstrzymane lub anulowane"] : ["tak", "nie"],
+  kryterium, link_zrodla: "https://example.invalid/propozycja", termin: "2027-06-30", status: "propozycja", wynik: null,
+  link_rozstrzygniecia: null, komentarz_urzedu: null, liczba_prognoz: 0, utworzono: iso(10), rozstrzygnieto: null,
+  obrot: 0, otwarto: null as string | null, kursy_otwarcia: null,
+});
+const propozycje = [
+  propozycja(21, "miasto", "Komunikat ZDMK o zakończeniu robót."),
+  propozycja(22, "luz", "Tak, jeśli BIP potwierdzi."),
+  propozycja(23, "luz", "Tak, jeśli BIP potwierdzi."),
+  propozycja(24, "miasto", ""),
+];
 const powody = [
   { pytanie: 1, powod: "wykonawca", liczba: 5, punkty: 120 },
   { pytanie: 1, powod: "pieniadze", liczba: 3, punkty: 60 },
@@ -273,7 +287,17 @@ async function mock(route: Route) {
     if (ok && stan.gracz) stan.gracz.czy_admin = true;
     return json(route, ok);
   }
-  if (p === "/rest/v1/rpc/admin_pytania") return json(route, pytania.map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null, prog_widocznosci: null })));
+  if (p === "/rest/v1/rpc/admin_pytania")
+    return json(route, [...pytania, ...propozycje].map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null, prog_widocznosci: null })));
+  if (p === "/rest/v1/rpc/admin_otworz") {
+    const body = req.postDataJSON() as { p_pytanie: number; p_kurs_otwarcia: number[] | null };
+    const q = propozycje.find((x) => x.id === body.p_pytanie);
+    if (!q || q.status !== "propozycja") return json(route, { message: "Otworzyć można tylko propozycję" }, 400);
+    if (q.id === 23) return json(route, { message: "Data rozstrzygnięcia już minęła" }, 400);
+    q.status = "otwarte";
+    q.otwarto = new Date().toISOString();
+    return json(route, null);
+  }
   if (p === "/rest/v1/rpc/admin_dodaj_pytanie") return json(route, 5);
   if (p === "/rest/v1/rpc/admin_ustaw_prog") return json(route, null);
   if (p === "/rest/v1/rpc/admin_ustaw_prog_domyslny") return json(route, (req.postDataJSON() as { p_prog: number }).p_prog);
@@ -492,7 +516,21 @@ async function main() {
     await oczekuj(page, "Dodaj pytanie");
     await oczekuj(page, "Próg ukrycia kursu");
     await oczekuj(page, "wyniki sportowe");
+    await oczekujNaglowka(page, "Propozycje (kolejka) (4)");
+    await oczekuj(page, "do uzupełnienia przed otwarciem: 1");
     await zrzut(page, "admin");
+    let pytanieOtwarcia = "";
+    page.once("dialog", async (d) => {
+      pytanieOtwarcia = d.message();
+      await d.accept();
+    });
+    await page.getByRole("button", { name: "Otwórz wszystkie (3)" }).click();
+    await oczekuj(page, "Otwarto 2 z 3.");
+    await oczekuj(page, "nr 23: Data rozstrzygnięcia już minęła");
+    await oczekujNaglowka(page, "Propozycje (kolejka) (2)");
+    if (!pytanieOtwarcia.startsWith("Otworzyć 3 propozycje?")) throw new Error(`Złe pytanie przed otwarciem: ${pytanieOtwarcia}`);
+    console.log(`  ✓ „${pytanieOtwarcia}”`);
+    await zrzut(page, "admin_otwarte");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });
 

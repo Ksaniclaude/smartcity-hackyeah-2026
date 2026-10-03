@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   dodajKomentarz,
@@ -30,10 +30,10 @@ import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, punkty, zmianaPp } from "@/ui/tekst";
+import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
 import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
-import { Iskry, LiczbaZywa, useWidoczny } from "@/ui/zywe";
+import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
 
 const LIMIT_NA_PYTANIE = 200;
 /** Punkty na start: goście liczą nimi podgląd wygranej, zanim założą konto. */
@@ -288,6 +288,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   const [udzialySprzedaz, setUdzialySprzedaz] = useState(0);
   const [wynikSprzedazy, setWynikSprzedazy] = useState<WynikSprzedazy | null>(null);
   const [nrKuponu, setNrKuponu] = useState(0);
+  /** Monety lecą z salda do panelu: przycisk czeka, aż wyląduje kupon. */
+  const [leci, setLeci] = useState(false);
+  const refPanelu = useRef<HTMLDivElement>(null);
+  const refKuponu = useRef<HTMLDivElement>(null);
+  const refStawki = useRef<HTMLDivElement>(null);
+  const refWygranej = useRef<HTMLSpanElement>(null);
+  const refPostaw = useRef<HTMLButtonElement>(null);
+  const refSprzedaj = useRef<HTMLButtonElement>(null);
   const kup = useAkcja(postawPrognoze);
   const sprzedaj = useAkcja(sprzedajUdzialy);
 
@@ -330,10 +338,45 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
     if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * 10) / 10);
   }, [pozycjaSprzedaz, udzialySprzedaz]);
 
-  const potwierdz = () => {
-    setNrKuponu((n) => n + 1);
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(12);
-  };
+  // Stawka ma wagę: pole podskakuje przy każdej zmianie, wygrana przy wzroście, a co 50 punktów idzie fala.
+  const poprzedniaStawka = useRef(stawkaOk);
+  useEffect(() => {
+    const przed = poprzedniaStawka.current;
+    if (przed === stawkaOk) return;
+    poprzedniaStawka.current = stawkaOk;
+    podbij(refStawki.current, 0.5);
+    if (stawkaOk <= przed) return;
+    podbij(refWygranej.current, 0.6 + stawkaOk / LIMIT_NA_PYTANIE);
+    if (refWygranej.current && Math.floor(stawkaOk / 50) > Math.floor(przed / 50)) {
+      fala(refWygranej.current, "tak", 80);
+      wibruj(10);
+    }
+  }, [stawkaOk]);
+
+  // Przycisk „Postaw” daje znać, że jest gotowy: podbija się w chwili, gdy niczego już nie brakuje.
+  const moznaPostawic = gotowy && odp != null && maks >= 1 && !brakPowodu;
+  useEffect(() => {
+    if (moznaPostawic) podbij(refPostaw.current, 1.2);
+  }, [moznaPostawic]);
+
+  // Uderzenie: kupon ląduje, pieczęć puszcza falę i drobiny (tym więcej, im większa stawka), panel drga.
+  useEffect(() => {
+    const kupon = refKuponu.current;
+    if (nrKuponu === 0 || !kupon) return;
+    const pieczec = kupon.querySelector(".kupon-gora svg") ?? kupon;
+    if (wynik) {
+      const waga = Math.min(1, wynik.stawka / LIMIT_NA_PYTANIE);
+      const klasa = klasaOdp(wynik.odpowiedz - 1);
+      fala(pieczec, klasa, 90 + 70 * waga);
+      wystrzel(pieczec, { ile: Math.round(14 + 22 * waga), moc: 0.8 + 0.7 * waga, klasa });
+      wstrzasnij(refPanelu.current);
+      wibruj([14, 40, 22]);
+    } else {
+      fala(pieczec, "tak", 70);
+    }
+    // tylko nowy kupon wywołuje uderzenie; `wynik` jest z tego samego renderu
+  }, [nrKuponu]);
+
   const wyslij = async (e: FormEvent) => {
     e.preventDefault();
     if (odp == null || maks < 1 || brakPowodu) return;
@@ -344,25 +387,57 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
       powod: miasto ? powod : null,
       komentarz: komentarz.trim(),
     });
-    if (w) {
-      setWynik(w);
-      setWynikSprzedazy(null);
-      setKomentarz("");
-      potwierdz();
-      await Promise.all([odswiezGracza(), poZmianie()]);
+    if (!w) return;
+    setKomentarz("");
+    setLeci(true);
+    // Kupon pojawi się na górze panelu: najpierw pokazujemy to miejsce, potem lecą tam monety z salda.
+    const panel = refPanelu.current;
+    const portfel = document.querySelector(".portfel");
+    const podNaglowkiem = (document.querySelector(".naglowek")?.getBoundingClientRect().height ?? 60) + 12;
+    panel?.parentElement?.scrollTo({ top: 0, behavior: "smooth" });
+    let gora = panel?.getBoundingClientRect().top ?? podNaglowkiem;
+    if (panel && gora < podNaglowkiem) {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      gora = podNaglowkiem;
     }
+    void odswiezGracza(); // saldo spada w tym samym czasie, gdy wylatują z niego monety
+    if (panel && portfel) {
+      const r = panel.getBoundingClientRect();
+      await lecPunkty(portfel, { x: r.left + r.width / 2, y: gora + 64 }, 5 + (w.stawka / LIMIT_NA_PYTANIE) * 15);
+    }
+    setWynik(w);
+    setWynikSprzedazy(null);
+    setNrKuponu((n) => n + 1);
+    setLeci(false);
+    // własny ruch na dużym kursie nad wykresem: o ile punktów procentowych przesunęła go ta prognoza
+    const ruch = zmianaPp(w.kursy?.[0], p.kursy?.[0]);
+    const duzyKurs = document.querySelector(".rynek-glowna .kurs-duzy")?.getBoundingClientRect();
+    if (ruch && duzyKurs) {
+      // obok dużej liczby, nie nad nią, żeby nie wchodzić na wiersz z terminem
+      const obok = { x: duzyKurs.right + 70, y: duzyKurs.top + duzyKurs.height * 0.55 };
+      uniesTekst(obok, `${ruch > 0 ? "+" : "−"}${Math.abs(ruch)} pkt proc.`, ruch > 0 ? "gora" : "dol");
+    }
+    await poZmianie();
   };
   const wyslijSprzedaz = async (e: FormEvent) => {
     e.preventDefault();
     if (!pozycjaSprzedaz || uSprzedaz <= 0) return;
     const w = await sprzedaj.wykonaj({ pytanie: p.id, odpowiedz: pozycjaSprzedaz.odpowiedz, udzialy: uSprzedaz });
-    if (w) {
-      setWynikSprzedazy(w);
-      setWynik(null);
-      setUdzialySprzedaz(0);
-      potwierdz();
-      await Promise.all([odswiezGracza(), poZmianie()]);
+    if (!w) return;
+    // Punkty wracają: monety lecą z przycisku sprzedaży do salda (start liczony, zanim formularz zniknie).
+    const portfel = document.querySelector(".portfel");
+    const lot = refSprzedaj.current && portfel ? lecPunkty(refSprzedaj.current, portfel, 5 + Math.min(15, w.zwrot / 10)) : null;
+    setWynikSprzedazy(w);
+    setWynik(null);
+    setUdzialySprzedaz(0);
+    setNrKuponu((n) => n + 1);
+    if (lot) {
+      await lot;
+      podbij(portfel, 2);
+      fala(portfel!, "tak", 80);
+      wibruj([10, 30, 16]);
     }
+    await Promise.all([odswiezGracza(), poZmianie()]);
   };
 
   const mojaPozycja = posiadane.length
@@ -390,7 +465,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
   }
 
   return (
-    <div className="panel" id="panel">
+    <div className="panel" id="panel" ref={refPanelu}>
       <div className="panel-naglowek">
         Prognoza
         {mojaPozycja ? <span>Masz {mojaPozycja}</span> : null}
@@ -413,8 +488,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
       ) : null}
 
       {wynik ? (
-        <div className="kupon" role="status" key={nrKuponu}>
-          <Iskry />
+        <div className="kupon" role="status" key={nrKuponu} ref={refKuponu}>
           <div className="kupon-gora">
             <IkPtaszek />
             Prognoza przyjęta
@@ -424,6 +498,10 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             <IkStrzalka />
             <KursPoZmianie przed={wynik.kurs_przed} po={wynik.kurs_po} />
           </div>
+          <p className="kupon-wygrana">
+            Do wygrania{" "}
+            <LiczbaZywa className="cyfry" od={0} wartosc={wynik.udzialy} format={(n) => `${liczba(n, 1)} pkt`} czas={900} />
+          </p>
           {wynik.sprzedano.length > 0 ? (
             <p>
               Sprzedano {wynik.sprzedano.map((z) => `${liczba(z.udzialy, 1)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
@@ -453,7 +531,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
         </div>
       ) : null}
       {wynikSprzedazy ? (
-        <div className="kupon" role="status" key={nrKuponu}>
+        <div className="kupon" role="status" key={nrKuponu} ref={refKuponu}>
           <div className="kupon-gora">
             <IkPtaszek />
             Sprzedano {liczba(wynikSprzedazy.udzialy, 1)} udz. za {liczba(wynikSprzedazy.zwrot, 1)} pkt
@@ -475,7 +553,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 key={i}
                 className={`odp-przycisk ${klasaOdp(i)} ${odp === i + 1 ? "wybrana" : ""}`}
                 aria-pressed={odp === i + 1}
-                onClick={() => setOdp(i + 1)}
+                onClick={(e) => {
+                  setOdp(i + 1);
+                  podbij(e.currentTarget, 1);
+                  wibruj(8);
+                }}
               >
                 <span className="nazwa">{o}</span>
                 {p.kursy ? <LiczbaZywa className="cyfry" wartosc={p.kursy[i] * 100} format={jakoProcent} /> : null}
@@ -495,7 +577,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                 <span>Stawka</span>
                 <span>{gotowy ? `masz ${pkt(saldo)}` : `na start dostajesz ${pkt(PUNKTY_NA_START)}`}</span>
               </div>
-              <div className="stawka-wejscie">
+              <div className="stawka-wejscie" ref={refStawki}>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -514,7 +596,12 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                     key={c}
                     className={`cyfry ${c <= maks && stawkaOk === c ? "wybrany" : ""}`}
                     disabled={c > maks && stawkaOk === maks}
-                    onClick={() => setStawka(Math.min(maks, c))}
+                    onClick={(e) => {
+                      const nowa = Math.min(maks, c);
+                      if (nowa !== stawkaOk) uniesTekst(e.currentTarget, `${nowa}`, "akcent");
+                      setStawka(nowa);
+                      wibruj(6);
+                    }}
                   >
                     {c}
                   </button>
@@ -558,7 +645,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             </div>
           ) : null}
           {odp != null && stan !== "blad" && maks >= 1 ? (
-            <div className="wygrana">
+            <div className="wygrana" style={{ "--waga": Math.min(1, stawkaOk / LIMIT_NA_PYTANIE).toFixed(2) } as CSSProperties}>
               {podglad ? (
                 <>
                   <div className="wiersz-pod">
@@ -573,7 +660,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
                   </div>
                   <div className="wygrana-glowna">
                     <span>Jeśli trafisz</span>
-                    <span className="cyfry zysk">
+                    <span className="cyfry zysk" ref={refWygranej}>
                       <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `+${liczba(n, 1)}`} czas={220} />
                       <small>pkt (×{liczba(mnoznik ?? 0, 2)})</small>
                     </span>
@@ -608,10 +695,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
           {gotowy ? (
             <button
               type="submit"
+              ref={refPostaw}
               className={`przycisk-postaw ${odp != null ? klasaOdp(odp - 1) : ""}`}
-              disabled={kup.trwa || odp == null || maks < 1 || brakPowodu}
+              disabled={kup.trwa || leci || odp == null || maks < 1 || brakPowodu}
             >
-              {kup.trwa
+              {kup.trwa || leci
                 ? "Zapisuję…"
                 : odp == null
                   ? "Wybierz odpowiedź"
@@ -720,7 +808,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             )}
           </div>
           {sprzedaj.blad ? <Komunikat typ="blad">{sprzedaj.blad}</Komunikat> : null}
-          <button type="submit" className="przycisk-postaw" disabled={sprzedaj.trwa || !pozycjaSprzedaz || uSprzedaz < 0.01}>
+          <button type="submit" ref={refSprzedaj} className="przycisk-postaw" disabled={sprzedaj.trwa || !pozycjaSprzedaz || uSprzedaz < 0.01}>
             {sprzedaj.trwa ? "Sprzedaję…" : `Sprzedaj ${liczba(uSprzedaz, 1)} udz.`}
           </button>
           <p className="zastrzezenie">Sprzedaż po bieżącym kursie: zwrot = C(q) − C(q′). Punkty wracają na saldo.</p>
@@ -741,7 +829,7 @@ export default function Pytanie() {
   const zalogowany = stan === "gotowy";
   const miejsca = useMiejsca();
 
-  const { dane: p, blad: bladPytania, laduje } = usePolling(() => pobierzPytanie(pid), 5000, pid);
+  const { dane: p, blad: bladPytania, laduje, odswiez: odswiezPytanie } = usePolling(() => pobierzPytanie(pid), 5000, pid);
   const { dane: historia, odswiez: odswiezHistorie } = usePolling(() => pobierzHistorie(pid), 10000, pid);
   const { dane: komentarze, odswiez: odswiezKomentarze } = usePolling(() => pobierzKomentarze(pid), 10000, pid);
   const { dane: aktywnosc, odswiez: odswiezAktywnosc } = usePolling(() => pobierzAktywnosc(pid, 30), 10000, pid);
@@ -816,14 +904,16 @@ export default function Pytanie() {
       /* brak schowka */
     }
   };
-  const przelaczObserwowanie = () => {
+  const przelaczObserwowanie = (e: { currentTarget: Element }) => {
+    if (!obserwowany) wystrzel(e.currentTarget, { ile: 8, moc: 0.45 });
     const nowe = obserwowany ? obserwowane.filter((x) => x !== pid) : [...obserwowane, pid];
     setObserwowane(nowe);
     zapiszObserwowane(nowe);
   };
   // Zaraz po RPC (nie przy następnym odpytaniu): własny nick w aktywności i wśród największych graczy, nowy punkt na wykresie.
   const poZmianie = async () => {
-    await Promise.all([odswiezUdzialy(), odswiezHistorie(), odswiezAktywnosc(), odswiezKomentarze(), odswiezNajwiekszych()]);
+    // razem z samym rynkiem: duży kurs nad wykresem rusza od razu po prognozie, bez czekania na odpytanie
+    await Promise.all([odswiezPytanie(), odswiezUdzialy(), odswiezHistorie(), odswiezAktywnosc(), odswiezKomentarze(), odswiezNajwiekszych()]);
   };
 
   return (
@@ -888,7 +978,7 @@ export default function Pytanie() {
             <p className="odsloniecie-opis">
               <Odsloniecie p={p} />
               <span>
-                Kurs tłumu odsłoni się po {p.prog_widocznosci} prognozach.{" "}
+                Kurs tłumu odsłoni się {poPrognozach(p.prog_widocznosci)}.{" "}
                 {p.liczba_prognoz === 0 ? "Na razie bez prognoz." : `Brakuje ${brakuje}.`}
               </span>
             </p>

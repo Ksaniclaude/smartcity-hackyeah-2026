@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode, SVGProps } from "react";
+import { useEffect, useRef, type ReactElement, type ReactNode, type SVGProps } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { procent } from "@/api/lmsr";
 import type { Kategoria, Pytanie } from "@/api/types";
@@ -20,8 +20,8 @@ import {
 } from "@/ui/ikony";
 import { useBlysk } from "@/ui/hooks";
 import { formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
-import { koniecTerminu, odliczanie, opisTerminu, ulamekCzasu, zmianaPp } from "@/ui/tekst";
-import { LiczbaZywa, useTeraz } from "@/ui/zywe";
+import { koniecTerminu, odliczanie, opisTerminu, poPrognozach, ulamekCzasu, zmianaPp } from "@/ui/tekst";
+import { LiczbaZywa, useTeraz, wystrzel } from "@/ui/zywe";
 
 const DZIEN = 24 * 60 * 60 * 1000;
 const KLASY_ODP = ["tak", "nie", "trzeci"] as const;
@@ -116,10 +116,16 @@ export function PasekCzasu({ p }: { p: Pick<Pytanie, "otwarto" | "utworzono" | "
 export function Odsloniecie({ p }: { p: Pick<Pytanie, "liczba_prognoz" | "prog_widocznosci"> }) {
   const kropki = Math.max(1, Math.min(p.prog_widocznosci, 20));
   const pelne = Math.min(kropki, Math.round((p.liczba_prognoz / Math.max(1, p.prog_widocznosci)) * kropki));
+  // kreski, które doszły od poprzedniego odpytania, zapalają się z podbiciem
+  const poprzednie = useRef(pelne);
+  const odKtorej = Math.min(poprzednie.current, pelne);
+  useEffect(() => {
+    poprzednie.current = pelne;
+  }, [pelne]);
   return (
-    <span className="odsloniecie" title={`Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach`}>
+    <span className="odsloniecie" title={`Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}`}>
       {Array.from({ length: kropki }, (_, i) => (
-        <i key={i} className={i < pelne ? "pelny" : ""} />
+        <i key={i} className={i < pelne ? (i >= odKtorej ? "pelny swiezy" : "pelny") : ""} />
       ))}
     </span>
   );
@@ -144,6 +150,12 @@ export function Odpowiedzi({ p, naWybor, mojTyp }: { p: Pytanie; naWybor?: (odp:
   const ukryty = p.kursy == null;
   const pokazane = p.kursy ?? p.kursy_otwarcia;
   const dwie = p.odpowiedzi.length === 2;
+  // chwila, w której rynek zebrał dość prognoz i kurs tłumu wychodzi z ukrycia
+  const bylUkryty = useRef(ukryty);
+  const odsloniety = bylUkryty.current && !ukryty;
+  useEffect(() => {
+    bylUkryty.current = ukryty;
+  }, [ukryty]);
   const pozycje = p.odpowiedzi.map((o, i) => {
     const k = pokazane ? (pokazane[i] ?? null) : null;
     const wnetrze = (
@@ -167,7 +179,7 @@ export function Odpowiedzi({ p, naWybor, mojTyp }: { p: Pytanie; naWybor?: (odp:
       </div>
     );
   });
-  return <div className={`${dwie ? "rynek-przyciski" : "wyniki"} ${ukryty ? "ukryte" : ""}`}>{pozycje}</div>;
+  return <div className={`${dwie ? "rynek-przyciski" : "wyniki"} ${ukryty ? "ukryte" : ""} ${odsloniety ? "odsloniete" : ""}`}>{pozycje}</div>;
 }
 
 /* ---------- karta rynku ---------- */
@@ -247,7 +259,10 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
             aria-label="Obserwuj"
             aria-pressed={obserwowany}
             title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-            onClick={() => przelaczObserwowanie(p.id)}
+            onClick={(e) => {
+              if (!obserwowany) wystrzel(e.currentTarget, { ile: 8, moc: 0.45 });
+              przelaczObserwowanie(p.id);
+            }}
           >
             <IkGwiazdka pelna={obserwowany} />
           </button>
@@ -258,7 +273,7 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
         {nowy ? <span className="znacznik znacznik-nowy">nowy</span> : null}
         {p.status === "zamkniete" ? <span className="znacznik znacznik-zamkniety">zamknięte</span> : null}
         {ukryty ? <Odsloniecie p={p} /> : null}
-        <span className="rynek-meta" title={ukryty ? `Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach` : undefined}>
+        <span className="rynek-meta" title={ukryty ? `Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}` : undefined}>
           {opisPrognoz(p)}
         </span>
         {otwarte ? <ZmianaOdGodziny p={p} /> : null}
