@@ -249,7 +249,7 @@ export function Naglowek() {
             {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           </button>
           {gracz ? (
-            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + udziały po kursie, zysk wobec 1000 na start" ref={refPortfela}>
+            <Link to="/profil" className="portfel" title="Portfel na żywo: punkty + tyle, ile da sprzedaż udziałów teraz, zysk wobec 1000 na start" ref={refPortfela}>
               <span className="portfel-saldo">
                 <LiczbaZywa
                   className="cyfry"
