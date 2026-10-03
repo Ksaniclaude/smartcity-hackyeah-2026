@@ -915,8 +915,11 @@ language sql stable security definer set search_path = public, pg_temp as $$
     group by z.gracz
   ),
   tr as (
+    -- tylko rynki widoczne publicznie (bez propozycji, np. pytań testowych)
     select t.gracz, count(*) filter (where t.typ = 'kupno')::integer as prognozy, sum(t.stawka) as obrot
-    from public.transakcje t group by t.gracz
+    from public.transakcje t join public.pytania p on p.id = t.pytanie
+    where p.status <> 'propozycja'
+    group by t.gracz
   ),
   wyn as (
     select w.gracz,
