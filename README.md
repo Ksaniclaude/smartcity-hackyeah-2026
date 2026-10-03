@@ -54,6 +54,9 @@ budzet.krakow.pl i lokalne media). W żywej bazie jest 8 z nich otwartych (limit
 w `/admin`. Szczegóły i zastrzeżenie o weryfikacji: [`data/PYTANIA_STARTOWE_UWAGA.md`](data/PYTANIA_STARTOWE_UWAGA.md).
 Przed demem otwórz każdy link i porównaj datę; termin zmienisz w `/admin`.
 
+W kolejce `/admin` czeka też 11 propozycji o Warszawie (id 26–36) z [`data/pytania_warszawa.csv`](data/pytania_warszawa.csv):
+odpowiedniki krakowskich rynków, z tym samym zastrzeżeniem o weryfikacji. Opis: [`data/WARSZAWA_PODOBNE.md`](data/WARSZAWA_PODOBNE.md).
+
 Wgranie CSV do pustej bazy (przez te same RPC, których używa panel):
 
 ```bash
