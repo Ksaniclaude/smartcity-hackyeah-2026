@@ -189,7 +189,13 @@ export async function postawPrognoze(args: {
     p_komentarz: args.komentarz || null,
   });
   const w = sprawdz<WynikZakladu>(r);
-  return { ...w, saldo: Number(w.saldo), obrot: Number(w.obrot ?? 0) };
+  return {
+    ...w,
+    saldo: Number(w.saldo),
+    obrot: Number(w.obrot ?? 0),
+    sprzedano: (w.sprzedano ?? []).map((z) => ({ ...z, udzialy: Number(z.udzialy), zwrot: Number(z.zwrot) })),
+    zwrot_ze_sprzedazy: Number(w.zwrot_ze_sprzedazy ?? 0),
+  };
 }
 
 export async function pobierzMojePozycje(): Promise<MojaPozycja[]> {

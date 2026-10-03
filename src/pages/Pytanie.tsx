@@ -264,12 +264,26 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
   const otwarte = p.status === "otwarte";
   const miasto = p.kategoria === "miasto";
   const saldo = Math.floor(gracz?.saldo ?? 0);
-  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneRazem), saldo));
+  const posiadane = udzialyMoje.filter((z) => z.udzialy > 0.005);
+  // Jedna strona rynku na gracza (jak na giełdach prognoz): kupno innej odpowiedzi najpierw sprzedaje te udziały.
+  const inne = odp != null ? posiadane.filter((z) => z.odpowiedz !== odp) : [];
+  const zwrotInne = inne.reduce(
+    (suma, z) => suma + (p.kursy ? podgladSprzedazy(p.kursy[z.odpowiedz - 1], z.udzialy).zwrot : 0),
+    0,
+  );
+  const wydaneTej = odp != null ? (udzialyMoje.find((z) => z.odpowiedz === odp)?.wydane ?? 0) : wydaneRazem;
+  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneTej), saldo + Math.floor(zwrotInne)));
   const stawkaOk = Math.max(1, Math.min(Math.round(stawka) || 1, Math.max(1, maks)));
-  const kursWybranej = odp != null && p.kursy ? p.kursy[odp - 1] : null;
+  // kurs wybranej odpowiedzi po ewentualnej sprzedaży drugiej strony (dokładnie dla 2 odpowiedzi, w przybliżeniu dla 3)
+  const kursWybranej = (() => {
+    if (odp == null || !p.kursy) return null;
+    if (inne.length === 1 && p.odpowiedzi.length === 2) {
+      return 1 - podgladSprzedazy(p.kursy[inne[0].odpowiedz - 1], inne[0].udzialy).kursPo;
+    }
+    return p.kursy[odp - 1];
+  })();
   const podglad = kursWybranej != null ? podgladZakladu(kursWybranej, stawkaOk) : null;
   const brakPowodu = miasto && !powod;
-  const posiadane = udzialyMoje.filter((z) => z.udzialy > 0.005);
   const pozycjaSprzedaz = posiadane.find((z) => z.odpowiedz === odpSprzedaz) ?? posiadane[0] ?? null;
   const kursSprzedazy = pozycjaSprzedaz && p.kursy ? p.kursy[pozycjaSprzedaz.odpowiedz - 1] : null;
   const uSprzedaz = pozycjaSprzedaz ? Math.max(0, Math.min(udzialySprzedaz, pozycjaSprzedaz.udzialy)) : 0;
@@ -356,6 +370,12 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
 
       {wynik ? (
         <div className="panel-sukces">
+          {wynik.sprzedano.length > 0 ? (
+            <div style={{ marginBottom: 4 }}>
+              Sprzedano {wynik.sprzedano.map((z) => `${liczba(z.udzialy, 1)} udz. „${z.odpowiedz_tekst}”`).join(", ")} za{" "}
+              {liczba(wynik.zwrot_ze_sprzedazy, 1)} pkt.
+            </div>
+          ) : null}
           <b>
             Twoja prognoza przesunęła kurs z {procent(wynik.kurs_przed)} na {procent(wynik.kurs_po)}
           </b>
@@ -394,7 +414,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               <Komunikat typ="ostrz">
                 {saldo < 1
                   ? "Nie masz już punktów. Poczekaj na rozstrzygnięcia albo sprzedaj udziały."
-                  : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneRazem)}.`}
+                  : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneTej)}.`}
               </Komunikat>
             ) : (
               <div className="stawka-pole">
@@ -452,6 +472,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             />
           </label>
 
+          {odp != null && inne.length > 0 && stan === "gotowy" ? (
+            <div className="panel-info">
+              Rynek ma jedną stronę na gracza. Masz{" "}
+              {inne.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(" i ")}: kupno „
+              {p.odpowiedzi[odp - 1]}” najpierw je sprzeda
+              {p.kursy ? ` (≈ ${liczba(zwrotInne, 1)} pkt wraca na saldo)` : ""}.
+            </div>
+          ) : null}
           {odp != null && stan === "gotowy" && maks >= 1 ? (
             <div className="podsumowanie">
               {podglad ? (
@@ -500,9 +528,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   ? "Wybierz odpowiedź"
                   : brakPowodu
                     ? "Wybierz powód"
-                    : odp === 3
-                      ? `Postaw: ${p.odpowiedzi[2]}`
-                      : `Postaw ${p.odpowiedzi[odp - 1]}`}
+                    : inne.length > 0
+                      ? `Sprzedaj „${inne.map((z) => p.odpowiedzi[z.odpowiedz - 1]).join("”, „")}” i postaw ${odp === 3 ? ": " : ""}${p.odpowiedzi[odp - 1]}`
+                      : odp === 3
+                        ? `Postaw: ${p.odpowiedzi[2]}`
+                        : `Postaw ${p.odpowiedzi[odp - 1]}`}
             </button>
           ) : stan === "brak_nicku" ? (
             <button
