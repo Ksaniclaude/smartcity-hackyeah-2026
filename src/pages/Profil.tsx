@@ -73,7 +73,7 @@ function Historia({ nick }: { nick: string }) {
   const { dane, blad, laduje } = usePolling(() => pobierzMojeTransakcje(100), 10000);
   const wpisy = dane ?? [];
   return (
-    <div className="waska">
+    <div>
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
       {dane && wpisy.length === 0 ? (
@@ -106,7 +106,7 @@ function Ustawienia() {
   const bezZmian = czysty === (gracz?.nick ?? "");
 
   return (
-    <div className="waska-2">
+    <div className="ustawienia">
       <div className="karta">
         <h3>Nick</h3>
         <form

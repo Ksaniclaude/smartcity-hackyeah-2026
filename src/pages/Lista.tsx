@@ -6,6 +6,7 @@ import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Aktywnosc, Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
+import { IkPlomien } from "@/ui/ikony";
 import { Awatar, Komunikat, Szkielet, Szukajka, opisPrognoz } from "@/ui/komponenty";
 import { KartaRynku, Odpowiedzi, Odsloniecie, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, liczba, odmien, pkt, zmianaPp } from "@/ui/tekst";
@@ -428,8 +429,9 @@ export default function Lista() {
             <Rzad
               tytul={
                 <>
+                  {/* płomień, nie pulsująca kropka: kropka oznacza taśmę „Na żywo” tuż nad tym rzędem */}
                   <span className="hot-ikona" aria-hidden="true">
-                    <i className="puls" />
+                    <IkPlomien />
                   </span>
                   Hot
                 </>
