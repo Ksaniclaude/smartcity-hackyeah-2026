@@ -55,6 +55,7 @@ create table public.pytania (
   kursy_otwarcia        double precision[],
   otwarto               timestamptz,
   miasto                text not null default 'Kraków' check (char_length(btrim(miasto)) between 2 and 40),
+  wyroznione            boolean not null default false,
   prog_widocznosci      integer check (prog_widocznosci is null or prog_widocznosci >= 1),
   constraint odpowiedzi_2_3 check (array_length(odpowiedzi, 1) between 2 and 3),
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
@@ -806,6 +807,17 @@ begin
   update public.pytania set termin = p_nowy_termin where id = p_pytanie;
 end $$;
 
+-- Wyróżnienie: rynek idzie na początek sekcji „Hot” na stronie głównej.
+create or replace function public.admin_wyroznij(p_pytanie bigint, p_wyroznione boolean)
+returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  update public.pytania set wyroznione = coalesce(p_wyroznione, false) where id = p_pytanie;
+  if not found then raise exception 'Nie ma takiego pytania'; end if;
+end $$;
+
 -- Pełny podgląd dla admina (w tym propozycje i q).
 create or replace function public.admin_pytania()
 returns setof public.pytania
@@ -896,7 +908,8 @@ select
   p.obrot, p.otwarto, p.kursy_otwarcia,
   public.kursy_godzine_temu(p.id) as kursy_1h,
   public.gracze_rynku(p.id) as gracze_rynku,
-  p.miasto
+  p.miasto,
+  p.wyroznione
 from public.pytania p
 where p.status <> 'propozycja';
 
@@ -1226,7 +1239,7 @@ create policy zmiany_publiczne on public.zmiany_terminow for select to anon, aut
 -- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
 grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
               wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto, obrot, otwarto,
-              kursy_otwarcia, prog_widocznosci, miasto)
+              kursy_otwarcia, prog_widocznosci, miasto, wyroznione)
   on public.pytania to anon, authenticated;
 create policy pytania_publiczne on public.pytania for select to anon, authenticated
   using (status <> 'propozycja');
@@ -1260,6 +1273,7 @@ grant execute on function public.zaproponuj_pytanie(text, public.kategoria, date
 grant execute on function public.admin_zaloguj(text) to authenticated;
 grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean, text) to authenticated;
 grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date, text) to authenticated;
+grant execute on function public.admin_wyroznij(bigint, boolean) to authenticated;
 grant execute on function public.admin_otworz(bigint, double precision[]) to authenticated;
 grant execute on function public.admin_zamknij(bigint) to authenticated;
 grant execute on function public.admin_rozstrzygnij(bigint, integer, text) to authenticated;

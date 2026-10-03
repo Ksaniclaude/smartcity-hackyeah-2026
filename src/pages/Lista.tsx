@@ -113,11 +113,11 @@ function porownanieZakonczonych(s: Sortowanie): (a: Pytanie, b: Pytanie) => numb
 /* ---------- „Hot”: rynki z największym ruchem w ostatniej dobie ---------- */
 
 const HOT_OKNO = 24 * 60 * 60 * 1000;
-const HOT_ILE = 10;
+const HOT_ILE = 12;
 
 /**
- * Otwarte rynki uszeregowane po liczbie prognoz z ostatniej doby, potem po obrocie i liczbie prognoz.
- * Gdy ruchu jest mało, listę dopełniają rynki z największym obrotem, a na końcu najnowsze.
+ * Najpierw rynki wyróżnione przez admina (najśmieszniejsze, najbardziej viralowe), potem reszta: po liczbie
+ * prognoz z ostatniej doby, obrocie i liczbie prognoz; gdy ruchu jest mało, dopełniają najnowsze.
  */
 function wybierzHot(otwarte: Pytanie[], aktywnosc: Aktywnosc[], teraz: number): Pytanie[] {
   const ruch = new Map<number, number>();
@@ -127,7 +127,7 @@ function wybierzHot(otwarte: Pytanie[], aktywnosc: Aktywnosc[], teraz: number): 
   }
   const r = (p: Pytanie) => ruch.get(p.id) ?? 0;
   return [...otwarte]
-    .sort((a, b) => r(b) - r(a) || b.obrot - a.obrot || b.liczba_prognoz - a.liczba_prognoz || czasOtwarcia(b) - czasOtwarcia(a) || a.id - b.id)
+    .sort((a, b) => Number(b.wyroznione) - Number(a.wyroznione) || r(b) - r(a) || b.obrot - a.obrot || b.liczba_prognoz - a.liczba_prognoz || czasOtwarcia(b) - czasOtwarcia(a) || a.id - b.id)
     .slice(0, HOT_ILE);
 }
 
@@ -436,7 +436,7 @@ export default function Lista() {
                   Hot
                 </>
               }
-              opis="najwięcej ruchu w ostatniej dobie"
+              opis="wyróżnione i z największym ruchem"
               lista={hot}
               link="/?s=obrot"
               {...listaProps}

@@ -10,6 +10,7 @@ import {
   adminUniewaznij,
   adminUstawProg,
   adminUstawProgDomyslny,
+  adminWyroznij,
   adminZaloguj,
   adminZamknij,
   adminZmienTermin,
@@ -311,6 +312,19 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
 
       <details>
         <summary>Akcje</summary>
+
+        {!koniec ? (
+          <div className="przyciski">
+            <button
+              type="button"
+              className={`przycisk przycisk-maly ${p.wyroznione ? "" : "przycisk-drugi"}`}
+              disabled={trwa}
+              onClick={() => akcja(p.wyroznione ? "Zdjęto wyróżnienie" : "Wyróżniono", () => adminWyroznij(p.id, !p.wyroznione))}
+            >
+              {p.wyroznione ? "Hot: wyróżniony (zdejmij)" : "Wyróżnij jako hot"}
+            </button>
+          </div>
+        ) : null}
 
         {p.status === "propozycja" ? (
           <>

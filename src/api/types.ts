@@ -59,6 +59,8 @@ export interface Pytanie {
   kursy_otwarcia: number[] | null;
   /** Miasto rynku („Polska” dla rynków ogólnokrajowych). */
   miasto: string;
+  /** Wyróżniony przez admina: idzie na początek sekcji „Hot”. */
+  wyroznione: boolean;
   /** Kurs sprzed godziny (albo kurs otwarcia, gdy rynek młodszy); null, gdy kurs ukryty lub rynek zakończony. */
   kursy_1h: number[] | null;
   /** Po rozstrzygnięciu: ilu graczy miało pozycję i ilu trafiło. */
@@ -85,6 +87,7 @@ export interface PytanieAdmin {
   utworzono: string;
   rozstrzygnieto: string | null;
   miasto: string;
+  wyroznione: boolean;
   /** Próg ukrycia kursu nadpisany przez admina (null = domyślny). */
   prog_widocznosci: number | null;
 }

@@ -433,6 +433,7 @@ button.wynik:active { transform: scale(0.98); }
 /* ---------- znaczniki ---------- */
 .znacznik, .odznaka { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; line-height: 1.4; background: var(--tlo-3); color: var(--tekst-2); white-space: nowrap; }
 .znacznik-nowy, .znacznik-akcent { background: var(--akcent-tlo); color: var(--akcent-tekst); }
+.znacznik-hot { background: var(--nie-tlo, var(--akcent-tlo)); color: var(--nie-tekst, var(--akcent-tekst)); }
 .odznaka-miasto { background: var(--tlo-3); color: var(--tekst-2); }
 .odznaka-luz { background: var(--trzeci-tlo); color: var(--trzeci-tekst); }
 .odznaka-status { background: var(--tlo-2); color: var(--mute); }

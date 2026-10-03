@@ -43,6 +43,10 @@ niższe `b` i zerowy próg widoczności kursu dla rynków krótkich.
 
 ## Stan: wgrane na produkcję 3.10.2026
 
+`dodatkowe.csv` (22 rynki pod beki i viral: Drwal, masło za 2 zł, Lotto, Chajzerowie, Taylor Swift, jarmarki, Coca-Cola truck)
+wgrane tą samą drogą; 12 rynków ma flagę `wyroznione` i idzie na początek sekcji Hot (przełącznik w /admin).
+
+
 142 rynki z tego katalogu (bez czterech warszawskich dubli rynków nr 27, 28, 32, 34 i bez rewanżowych derbów) zostały
 wstawione do żywej bazy jako otwarte, z kursem otwarcia 34/33/33 („miasto”) albo 50/50 („luz”). Zastrzeżenie o
 weryfikacji źródeł nadal obowiązuje: błędny termin poprawia się w /admin („zmień termin”), błędne pytanie unieważnia.

@@ -116,7 +116,7 @@ export async function ustawNick(nick: string): Promise<Gracz> {
 // --- pytania ---------------------------------------------------------------
 
 function normalizujPytanie(p: Pytanie): Pytanie {
-  return { ...p, obrot: Number(p.obrot ?? 0), miasto: p.miasto || MIASTO_DOMYSLNE };
+  return { ...p, obrot: Number(p.obrot ?? 0), miasto: p.miasto || MIASTO_DOMYSLNE, wyroznione: p.wyroznione === true };
 }
 
 export async function pobierzPytania(): Promise<Pytanie[]> {
@@ -334,6 +334,11 @@ export async function adminEdytujPytanie(args: {
     p_termin: args.termin,
     p_miasto: args.miasto ?? null,
   });
+  sprawdz(r);
+}
+
+export async function adminWyroznij(pytanie: number, wyroznione: boolean): Promise<void> {
+  const r = await supabase.rpc("admin_wyroznij", { p_pytanie: pytanie, p_wyroznione: wyroznione });
   sprawdz(r);
 }
 

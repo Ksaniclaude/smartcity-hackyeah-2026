@@ -271,6 +271,7 @@ export function KartaRynku({ p, obserwowany = false, przelaczObserwowanie, mojTy
       {srodek}
       <div className="rynek-dol">
         <span className="rynek-miasto">{p.miasto}</span>
+        {p.wyroznione && otwarte ? <span className="znacznik znacznik-hot">hot</span> : null}
         {nowy ? <span className="znacznik znacznik-nowy">nowy</span> : null}
         {p.status === "zamkniete" ? <span className="znacznik znacznik-zamkniety">zamknięte</span> : null}
         {ukryty ? <Odsloniecie p={p} /> : null}
