@@ -4,6 +4,7 @@ import { pobierzPytanie } from "@/api/api";
 import type { MojaPozycja, Pytanie } from "@/api/types";
 import { useLicznik } from "@/ui/hooks";
 import { liczba, odmien } from "@/ui/tekst";
+import { PrzyciskUdostepnij } from "@/ui/udostepnij";
 
 const KLUCZ = "zdaza.rozstrzygniecia_widziane";
 
@@ -117,6 +118,13 @@ export function EkranRozstrzygniecia({ moja, pytanie, onClose }: Props) {
           <button type="button" className="przycisk przycisk-glowny" onClick={onClose}>
             Jasne
           </button>
+          {trafione && odslonione && moja.wynik != null ? (
+            <PrzyciskUdostepnij
+              etykieta="Pochwal się"
+              klasa="przycisk przycisk-glowny przycisk-drugi"
+              dane={{ tresc: moja.tresc, odpowiedz: wynikTekst, indeks: moja.wynik - 1, kurs: 1, url: `${window.location.origin}/pytanie/${moja.pytanie}`, rodzaj: "trafione", wyplata }}
+            />
+          ) : null}
           <Link to={`/pytanie/${moja.pytanie}`} className="przycisk przycisk-glowny przycisk-drugi" onClick={onClose}>
             Zobacz rynek
           </Link>

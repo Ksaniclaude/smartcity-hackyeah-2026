@@ -7,6 +7,7 @@ import type { MojaPozycja, MojaTransakcja } from "@/api/types";
 import { useAkcja, useMiejsca, usePolling } from "@/ui/hooks";
 import { IkKsiezyc, IkSlonce } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
+import { PrzyciskLinku } from "@/ui/udostepnij";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { czasTemu, liczba, pkt } from "@/ui/tekst";
 import { PasPoziomu, TablicaOdznak } from "@/ui/postep";
@@ -227,6 +228,11 @@ export default function Profil() {
           </div>
         </div>
         <div className="akcje">
+          <PrzyciskLinku
+            etykieta="Udostępnij profil"
+            tekst={`Gram w Zdążą? jako ${nick}${miejsce != null ? `, ${miejsce}. miejsce w rankingu` : ""}. A Ty ile dajesz?`}
+            url={`${window.location.origin}/u/${encodeURIComponent(nick)}`}
+          />
           <button
             type="button"
             className="przycisk przycisk-maly przycisk-drugi"

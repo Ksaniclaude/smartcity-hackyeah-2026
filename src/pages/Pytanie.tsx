@@ -31,7 +31,7 @@ import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrat
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, wDol, zmianaPp } from "@/ui/tekst";
-import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
+import { PasekUdostepniania, PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { usePostep } from "@/ui/postep";
 import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
@@ -527,18 +527,9 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: Pan
             <b className="zysk">+{liczba(wynik.udzialy, 1)} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
           </p>
           <Awans przed={wynik.miejsce_przed} po={wynik.miejsce_po} graczy={wynik.graczy_w_rankingu} />
-          <div className="kupon-akcje">
-            <PrzyciskUdostepnij
-              dane={{
-                tresc: p.tresc,
-                odpowiedz: p.odpowiedzi[wynik.odpowiedz - 1],
-                indeks: wynik.odpowiedz - 1,
-                kurs: wynik.kurs_po,
-                nick: gracz?.nick ?? null,
-                url,
-              }}
-            />
-          </div>
+          <PasekUdostepniania
+            dane={{ tresc: p.tresc, odpowiedz: p.odpowiedzi[wynik.odpowiedz - 1], indeks: wynik.odpowiedz - 1, kurs: wynik.kurs_po, url, rodzaj: "moja" }}
+          />
         </div>
       ) : null}
       {wynikSprzedazy ? (
@@ -854,7 +845,6 @@ export default function Pytanie() {
 
   const [odp, setOdp] = useState<number | null>(null);
   const [okres, setOkres] = useState<Okres>("all");
-  const [skopiowano, setSkopiowano] = useState(false);
   const [obserwowane, setObserwowane] = useState<number[]>(() => czytajObserwowane());
   const [refPanelu, panelWidoczny] = useWidoczny<HTMLElement>();
   const t = params.get("tab");
@@ -888,11 +878,11 @@ export default function Pytanie() {
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
   const url = `${window.location.origin}/pytanie/${pid}`;
-  // karta „Daję X%”: mój główny typ, a bez pozycji pierwsza odpowiedź
+  // plansza do udostępniania: z pozycją „Daję X%” na mój główny typ, bez pozycji „Rynek daje X%” na pierwszą odpowiedź
   const indeksKarty = moja ? moja.odpowiedz_glowna - 1 : 0;
   const kursKarty = p.kursy ? p.kursy[indeksKarty] : p.kursy_otwarcia ? p.kursy_otwarcia[indeksKarty] : null;
   const daneKarty: DaneKarty | null =
-    kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, nick: gracz?.nick ?? null, url } : null;
+    kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, url, rodzaj: moja ? "moja" : "rynek" } : null;
   const podobne = (wszystkie ?? []).filter((q) => q.id !== pid && q.kategoria === p.kategoria && q.status === "otwarte").slice(0, 3);
   const obserwowany = obserwowane.includes(pid);
 
@@ -905,15 +895,6 @@ export default function Pytanie() {
   const wybierz = (i: number) => {
     setOdp(i);
     if (window.innerWidth < 1000) document.getElementById("panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  const udostepnij = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setSkopiowano(true);
-      window.setTimeout(() => setSkopiowano(false), 2000);
-    } catch {
-      /* brak schowka */
-    }
   };
   const przelaczObserwowanie = (e: { currentTarget: Element }) => {
     if (!obserwowany) wystrzel(e.currentTarget, { ile: 8, moc: 0.45 });
@@ -952,21 +933,19 @@ export default function Pytanie() {
                   <b>{liczba(p.obrot)}</b> pkt obrotu
                 </span>
               ) : null}
-              <button type="button" className="przycisk-ikona" onClick={() => void udostepnij()} aria-label="Udostępnij" title="Skopiuj link">
-                <IkLink />
-              </button>
-              <button
-                type="button"
-                className="przycisk-ikona"
-                onClick={przelaczObserwowanie}
-                aria-label="Obserwuj"
-                aria-pressed={obserwowany}
-                title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-              >
-                <IkGwiazdka pelna={obserwowany} />
-              </button>
-              {skopiowano ? <span className="typ-tak">Skopiowano link</span> : null}
-              {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} etykieta="Karta „Daję X%”" klasa="przycisk-tekst" /> : null}
+              <span className="meta-akcje">
+                {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} /> : null}
+                <button
+                  type="button"
+                  className="przycisk-ikona"
+                  onClick={przelaczObserwowanie}
+                  aria-label="Obserwuj"
+                  aria-pressed={obserwowany}
+                  title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
+                >
+                  <IkGwiazdka pelna={obserwowany} />
+                </button>
+              </span>
             </div>
           </header>
 
