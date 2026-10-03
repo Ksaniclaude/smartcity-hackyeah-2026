@@ -41,11 +41,12 @@ npm run dev
 Aplikacja działa pod http://localhost:3000 i od razu łączy się z bazą w Supabase (projekt `smartcity-hackyeah-2026`),
 w której są już dane demo: 24 konta, 15 rynków z historią cen, rozstrzygnięcia i propozycje dnia.
 
-Konta demo: `kamienica_12` (gracz z historią) i `admin`. Hasła są w [`supabase/seed.sql`](supabase/seed.sql).
-**Przed publicznym pokazem zmień hasło admina** (np. w SQL Editorze Supabase):
+Konto demo do pokazu: `kamienica_12` (gracz z historią); hasło kont demo jest w [`supabase/seed.sql`](supabase/seed.sql).
+Hasła konta `admin` nie ma w repo — zna je właściciel projektu. Zmiana hasła admina (SQL Editor Supabase):
 
 ```sql
 update game.users set pass_hash = extensions.crypt('NOWE_HASLO', extensions.gen_salt('bf')) where nick = 'admin';
+update game.settings set value = (select pass_hash from game.users where nick = 'admin') where key = 'admin_hash';
 ```
 
 ## Scenariusz demo dla jury (3 minuty)
