@@ -11,7 +11,8 @@ czy miejskie sprawy zdążą na czas. Zasady gry i architektura: [README.md](REA
 - **Push do `main` = automatyczny deploy na produkcję.** W trakcie hackathonu `main` to wersja, którą widzi jury.
 - **Każda inna gałąź i każdy PR dostaje podgląd** (preview) pod własnym adresem. Link wstawia bot Vercela w PR.
   Podglądy są chronione logowaniem do Vercela. Większe zmiany rób na gałęzi i sprawdzaj na podglądzie przed scaleniem.
-- **Produkcja: https://zdaza-mauve.vercel.app** — **`zdaza.vercel.app` to NIE jest nasz projekt** (cudza aplikacja).
+- **Produkcja tego repo: https://zdaza-mauve.vercel.app.** `zdaza.vercel.app` to osobny prototyp frontendu Wojtka
+  (Vite + React, inne konto Vercel, bez Supabase) — nie jest budowany z tego repo.
 - Gdy push nie wywoła deployu (zdarza się, że webhook GitHuba nie dojdzie): Vercel → `zdaza` → Deployments →
   **Create Deployment** → gałąź `main`. Stan deployu commita widać też na GitHubie (status „Vercel” przy commicie).
 - Root Directory to `./`. Jeśli przeniesiesz aplikację do podfolderu, trzeba zmienić to w ustawieniach projektu na Vercelu.
