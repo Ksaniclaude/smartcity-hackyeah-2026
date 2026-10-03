@@ -25,6 +25,11 @@ export function wDol(n: number, miejsca = 1): number {
   return Math.floor(n * m + 1e-9) / m;
 }
 
+/** Liczba udziałów na ekranie: pełne udziały w dół (23,76 → „23”); poniżej 1 z jedną cyfrą po przecinku (0,6). */
+export function udzialyTekst(n: number): string {
+  return n > 0 && n < 1 ? liczba(wDol(n, 1), 1) : liczba(wDol(n, 0), 0);
+}
+
 export function liczba(n: number, miejsca = 0): string {
   return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: miejsca, minimumFractionDigits: miejsca }).format(n);
 }
