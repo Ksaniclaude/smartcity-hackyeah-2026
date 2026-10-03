@@ -27,7 +27,9 @@ przez wyszukiwarkę. Środowisko nie miało dostępu do stron źródłowych, tak
 ## 2. Odpowiedniki warszawskie
 
 Kandydaci na rynki są w [`pytania_warszawa.csv`](pytania_warszawa.csv), w formacie `pytania_startowe.csv`.
-Plik nie jest wgrany do bazy (skrypt `npm run pytania` czyta tylko `pytania_startowe.csv`).
+3.10.2026 wgrane do żywej bazy jako propozycje (id 26–36, kurs 34/33/33 i 50/50), widać je w `/admin`
+w kolejce propozycji. W bazie nie było konta admina, więc poszły jednym INSERT-em, który robi to samo co
+`admin_dodaj_pytanie(..., p_otworz := false)`. `npm run pytania` czyta tylko `pytania_startowe.csv`.
 
 | Rynek w Krakowie | Warszawa, otwarte | Termin | Dlaczego podobne |
 | --- | --- | --- | --- |
