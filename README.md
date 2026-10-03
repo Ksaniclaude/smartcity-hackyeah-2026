@@ -1,7 +1,8 @@
 # Zdążą?
 
-Rynek prognoz o terminach w polskich miastach, w stylu giełd prognoz (Polymarket), ale o punkty. Mieszkańcy stawiają punkty na to,
-czy miasto dotrzyma terminu, a kurs pokazuje, ile w to wierzą. Projekt na HackYeah 2026, zadanie otwarte Smart City.
+Polski rynek prognoz w stylu giełd prognoz (Polymarket), ale o punkty zamiast złotówek. Gracze stawiają punkty na to,
+co wydarzy się w Polsce, od terminów miejskich inwestycji po celebrytów, a kurs pokazuje, ile w to wierzą.
+Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
 - **Demo:** https://zdaza.vercel.app
 - **Widok dla miast (bez logowania):** https://zdaza.vercel.app/miasto

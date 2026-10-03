@@ -178,8 +178,12 @@ function Tasma() {
       <span className="tasma-etykieta">
         <i className="puls" />
         Na żywo
-        <small className="tasma-licznik cyfry">{ostatnie10}</small>
-        <small className="tasma-opis">{ostatnie10 === 1 ? "prognoza" : ostatnie10 >= 2 && ostatnie10 <= 4 ? "prognozy" : "prognoz"} w 10 min</small>
+        {ostatnie10 > 0 ? (
+          <>
+            <small className="tasma-licznik cyfry">{ostatnie10}</small>
+            <small className="tasma-opis">{ostatnie10 === 1 ? "prognoza" : ostatnie10 >= 2 && ostatnie10 <= 4 ? "prognozy" : "prognoz"} w 10 min</small>
+          </>
+        ) : null}
       </span>
       <div className="tasma-wpisy">
         {wpisy.map((a) => (
@@ -372,10 +376,10 @@ export default function Lista() {
           <section className={`czolowka ${gosc ? "z-haslem" : ""}`}>
             {gosc ? (
               <div className="czolowka-haslo">
-                <h1>Czy miasto zdąży?</h1>
+                <h1>Polski rynek prognoz</h1>
                 <p>
-                  Rynek prognoz dla polskich miast: mieszkańcy stawiają punkty na to, czy urząd dotrzyma terminu, a kurs
-                  pokazuje, ile w to wierzą.
+                  Bez złotówek: stawiasz punkty na to, co wydarzy się w Polsce, od miejskich inwestycji po celebrytów,
+                  a kurs pokazuje, ile ludzie w to wierzą.
                 </p>
                 {odsetek != null ? (
                   <p className="czolowka-liczba">

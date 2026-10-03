@@ -105,6 +105,21 @@ export const IkPtaszek = (p: P) => (
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   </svg>
 );
+export const IkPlomien = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-1.6.6-2.8 1.5-3.8.3 1.5 1 2.3 2 2.8C10 9 10.5 6 12 3z" />
+  </svg>
+);
+export const IkZamiana = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M4 8h14l-3-3M20 16H6l3 3" />
+  </svg>
+);
+export const IkDymek = (p: P) => (
+  <svg {...baza} {...p}>
+    <path d="M4 5h16v11H9l-5 4V5z" />
+  </svg>
+);
 /** Trójkąt kierunku zmiany kursu (pełny, bez obrysu). */
 export const IkGora = (p: P) => (
   <svg viewBox="0 0 10 8" fill="currentColor" aria-hidden="true" {...p}>

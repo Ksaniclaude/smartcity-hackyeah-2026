@@ -162,6 +162,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .drobina.trzeci { background: var(--trzeci); }
 .drobina.jasna { background: var(--tekst); }
 .moneta { left: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--akcent); box-shadow: inset 0 0 0 3px var(--akcent-hover), 0 0 0 1.5px var(--na-akcencie); }
+.moneta.iskierka { width: 10px; height: 10px; background: var(--tekst); box-shadow: 0 0 0 2px var(--akcent); }
 .unoszony { font-size: 22px; color: var(--akcent-tekst); white-space: nowrap; text-shadow: 0 1px 0 var(--tlo), 0 0 8px var(--tlo); }
 .unoszony.gora { color: var(--tak-tekst); }
 .unoszony.dol { color: var(--nie-tekst); }
@@ -229,6 +230,17 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .awatar-k5 { background: var(--aw-5); }
 .awatar-k6 { background: var(--aw-6); }
 .awatar-duzy { width: 60px; height: 60px; font-size: 19px; }
+/* pierścień postępu do następnego poziomu wokół awatara, numer poziomu w rogu (src/ui/postep.tsx) */
+.pierscien { position: relative; display: inline-flex; padding: 4px; flex: none; }
+.pierscien svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.pierscien-tor { fill: none; stroke: var(--linia-2); stroke-width: 7; }
+.pierscien-luk { fill: none; stroke: var(--akcent); stroke-width: 7; stroke-linecap: round; transition: stroke-dasharray 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pierscien-poziom { position: absolute; right: -4px; bottom: -3px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--akcent); color: var(--na-akcencie); font-size: 12px; line-height: 17px; text-align: center; box-shadow: 0 0 0 2px var(--tlo-2); }
+.pierscien-duzy { padding: 6px; }
+.pierscien-duzy .pierscien-poziom { min-width: 24px; height: 24px; border-radius: 12px; font-size: 16px; line-height: 24px; }
+.seria { display: inline-flex; align-items: center; gap: 2px; color: var(--akcent-tekst); }
+.seria svg { width: 16px; height: 16px; }
+.seria .cyfry { font-size: 17px; }
 
 /* ---------- pasek filtrów (pod nagłówkiem) ---------- */
 .kategorie { position: sticky; top: var(--naglowek-h); z-index: 20; background: var(--tlo); border-bottom: 1px solid var(--linia); }
@@ -644,6 +656,35 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .stat .wartosc.zysk { color: var(--tak-tekst); }
 .stat .wartosc.strata { color: var(--nie-tekst); }
 .stat .pod { font-size: 12px; color: var(--mute); }
+/* poziom i odznaki na profilu */
+.poziom-pas { margin: 16px 0 4px; }
+.poziom-opis { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
+.poziom-numer { font-size: 26px; color: var(--akcent-tekst); }
+.poziom-opis b { font-size: 16px; }
+.poziom-ile { margin-left: auto; font-size: 13px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.poziom-slupek { height: 10px; border-radius: 5px; background: var(--tlo-3); overflow: hidden; }
+.poziom-slupek i { display: block; height: 100%; border-radius: 5px; background: var(--akcent); transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.poziom-pas .pomoc { margin: 8px 0 0; }
+.odznaki { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; margin: 8px 0; }
+.odznaka-kafel { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--linia); border-radius: var(--r); background: var(--karta); }
+.odznaka-kafel b { display: block; font-size: 15px; color: var(--mute); }
+.odznaka-kafel span { display: block; font-size: 13px; color: var(--mute); }
+.odznaka-kafel .odznaka-ikona { width: 44px; height: 44px; border-radius: 50%; background: var(--tlo-3); color: var(--slaby); display: inline-flex; align-items: center; justify-content: center; }
+.odznaka-ikona svg { width: 22px; height: 22px; }
+.odznaka-kafel.zdobyta { border-color: var(--akcent); }
+.odznaka-kafel.zdobyta b { color: var(--tekst); }
+.odznaka-kafel.zdobyta .odznaka-ikona { background: var(--akcent); color: var(--na-akcencie); }
+.odznaka-postep { margin-top: 6px; font-variant-numeric: tabular-nums; }
+.odznaka-postep i { display: block; height: 5px; border-radius: 3px; margin-bottom: 4px; background: linear-gradient(90deg, var(--akcent) calc(var(--ile) * 100%), var(--tlo-3) calc(var(--ile) * 100%)); }
+/* plansza nagrody u dołu ekranu (na telefonie nad dolną nawigacją i paskiem odpowiedzi): nowa odznaka, poziom
+   albo dzień serii; nie zasłania kuponu i nie przechwytuje kliknięć */
+.nagroda { position: fixed; bottom: calc(var(--dol-nav-h) + 84px + env(safe-area-inset-bottom)); left: 50%; z-index: 60; width: min(420px, calc(100vw - 24px)); margin-left: calc(min(420px, 100vw - 24px) / -2); display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px; align-items: center; padding: 14px 16px; border-radius: 16px; background: var(--karta); border: 1.5px solid var(--akcent); box-shadow: var(--cien-2); pointer-events: none; animation: wydruk 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.nagroda-ikona { width: 52px; height: 52px; border-radius: 50%; background: var(--akcent); color: var(--na-akcencie); display: inline-flex; align-items: center; justify-content: center; animation: stempel 0.55s cubic-bezier(0.2, 0.8, 0.3, 1.2); }
+.nagroda-ikona svg { width: 26px; height: 26px; }
+@media (min-width: 900px) { .nagroda { bottom: 28px; } }
+.nagroda small { display: block; font-size: 13px; font-weight: 600; color: var(--akcent-tekst); }
+.nagroda b { display: block; font-family: var(--wyswietlana); font-stretch: 88%; font-size: 22px; font-weight: 800; line-height: 1.15; }
+.nagroda span { display: block; font-size: 13px; color: var(--mute); }
 .profil-naglowek { display: flex; align-items: center; gap: 14px; margin: 4px 0; flex-wrap: wrap; }
 .profil-naglowek .akcje { margin-left: auto; margin-top: 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .profil-naglowek h1 { margin: 0; }

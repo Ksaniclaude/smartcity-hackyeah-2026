@@ -13,6 +13,7 @@ import Ranking from "@/pages/Ranking";
 import Start from "@/pages/Start";
 import Zaproponuj from "@/pages/Zaproponuj";
 import { DolnaNawigacja, Komunikat, Ladowanie, Modale, Naglowek, StopkaStrony } from "@/ui/komponenty";
+import { Nagrody, PostepProvider } from "@/ui/postep";
 import { useEfektyDotyku } from "@/ui/zywe";
 
 /** Ekrany wymagające gracza z nickiem (profil, propozycje, admin). Rynki są publiczne. */
@@ -51,6 +52,7 @@ function Uklad() {
   return (
     <div className="aplikacja">
       {!pelnyEkran ? <Naglowek /> : null}
+      <Nagrody />
       <Routes>
         <Route path="/" element={<Lista />} />
         <Route path="/pytanie/:id" element={<Pytanie />} />
@@ -97,7 +99,9 @@ function Uklad() {
 export default function App() {
   return (
     <SesjaProvider>
-      <Uklad />
+      <PostepProvider>
+        <Uklad />
+      </PostepProvider>
     </SesjaProvider>
   );
 }

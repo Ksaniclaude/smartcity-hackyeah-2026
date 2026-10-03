@@ -9,12 +9,14 @@ import { IkKsiezyc, IkSlonce } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { czasTemu, liczba, pkt } from "@/ui/tekst";
+import { PasPoziomu, TablicaOdznak } from "@/ui/postep";
 import { LiczbaZywa } from "@/ui/zywe";
 import { klasaTypu } from "@/pages/Aktywnosc";
 
-type Tab = "pozycje" | "historia" | "ustawienia";
+type Tab = "pozycje" | "odznaki" | "historia" | "ustawienia";
 const ZAKLADKI: { klucz: Tab; etykieta: string }[] = [
   { klucz: "pozycje", etykieta: "Pozycje" },
+  { klucz: "odznaki", etykieta: "Odznaki" },
   { klucz: "historia", etykieta: "Historia" },
   { klucz: "ustawienia", etykieta: "Ustawienia" },
 ];
@@ -185,7 +187,7 @@ export default function Profil() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const t = params.get("tab");
-  const tab: Tab = t === "historia" || t === "ustawienia" ? t : "pozycje";
+  const tab: Tab = t === "odznaki" || t === "historia" || t === "ustawienia" ? t : "pozycje";
   const miejsca = useMiejsca(10000);
   const rozstrzygniecie = useRozstrzygniecieDoPokazania(gracz?.nick ?? null, dane);
   const wylogowanie = useAkcja(async () => {
@@ -270,6 +272,8 @@ export default function Profil() {
         </div>
       </div>
 
+      <PasPoziomu />
+
       {wylogowanie.blad ? <Komunikat typ="blad">{wylogowanie.blad}</Komunikat> : null}
 
       <div className="zakladki" role="tablist">
@@ -349,6 +353,8 @@ export default function Profil() {
             </table>
           ) : null}
         </>
+      ) : tab === "odznaki" ? (
+        <TablicaOdznak />
       ) : tab === "historia" ? (
         <Historia nick={nick} />
       ) : (

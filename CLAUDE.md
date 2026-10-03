@@ -78,6 +78,10 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   między saldem a zakładem), `fala`, `wystrzel`, `podbij`, `wstrzasnij`, `uniesTekst`, `wibruj`, a plusk pod palcem
   dostaje każdy przycisk z listy `DOTYKALNE`. Siła efektu rośnie ze stawką; przy `prefers-reduced-motion` efekty
   są pomijane. Nowe miejsce z wartością (np. wypłata po rozstrzygnięciu) podpinaj do tych funkcji, nie pisz osobnych.
+- Postęp gracza jest w `src/ui/postep.tsx`: doświadczenie, poziom (pierścień wokół awatara), odznaki i seria dni.
+  Liczy się z własnych transakcji i pozycji gracza, bez zapisu w bazie; urządzenie pamięta tylko, co już świętowano
+  (`localStorage`, klucz `zdaza.postep`). Doświadczenie nie ma wartości w punktach: nie da się go postawić ani
+  wymienić i tak ma zostać. Nową odznakę dopisuje się jednym wierszem w `policzPostep`.
 - Karta rynku, piktogram tematu, termin, licznik odsłonięcia i przyciski odpowiedzi są w `src/ui/rynek.tsx`;
   używaj ich zamiast składać kartę od nowa.
 - Siatki kart liczone z szerokości kontenera (`auto-fill`), nie z breakpointów okna, bo karty leżą też w wąskich

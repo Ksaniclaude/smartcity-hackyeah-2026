@@ -12,6 +12,7 @@
 //   npm run zrzuty -- --strony=/,/pytanie/1,/profil --urzadzenia=desktop   # urządzenia: desktop, desktop-cala, tel, tel-ekran
 //   npm run zrzuty -- --out=data/zrzuty_dev
 //   npm run zrzuty -- --strony=/ --klik="Jak to działa"                      # zrzut po kliknięciu przycisku (modal)
+//   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^\+100$;;^Postaw"   # kilka kliknięć po kolei (;;)
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw"   # kupon po przyjętej prognozie
 //   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw" --klatki=150,450,750,1100
 //                                          # klatki animacji: zrzuty po tylu ms od kliknięcia (pliki …_k150.png)
@@ -37,8 +38,8 @@ const MOTYW = arg("motyw") ?? "";
 const STRONY = (arg("strony") ?? "/,/pytanie/1,/pytanie/4").split(",").map((s) => s.trim()).filter(Boolean);
 const URZADZENIA = (arg("urzadzenia") ?? "desktop,tel").split(",").map((s) => s.trim()).filter(Boolean);
 const OUT = path.resolve(arg("out") ?? "data/zrzuty_dev");
-/** Wyrażenie regularne na nazwę przycisku, który ma zostać kliknięty po wczytaniu strony (stany po interakcji). */
-const KLIK = arg("klik") ?? "";
+/** Wyrażenia regularne na nazwy przycisków klikanych po kolei po wczytaniu strony (stany po interakcji), rozdzielone „;;”. */
+const KLIKI = (arg("klik") ?? "").split(";;").map((x) => x.trim()).filter(Boolean);
 /** Po ilu milisekundach od kliknięcia zrobić zrzuty klatek animacji (sam ekran, bez przewijania). */
 const KLATKI = (arg("klatki") ?? "").split(",").map((x) => Number(x.trim())).filter((x) => x > 0);
 const PORT = 4175;
@@ -212,6 +213,13 @@ async function mock(route: Route) {
     const noweKursy = q?.kursy ? q.kursy.map((k, j) => (j === i ? kursPo : (k * (1 - kursPo)) / (1 - kurs))) : null;
     if (q && noweKursy) q.kursy = noweKursy;
     gracz.saldo -= stawka;
+    if (q) {
+      mojeTransakcje.unshift({
+        id: 100 + mojeTransakcje.length, pytanie: q.id, odpowiedz: i + 1, stawka, udzialy: 1000 * Math.log((e - 1 + kurs) / kurs),
+        kurs_przed: kurs, kurs_po: kursPo, powod: null, komentarz: null, typ: "kupno", czas: new Date().toISOString(),
+        pytania: { tresc: q.tresc, odpowiedzi: q.odpowiedzi, status: "otwarte", wynik: null },
+      });
+    }
     return json(route, {
       pytanie: body.p_pytanie, odpowiedz: i + 1, stawka, udzialy: 1000 * Math.log((e - 1 + kurs) / kurs),
       kurs_przed: kurs, kurs_po: kursPo, kursy: noweKursy, saldo: gracz.saldo,
@@ -302,9 +310,12 @@ async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: Brow
       zepsute.add(page);
     });
     await page.goto(`${ADRES}${s}`);
-    if (KLIK) {
+    if (KLIKI.length > 0) {
       await page.waitForLoadState("networkidle").catch(() => undefined);
-      await page.getByRole("button", { name: new RegExp(KLIK) }).first().click({ timeout: 8000 });
+      for (const [nr, wzor] of KLIKI.entries()) {
+        if (nr > 0) await page.waitForTimeout(350);
+        await page.getByRole("button", { name: new RegExp(wzor) }).first().click({ timeout: 8000 });
+      }
       const start = Date.now();
       fs.mkdirSync(OUT, { recursive: true });
       for (const ms of KLATKI) {

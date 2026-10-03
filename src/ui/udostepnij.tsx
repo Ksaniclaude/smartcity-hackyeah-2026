@@ -89,7 +89,7 @@ export function rysujKarte(d: DaneKarty): string | null {
   ctx.fillText("Zdążą?", 132, 82);
   ctx.fillStyle = k.mute;
   ctx.font = `600 22px ${k.tekstowa}`;
-  ctx.fillText("rynek prognoz o terminach w polskich miastach", 132 + ctx.measureText("Zdążą?").width + 50, 84);
+  ctx.fillText("polski rynek prognoz na punkty", 132 + ctx.measureText("Zdążą?").width + 50, 84);
 
   // „Daję X%”
   ctx.textBaseline = "alphabetic";

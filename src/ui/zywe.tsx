@@ -192,7 +192,7 @@ export function wystrzel(cel: Cel, { ile = 16, moc = 1, klasa = "" }: { ile?: nu
  * Monety lecące łukiem z jednego miejsca w drugie (saldo → zakład, sprzedaż → saldo). Obietnica spełnia się,
  * gdy doleci połowa, żeby dalszy ciąg (kupon, podbicie salda) trafił w moment uderzenia.
  */
-export function lecPunkty(od: Cel, dokad: Cel, ile = 10): Promise<void> {
+export function lecPunkty(od: Cel, dokad: Cel, ile = 10, klasa = ""): Promise<void> {
   if (bezRuchu()) return Promise.resolve();
   const a = srodek(od);
   const b = srodek(dokad);
@@ -205,7 +205,7 @@ export function lecPunkty(od: Cel, dokad: Cel, ile = 10): Promise<void> {
     let dolecialo = 0;
     for (let i = 0; i < n; i++) {
       const el = document.createElement("i");
-      el.className = "moneta";
+      el.className = `moneta ${klasa}`;
       // punkt kontrolny łuku odchylony prostopadle do toru, losowo w obie strony
       const odchyl = los(-0.5, 0.5) * Math.min(240, dl * 0.8);
       const cx = a.x + dx / 2 - (dy / dl) * odchyl;
@@ -231,10 +231,15 @@ export function lecPunkty(od: Cel, dokad: Cel, ile = 10): Promise<void> {
   });
 }
 
-/** Liczba albo krótki tekst unoszący się znad elementu i znikający („+25”, „+3 pkt proc.”). */
-export function uniesTekst(cel: Cel, tekst: string, klasa = "") {
+/**
+ * Liczba albo krótki tekst unoszący się znad elementu i znikający („+25”, „+3 pkt proc.”). Z `wDol` tekst
+ * wychodzi spod elementu i opada (dla rzeczy przy górnej krawędzi ekranu, np. awatara w nagłówku).
+ */
+export function uniesTekst(cel: Cel, tekst: string, klasa = "", wDol = false) {
   if (bezRuchu()) return;
-  const p = cel instanceof Element ? { x: srodek(cel).x, y: cel.getBoundingClientRect().top } : cel;
+  const r = cel instanceof Element ? cel.getBoundingClientRect() : null;
+  const p = r ? { x: Math.min(window.innerWidth - 90, r.left + r.width / 2), y: wDol ? r.bottom + 14 : r.top } : (cel as Punkt);
+  const k = wDol ? -1 : 1;
   const el = document.createElement("span");
   el.className = `unoszony cyfry ${klasa}`;
   el.textContent = tekst;
@@ -243,9 +248,9 @@ export function uniesTekst(cel: Cel, tekst: string, klasa = "") {
   const anim = el.animate(
     [
       { transform: "translate(-50%, 0) scale(0.7)", opacity: 0 },
-      { transform: "translate(-50%, -14px) scale(1.15)", opacity: 1, offset: 0.2 },
-      { transform: "translate(-50%, -30px) scale(1)", opacity: 1, offset: 0.65 },
-      { transform: "translate(-50%, -46px) scale(1)", opacity: 0 },
+      { transform: `translate(-50%, ${-14 * k}px) scale(1.15)`, opacity: 1, offset: 0.2 },
+      { transform: `translate(-50%, ${-30 * k}px) scale(1)`, opacity: 1, offset: 0.65 },
+      { transform: `translate(-50%, ${-46 * k}px) scale(1)`, opacity: 0 },
     ],
     { duration: 1000, easing: "ease-out", fill: "both" },
   );
