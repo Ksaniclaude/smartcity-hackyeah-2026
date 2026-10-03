@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { Kategoria, Status } from "@/api/types";
+import type { Kategoria, Pytanie, Status } from "@/api/types";
 import { ETYKIETY_STATUSU } from "@/api/types";
 import { procent } from "@/api/lmsr";
 import { pobierzGracza, zalogujEmailem, zarejestruj } from "@/api/api";
 import { useSesja } from "@/api/sesja";
 import { useAkcja } from "@/ui/hooks";
-import { inicjaly, liczba } from "@/ui/tekst";
+import { inicjaly, liczba, odmien } from "@/ui/tekst";
 import {
   IkAktywnosc,
   IkInfo,
@@ -71,6 +71,13 @@ export function formatujDateKrotko(iso: string | null | undefined): string {
   if (!iso) return "–";
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return d.toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
+}
+
+/** Stopka karty rynku: „bez prognoz”, „3/10 prognoz” (kurs jeszcze ukryty) albo „12 prognoz”. Krótko, bez zer. */
+export function opisPrognoz(p: Pick<Pytanie, "liczba_prognoz" | "prog_widocznosci" | "status" | "kursy">): string {
+  if (p.liczba_prognoz === 0) return "bez prognoz";
+  if (p.status === "otwarte" && p.kursy == null) return `${p.liczba_prognoz}/${p.prog_widocznosci} prognoz`;
+  return odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz");
 }
 
 /** Kafelek kategorii (zamiast obrazka rynku). */
@@ -504,7 +511,7 @@ function ModalKonta() {
   if (tryb === "nick") {
     return (
       <Modal tytul="Jeszcze nick" onClose={zamknijModal}>
-        <p className="pod">Jesteś zalogowany. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
+        <p className="pod">Zalogowano. Nick zobaczą inni gracze przy Twoich prognozach i komentarzach.</p>
         <FormularzNicku />
       </Modal>
     );

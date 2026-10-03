@@ -37,6 +37,7 @@ import {
   Wskaznik,
   formatujDate,
   formatujDateKrotko,
+  opisPrognoz,
 } from "@/ui/komponenty";
 import { czasTemu, liczba, odmien, pkt, punkty } from "@/ui/tekst";
 import { Wykres } from "@/ui/wykres";
@@ -102,12 +103,12 @@ function WpisAktywnosci({ a }: { a: Aktywnosc }) {
           </b>
           {sprzedaz ? (
             <span>
-              sprzedał {liczba(-a.udzialy, 1)} udz. na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span> za{" "}
+              sprzedaje {liczba(-a.udzialy, 1)} udz. na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span> za{" "}
               {liczba(a.stawka)} pkt
             </span>
           ) : (
             <span>
-              postawił {liczba(a.stawka)} pkt na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span>
+              stawia {liczba(a.stawka)} pkt na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span>
             </span>
           )}
           {a.kurs_po != null ? <span>· kurs {procent(a.kurs_po)}</span> : null}
@@ -197,7 +198,7 @@ function Komentarze({
           </button>
         </div>
       )}
-      {komentarze.length === 0 ? <p className="pusto">Jeszcze nikt nie skomentował. Napisz pierwszy.</p> : null}
+      {komentarze.length === 0 ? <p className="pusto">Jeszcze nikt nie skomentował. Twój komentarz może być pierwszy.</p> : null}
       {komentarze.map((k) => (
         <WpisKomentarza key={k.id} k={k} />
       ))}
@@ -808,7 +809,7 @@ export default function Pytanie() {
                   )}
                   {otwarte ? (
                     <button type="button" className={`kup kup-${KLASY[i] ?? "trzeci"}`} onClick={() => wybierz(i + 1)}>
-                      Tak
+                      Wybierz
                     </button>
                   ) : (
                     <span />
@@ -943,7 +944,7 @@ export default function Pytanie() {
                         )}
                       </Link>
                       <div className="rynek-dol">
-                        <span>{pkt(q.obrot)} obrotu</span>
+                        <span>{opisPrognoz(q)}</span>
                         <span className="prawy">do {formatujDateKrotko(q.termin)}</span>
                       </div>
                     </article>

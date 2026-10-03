@@ -45,11 +45,11 @@ function WpisTransakcji({ t, nick }: { t: MojaTransakcja; nick: string }) {
         <div className="kto">
           {sprzedaz ? (
             <span>
-              sprzedałeś <b>{liczba(-t.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(t.stawka)} pkt</b>
+              sprzedane <b>{liczba(-t.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(t.stawka)} pkt</b>
             </span>
           ) : (
             <span>
-              postawiłeś <b>{liczba(t.stawka)} pkt</b> na {typ}
+              postawione <b>{liczba(t.stawka)} pkt</b> na {typ}
             </span>
           )}
           <span>

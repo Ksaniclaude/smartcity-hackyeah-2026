@@ -6,7 +6,7 @@ import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Pytanie } from "@/api/types";
 import { terminowosc } from "@/dane/terminowosc";
 import { usePolling } from "@/ui/hooks";
-import { KafelekKategorii, Komunikat, OdznakaStatusu, Szkielet, Szukajka, Wskaznik, formatujDateKrotko } from "@/ui/komponenty";
+import { KafelekKategorii, Komunikat, OdznakaStatusu, Szkielet, Szukajka, Wskaznik, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { IkGwiazdka } from "@/ui/ikony";
 import { odmien } from "@/ui/tekst";
 
@@ -115,17 +115,10 @@ interface PropsKarty {
   przelaczObserwowanie: (id: number) => void;
 }
 
-/** Stopka karty (lewa strona): liczba prognoz, a gdy kurs jeszcze ukryty, ile brakuje do odsłonięcia. Krótko, bez zer. */
-function Meta({ p, otwarte, kursUkryty }: { p: Pytanie; otwarte: boolean; kursUkryty: boolean }) {
-  if (p.liczba_prognoz === 0) return <span>bez prognoz</span>;
-  if (otwarte && kursUkryty) {
-    return (
-      <span title={`Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach`}>
-        {p.liczba_prognoz}/{p.prog_widocznosci} prognoz
-      </span>
-    );
-  }
-  return <span>{odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz")}</span>;
+/** Stopka karty (lewa strona); gdy kurs jeszcze ukryty, podpowiedź mówi, po ilu prognozach się pokaże. */
+function Meta({ p }: { p: Pytanie }) {
+  const ukryty = p.status === "otwarte" && p.kursy == null && p.liczba_prognoz > 0;
+  return <span title={ukryty ? `Kurs tłumu pokaże się po ${p.prog_widocznosci} prognozach` : undefined}>{opisPrognoz(p)}</span>;
 }
 
 /** Karta jak na giełdzie prognoz: kafelek, tytuł, wskaźnik kursu, przyciski Tak/Nie albo lista odpowiedzi, stopka. */
@@ -228,7 +221,7 @@ function Rynek({ p, obserwowany, przelaczObserwowanie }: PropsKarty) {
       {tresc}
       <div className="rynek-dol">
         {nowy ? <span className="odznaka odznaka-nowe">Nowe</span> : null}
-        <Meta p={p} otwarte={otwarte} kursUkryty={kursy == null} />
+        <Meta p={p} />
         <span className="prawy">
           <button
             type="button"
