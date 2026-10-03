@@ -352,7 +352,7 @@ async function main() {
     await page.getByPlaceholder("np. krowodrza_42").fill("krowodrza_42");
     await page.getByPlaceholder("ty@przyklad.pl").fill("krowodrza@przyklad.pl");
     await page.getByLabel(/Hasło/).fill("haslo123");
-    await page.getByRole("button", { name: "Załóż konto" }).click();
+    await page.locator(".modal").getByRole("button", { name: "Załóż konto", exact: true }).click();
     await page.getByRole("button", { name: /^Postaw/ }).first().waitFor({ timeout: 8000 });
     await zrzut(page, "rynek_panel");
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
