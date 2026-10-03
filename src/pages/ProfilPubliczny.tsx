@@ -4,7 +4,7 @@ import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { PozycjaPubliczna } from "@/api/types";
 import { usePolling } from "@/ui/hooks";
-import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaStatusu, formatujDate } from "@/ui/komponenty";
+import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate } from "@/ui/komponenty";
 import { liczba, odmien, pkt } from "@/ui/tekst";
 import { WpisAktywnosci, klasaTypu } from "@/pages/Aktywnosc";
 
@@ -55,9 +55,11 @@ export default function ProfilPubliczny() {
           <div className="profil-naglowek">
             <Awatar nick={p.nick} duzy />
             <div>
-              <h1>{p.nick}</h1>
+              <h1>
+                {p.nick} <OdznakaMiejsca miejsce={p.miejsce} duza />
+              </h1>
               <div className="pod">
-                Gra od {formatujDate(p.utworzono)}
+                {p.miejsce != null ? `${p.miejsce}. miejsce w rankingu · ` : ""}Gra od {formatujDate(p.utworzono)}
                 {toJa ? (
                   <>
                     {" · "}
@@ -116,6 +118,7 @@ export default function ProfilPubliczny() {
                     <th className="liczba">Udziały</th>
                     <th className="liczba">Kurs</th>
                     <th className="liczba">Wartość</th>
+                    <th className="liczba">Zysk/strata</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,6 +141,9 @@ export default function ProfilPubliczny() {
                       </td>
                       <td className="liczba" data-etykieta="Wartość">
                         {liczba(z.wartosc, 1)} pkt
+                      </td>
+                      <td className="liczba" data-etykieta="Zysk/strata">
+                        {z.status === "uniewaznione" ? <span className="mala">zwrot</span> : <ZyskStrata wartosc={z.wartosc - z.wydane} miejsca={1} />}
                       </td>
                     </tr>
                   ))}

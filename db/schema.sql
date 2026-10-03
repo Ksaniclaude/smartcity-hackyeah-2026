@@ -55,6 +55,7 @@ create table public.pytania (
   kursy_otwarcia        double precision[],
   otwarto               timestamptz,
   miasto                text not null default 'Kraków' check (char_length(btrim(miasto)) between 2 and 40),
+  prog_widocznosci      integer check (prog_widocznosci is null or prog_widocznosci >= 1),
   constraint odpowiedzi_2_3 check (array_length(odpowiedzi, 1) between 2 and 3),
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
   constraint wynik_zakres check (wynik is null or wynik between 1 and array_length(odpowiedzi, 1)),
@@ -123,7 +124,26 @@ create table public.ustawienia (
 create or replace function public.limit_na_pytanie() returns numeric
   language sql immutable set search_path = public, pg_temp as $$ select 200::numeric $$;
 create or replace function public.prog_widocznosci_kursu() returns integer
-  language sql immutable set search_path = public, pg_temp as $$ select 10 $$;
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(
+    (select case when u.wartosc ~ '^[0-9]+$' then greatest(1, u.wartosc::integer) end
+       from public.ustawienia u where u.klucz = 'prog_widocznosci_kursu'),
+    2)
+$$;
+
+create or replace function public.prog_pytania(p_id bigint) returns integer
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(p.prog_widocznosci, public.prog_widocznosci_kursu())
+  from public.pytania p where p.id = p_id
+$$;
+
+create or replace function public.kurs_widoczny(p_id bigint) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select p.status <> 'propozycja'
+         and (p.liczba_prognoz >= public.prog_pytania(p.id)
+              or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
+  from public.pytania p where p.id = p_id
+$$;
 
 -- ---------------------------------------------------------------------------
 -- LMSR
@@ -274,6 +294,7 @@ declare
   v_s jsonb;
   v_sprzedano jsonb := '[]'::jsonb;
   v_zwrot_s numeric := 0;
+  v_miejsce_przed integer;
 begin
   -- 1. blokada pytania (kolejne zakłady czekają)
   select * into p from public.pytania where id = p_pytanie for update;
@@ -304,6 +325,7 @@ begin
   if v_komentarz is not null and char_length(v_komentarz) > 200 then
     raise exception 'Komentarz: najwyżej 200 znaków';
   end if;
+  v_miejsce_przed := public.miejsce_w_rankingu(v_gracz);
 
   -- 2b. jedna strona rynku na gracza (jak na giełdach prognoz): udziały na innych
   -- odpowiedziach są najpierw sprzedawane po bieżącym kursie, w tej samej transakcji
@@ -366,7 +388,7 @@ begin
   values
     (v_gracz, p_pytanie, p_odpowiedz, p_stawka, v_udzialy, v_kurs_przed, v_kurs_po, p_powod, v_komentarz, v_kursy);
 
-  -- 5. nowe kursy
+  -- 5. nowe kursy, miejsce w rankingu
   return jsonb_build_object(
     'pytanie', p_pytanie,
     'odpowiedz', p_odpowiedz,
@@ -379,7 +401,10 @@ begin
     'liczba_prognoz', p.liczba_prognoz + 1,
     'obrot', p.obrot + p_stawka,
     'sprzedano', v_sprzedano,
-    'zwrot_ze_sprzedazy', v_zwrot_s
+    'zwrot_ze_sprzedazy', v_zwrot_s,
+    'miejsce_przed', v_miejsce_przed,
+    'miejsce_po', public.miejsce_w_rankingu(v_gracz),
+    'graczy_w_rankingu', (select count(*)::integer from public.ranking_graczy())
   );
 end $$;
 
@@ -408,6 +433,7 @@ declare
   v_saldo numeric;
   v_wydane_po numeric;
   v_wszystko boolean;
+  v_miejsce_przed integer;
 begin
   select * into p from public.pytania where id = p_pytanie for update;
   if not found then raise exception 'Nie ma takiego pytania'; end if;
@@ -425,6 +451,7 @@ begin
   v_wszystko := (v_udzialy = z.udzialy);
   if not v_wszystko and v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
   select saldo into v_saldo from public.gracze where id = v_gracz for update;
+  v_miejsce_przed := public.miejsce_w_rankingu(v_gracz);
 
   -- C(q) i C(q') przez log-sum-exp
   m := (select max(x / p.b) from unnest(p.q) as x);
@@ -448,7 +475,8 @@ begin
     return jsonb_build_object(
       'pytanie', p_pytanie, 'odpowiedz', p_odpowiedz, 'udzialy', v_udzialy, 'zwrot', 0,
       'kurs_przed', v_kurs_przed, 'kurs_po', v_kurs_po, 'kursy', to_jsonb(v_kursy),
-      'saldo', v_saldo, 'udzialy_pozostale', 0);
+      'saldo', v_saldo, 'udzialy_pozostale', 0,
+      'miejsce_przed', v_miejsce_przed, 'miejsce_po', public.miejsce_w_rankingu(v_gracz));
   end if;
   v_wydane_po := case when z.udzialy - v_udzialy <= 0 then 0
                       else round(z.wydane_punkty * ((z.udzialy - v_udzialy) / z.udzialy)::numeric, 4) end;
@@ -471,7 +499,9 @@ begin
     'kurs_po', v_kurs_po,
     'kursy', to_jsonb(v_kursy),
     'saldo', v_saldo + v_zwrot,
-    'udzialy_pozostale', z.udzialy - v_udzialy
+    'udzialy_pozostale', z.udzialy - v_udzialy,
+    'miejsce_przed', v_miejsce_przed,
+    'miejsce_po', public.miejsce_w_rankingu(v_gracz)
   );
 end $$;
 
@@ -773,6 +803,29 @@ begin
     termin, id;
 end $$;
 
+create or replace function public.admin_ustaw_prog(p_pytanie bigint, p_prog integer default null)
+returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  if p_prog is not null and p_prog < 1 then raise exception 'Próg musi wynosić co najmniej 1 prognozę'; end if;
+  update public.pytania set prog_widocznosci = p_prog where id = p_pytanie;
+  if not found then raise exception 'Nie ma takiego pytania'; end if;
+end $$;
+
+create or replace function public.admin_ustaw_prog_domyslny(p_prog integer)
+returns integer
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  if p_prog is null or p_prog < 1 then raise exception 'Próg musi wynosić co najmniej 1 prognozę'; end if;
+  insert into public.ustawienia (klucz, wartosc) values ('prog_widocznosci_kursu', p_prog::text)
+  on conflict (klucz) do update set wartosc = excluded.wartosc;
+  return public.prog_widocznosci_kursu();
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Odczyt: widoki z RLS (security_invoker). Kolumna q nie jest dostępna dla
 -- klienta (uprawnienia kolumnowe), a kursy liczy funkcja SECURITY DEFINER,
@@ -782,24 +835,53 @@ end $$;
 create or replace function public.kursy_pytania(p_id bigint)
 returns double precision[]
 language sql stable security definer set search_path = public, pg_temp as $$
-  select case when p.status <> 'propozycja'
-               and (p.liczba_prognoz >= public.prog_widocznosci_kursu()
-                    or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
-         then public.kursy(p.q, p.b) end
+  select case when public.kurs_widoczny(p.id) then public.kursy(p.q, p.b) end
   from public.pytania p
   where p.id = p_id
 $$;
 
-create view public.v_pytania with (security_invoker = true) as
+create or replace function public.kursy_godzine_temu(p_id bigint)
+returns double precision[]
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when public.kurs_widoczny(p.id) and p.status in ('otwarte', 'zamkniete') then
+    coalesce(
+      (select coalesce(t.kursy_rynku,
+                       case when array_length(p.odpowiedzi, 1) = 2 then
+                         case when t.odpowiedz = 1 then array[t.kurs_po, 1 - t.kurs_po]
+                              else array[1 - t.kurs_po, t.kurs_po] end
+                       end)
+         from public.transakcje t
+        where t.pytanie = p.id and t.czas <= now() - interval '1 hour'
+        order by t.czas desc, t.id desc
+        limit 1),
+      p.kursy_otwarcia)
+  end
+  from public.pytania p where p.id = p_id
+$$;
+
+create or replace function public.gracze_rynku(p_id bigint)
+returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when p.status = 'rozstrzygniete' then jsonb_build_object(
+    'graczy', (select count(distinct z.gracz) from public.pozycje z
+                where z.pytanie = p.id and (z.udzialy > 0 or z.wydane_punkty > 0)),
+    'trafilo', (select count(distinct z.gracz) from public.pozycje z
+                 where z.pytanie = p.id and z.odpowiedz = p.wynik and z.udzialy > 0))
+  end
+  from public.pytania p where p.id = p_id
+$$;
+
+create or replace view public.v_pytania with (security_invoker = true) as
 select
   p.id, p.tresc, p.kategoria, p.odpowiedzi, p.kryterium, p.link_zrodla, p.termin, p.status,
   p.wynik, p.link_rozstrzygniecia, p.komentarz_urzedu, p.liczba_prognoz, p.utworzono, p.rozstrzygnieto,
-  (p.liczba_prognoz >= public.prog_widocznosci_kursu()
-     or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')) as kurs_widoczny,
+  public.kurs_widoczny(p.id) as kurs_widoczny,
   public.kursy_pytania(p.id) as kursy,
-  public.prog_widocznosci_kursu() as prog_widocznosci,
+  public.prog_pytania(p.id) as prog_widocznosci,
   (select count(*) from public.zmiany_terminow z where z.pytanie = p.id)::integer as liczba_zmian_terminu,
   p.obrot, p.otwarto, p.kursy_otwarcia,
+  public.kursy_godzine_temu(p.id) as kursy_1h,
+  public.gracze_rynku(p.id) as gracze_rynku,
   p.miasto
 from public.pytania p
 where p.status <> 'propozycja';
@@ -835,9 +917,7 @@ returns table (czas timestamptz, kursy double precision[])
 language sql stable security definer set search_path = public, pg_temp as $$
   with p as (
     select * from public.pytania
-    where id = p_pytanie and status <> 'propozycja'
-      and (liczba_prognoz >= public.prog_widocznosci_kursu()
-           or status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
+    where id = p_pytanie and public.kurs_widoczny(id)
   )
   select h.czas, h.kursy from (
     select coalesce(p.otwarto, p.utworzono) as czas, p.kursy_otwarcia as kursy from p
@@ -863,9 +943,7 @@ returns table (id bigint, pytanie bigint, tresc text, kategoria public.kategoria
 language sql stable security definer set search_path = public, pg_temp as $$
   select t.id, t.pytanie, p.tresc, p.kategoria, g.nick, t.odpowiedz, p.odpowiedzi[t.odpowiedz],
          t.stawka, case when t.typ = 'sprzedaz' then -t.udzialy else t.udzialy end,
-         case when p.liczba_prognoz >= public.prog_widocznosci_kursu()
-                or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')
-              then t.kurs_po end,
+         case when public.kurs_widoczny(p.id) then t.kurs_po end,
          t.powod, t.komentarz, t.czas
   from public.transakcje t
   join public.pytania p on p.id = t.pytanie
@@ -944,16 +1022,16 @@ $$;
 -- Ranking graczy (tylko ci, którzy coś postawili). Portfel = saldo + wartość
 -- udziałów w otwartych pytaniach (po bieżącym kursie; po koszcie, dopóki kurs
 -- ukryty). Trafność liczona jak w profilu: główny typ vs wynik.
-create or replace function public.ranking(p_limit integer default 50)
-returns table (nick text, saldo numeric, wartosc_pozycji double precision, portfel double precision,
-               zysk double precision, prognozy integer, obrot numeric, trafione integer, rozstrzygniete integer)
+create or replace function public.ranking_graczy()
+returns table (gracz uuid, nick text, saldo numeric, wartosc_pozycji double precision, portfel double precision,
+               zysk double precision, prognozy integer, obrot numeric, trafione integer, rozstrzygniete integer,
+               miejsce integer)
 language sql stable security definer set search_path = public, pg_temp as $$
   with poz as (
     select z.gracz,
            sum(case
                  when p.status not in ('otwarte', 'zamkniete') then 0
-                 when p.liczba_prognoz >= public.prog_widocznosci_kursu() or p.status = 'zamkniete'
-                   then z.udzialy * (public.kursy(p.q, p.b))[z.odpowiedz]
+                 when public.kurs_widoczny(p.id) then z.udzialy * (public.kursy(p.q, p.b))[z.odpowiedz]
                  else z.wydane_punkty::double precision
                end) as wartosc
     from public.pozycje z join public.pytania p on p.id = z.pytanie
@@ -978,15 +1056,30 @@ language sql stable security definer set search_path = public, pg_temp as $$
     join public.pytania p on p.id = w.pytanie and p.status = 'rozstrzygniete'
     group by w.gracz
   )
-  select g.nick, g.saldo, coalesce(poz.wartosc, 0),
+  select g.id, g.nick, g.saldo, coalesce(poz.wartosc, 0),
          g.saldo::double precision + coalesce(poz.wartosc, 0),
          g.saldo::double precision + coalesce(poz.wartosc, 0) - 1000,
-         tr.prognozy, tr.obrot, coalesce(wyn.trafione, 0), coalesce(wyn.rozstrzygniete, 0)
+         tr.prognozy, tr.obrot, coalesce(wyn.trafione, 0), coalesce(wyn.rozstrzygniete, 0),
+         (row_number() over (order by g.saldo::double precision + coalesce(poz.wartosc, 0) desc, g.nick))::integer
   from public.gracze g
   join tr on tr.gracz = g.id
   left join poz on poz.gracz = g.id
   left join wyn on wyn.gracz = g.id
-  order by 4 desc, g.nick
+$$;
+
+create or replace function public.miejsce_w_rankingu(p_gracz uuid) returns integer
+language sql stable security definer set search_path = public, pg_temp as $$
+  select r.miejsce from public.ranking_graczy() r where r.gracz = p_gracz
+$$;
+
+-- Publiczny ranking: wiersze w kolejności miejsc (miejsce = pozycja na liście), bez zmiany sygnatury.
+create or replace function public.ranking(p_limit integer default 50)
+returns table (nick text, saldo numeric, wartosc_pozycji double precision, portfel double precision,
+               zysk double precision, prognozy integer, obrot numeric, trafione integer, rozstrzygniete integer)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select r.nick, r.saldo, r.wartosc_pozycji, r.portfel, r.zysk, r.prognozy, r.obrot, r.trafione, r.rozstrzygniete
+  from public.ranking_graczy() r
+  order by r.miejsce
   limit greatest(1, least(coalesce(p_limit, 50), 200))
 $$;
 
@@ -1033,8 +1126,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
   akt as (
     select t.id, t.pytanie, p.tresc, p.kategoria, g.nick, t.odpowiedz, p.odpowiedzi[t.odpowiedz] as odpowiedz_tekst,
            t.stawka, case when t.typ = 'sprzedaz' then -t.udzialy else t.udzialy end as udzialy,
-           case when p.liczba_prognoz >= public.prog_widocznosci_kursu()
-                  or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione') then t.kurs_po end as kurs_po,
+           case when public.kurs_widoczny(p.id) then t.kurs_po end as kurs_po,
            t.powod, t.komentarz, t.czas
     from public.transakcje t join g on g.id = t.gracz join public.pytania p on p.id = t.pytanie
     where p.status <> 'propozycja'
@@ -1050,6 +1142,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
     'najwieksza_wygrana', (select najwieksza from wygrana),
     'trafione', coalesce((select trafione from wyn), 0),
     'rozstrzygniete', coalesce((select rozstrzygniete from wyn), 0),
+    'miejsce', (select r.miejsce from public.ranking_graczy() r where r.gracz = (select id from g)),
     'pozycje', coalesce((select jsonb_agg(to_jsonb(poz) order by poz.termin desc, poz.pytanie desc) from poz), '[]'::jsonb),
     'aktywnosc', coalesce((select jsonb_agg(to_jsonb(akt) order by akt.czas desc) from akt), '[]'::jsonb)
   ) end
@@ -1113,7 +1206,7 @@ create policy zmiany_publiczne on public.zmiany_terminow for select to anon, aut
 -- uprawnienia kolumnowe; kursy daje kursy_pytania() z progiem widoczności.
 grant select (id, tresc, kategoria, odpowiedzi, kryterium, link_zrodla, termin, status, b,
               wynik, link_rozstrzygniecia, komentarz_urzedu, liczba_prognoz, utworzono, rozstrzygnieto, obrot, otwarto,
-              kursy_otwarcia, miasto)
+              kursy_otwarcia, prog_widocznosci, miasto)
   on public.pytania to anon, authenticated;
 create policy pytania_publiczne on public.pytania for select to anon, authenticated
   using (status <> 'propozycja');
@@ -1123,6 +1216,10 @@ grant select on public.v_pytania to anon, authenticated;
 grant select on public.v_moje_pozycje to authenticated;
 grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
 grant execute on function public.prog_widocznosci_kursu() to anon, authenticated;
+grant execute on function public.prog_pytania(bigint) to anon, authenticated;
+grant execute on function public.kurs_widoczny(bigint) to anon, authenticated;
+grant execute on function public.kursy_godzine_temu(bigint) to anon, authenticated;
+grant execute on function public.gracze_rynku(bigint) to anon, authenticated;
 grant execute on function public.limit_na_pytanie() to anon, authenticated;
 grant execute on function public.rozklad_powodow() to anon, authenticated;
 grant execute on function public.komentarze_pytania(bigint, integer) to anon, authenticated;
@@ -1149,6 +1246,8 @@ grant execute on function public.admin_uniewaznij(bigint, text) to authenticated
 grant execute on function public.admin_komentarz_urzedu(bigint, text) to authenticated;
 grant execute on function public.admin_zmien_termin(bigint, date, text) to authenticated;
 grant execute on function public.admin_pytania() to authenticated;
+grant execute on function public.admin_ustaw_prog(bigint, integer) to authenticated;
+grant execute on function public.admin_ustaw_prog_domyslny(integer) to authenticated;
 -- Czyste funkcje matematyczne mogą być wołane przez każdego (np. podgląd kursu).
 grant execute on function public.kursy(double precision[], double precision) to anon, authenticated;
 grant execute on function public.q_z_kursu(double precision[], double precision) to anon, authenticated;

@@ -2,8 +2,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { pobierzAktywnosc } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { POWODY, type Aktywnosc as WpisAkt, type Kategoria } from "@/api/types";
-import { usePolling } from "@/ui/hooks";
-import { Awatar, Komunikat, Ladowanie } from "@/ui/komponenty";
+import { useMiejsca, usePolling } from "@/ui/hooks";
+import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca } from "@/ui/komponenty";
 import { czasTemu, liczba } from "@/ui/tekst";
 
 const KLASY_TYPU = ["typ-tak", "typ-nie", "typ-trzeci"];
@@ -14,7 +14,7 @@ export function klasaTypu(indeks: number): string {
 }
 
 /** Jeden wiersz aktywności: „nick stawia 25 pkt na tak · kurs 44% · 5 min temu”. */
-export function WpisAktywnosci({ wpis }: { wpis: WpisAkt }) {
+export function WpisAktywnosci({ wpis, miejsce }: { wpis: WpisAkt; miejsce?: number | null }) {
   const sprzedaz = wpis.udzialy < 0;
   const typ = <span className={klasaTypu(wpis.odpowiedz - 1)}>{wpis.odpowiedz_tekst}</span>;
   const powod = wpis.powod ? (POWODY.find((p) => p.wartosc === wpis.powod)?.etykieta ?? wpis.powod) : null;
@@ -26,6 +26,7 @@ export function WpisAktywnosci({ wpis }: { wpis: WpisAkt }) {
           <b>
             <Link to={`/u/${encodeURIComponent(wpis.nick)}`}>{wpis.nick}</Link>
           </b>
+          <OdznakaMiejsca miejsce={miejsce} />
           {sprzedaz ? (
             <span>
               sprzedaje <b>{liczba(-wpis.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(wpis.stawka)} pkt</b>
@@ -61,6 +62,7 @@ export default function Aktywnosc() {
   const f = params.get("f");
   const filtr: Filtr = f === "miasto" || f === "luz" ? f : "wszystko";
   const { dane, blad, laduje } = usePolling(() => pobierzAktywnosc(null, 60), 5000);
+  const miejsca = useMiejsca();
   const wszystkie = dane ?? [];
   const wpisy = filtr === "wszystko" ? wszystkie : wszystkie.filter((w) => w.kategoria === filtr);
 
@@ -100,7 +102,7 @@ export default function Aktywnosc() {
         {wpisy.length > 0 ? (
           <div>
             {wpisy.map((w) => (
-              <WpisAktywnosci key={w.id} wpis={w} />
+              <WpisAktywnosci key={w.id} wpis={w} miejsce={miejsca.get(w.nick)} />
             ))}
           </div>
         ) : null}

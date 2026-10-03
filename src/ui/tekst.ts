@@ -97,7 +97,7 @@ export function kolorAwatara(nick: string): number {
   return (h % 6) + 1;
 }
 
-/** Inicjały do awatara: "krowodrza_42" → "KR". */
+/** Inicjały do awatara: "sokole_oko" → "SO". */
 export function inicjaly(nick: string): string {
   const czyste = nick.replace(/[^\p{L}\p{N}]/gu, "");
   return (czyste.slice(0, 2) || "??").toUpperCase();

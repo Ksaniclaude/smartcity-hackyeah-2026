@@ -5,7 +5,6 @@ import {
   pobierzAktywnosc,
   pobierzHistorie,
   pobierzKomentarze,
-  pobierzMojePozycje,
   pobierzMojeUdzialy,
   pobierzNajwiekszych,
   pobierzPytania,
@@ -26,18 +25,21 @@ import {
   type WynikSprzedazy,
   type WynikZakladu,
 } from "@/api/types";
-import { useAkcja, usePolling } from "@/ui/hooks";
+import { useAkcja, useMiejsca, usePolling } from "@/ui/hooks";
 import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
-import { Awatar, Komunikat, Ladowanie, OdznakaStatusu, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
-import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
+import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
+import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
+import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
 import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, zmianaPp } from "@/ui/tekst";
+import { PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { LiczbaZywa, fala, lecPunkty, podbij, uniesTekst, useWidoczny, wibruj, wstrzasnij, wystrzel } from "@/ui/zywe";
 
 const LIMIT_NA_PYTANIE = 200;
 /** Punkty na start: goście liczą nimi podgląd wygranej, zanim założą konto. */
 const PUNKTY_NA_START = 1000;
-const CHIPY = [10, 25, 50, 100];
+/** Szybkie stawki: jeden klik zamiast wpisywania liczby. */
+const SZYBKIE_STAWKI = [20, 50, 100, 200];
 type Okres = "1d" | "1t" | "1m" | "all";
 type Zakladka = "komentarze" | "gracze" | "moje" | "aktywnosc";
 const KLUCZ_OBSERWOWANE = "zdaza.obserwowane";
@@ -75,7 +77,7 @@ function wytnijOkres(h: PunktHistorii[], okres: Okres): PunktHistorii[] {
 
 /* ---------- zakładki pod rynkiem ---------- */
 
-function WpisAktywnosci({ a }: { a: Aktywnosc }) {
+function WpisAktywnosci({ a, miejsce }: { a: Aktywnosc; miejsce?: number | null }) {
   const sprzedaz = a.udzialy < 0;
   return (
     <div className="wpis">
@@ -85,6 +87,7 @@ function WpisAktywnosci({ a }: { a: Aktywnosc }) {
           <b>
             <Link to={`/u/${encodeURIComponent(a.nick)}`}>{a.nick}</Link>
           </b>
+          <OdznakaMiejsca miejsce={miejsce} />
           {sprzedaz ? (
             <span>
               sprzedaje {liczba(-a.udzialy, 1)} udz. na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span> za{" "}
@@ -104,7 +107,8 @@ function WpisAktywnosci({ a }: { a: Aktywnosc }) {
   );
 }
 
-function WpisKomentarza({ k }: { k: Komentarz }) {
+/** Komentarz z odznaką pozycji autora („stawia 120 na tak”, z już zapisanej stawki) i miejscem w rankingu. */
+function WpisKomentarza({ k, miejsce }: { k: Komentarz; miejsce?: number | null }) {
   return (
     <div className="wpis">
       <Awatar nick={k.nick} />
@@ -113,10 +117,10 @@ function WpisKomentarza({ k }: { k: Komentarz }) {
           <b>
             <Link to={`/u/${encodeURIComponent(k.nick)}`}>{k.nick}</Link>
           </b>
+          <OdznakaMiejsca miejsce={miejsce} />
           {k.odpowiedz != null && k.odpowiedz_tekst ? (
-            <span>
-              {k.stawka > 0 ? `${liczba(k.stawka)} pkt na ` : "typ: "}
-              <span className={klasaTypu(k.odpowiedz - 1)}>{k.odpowiedz_tekst}</span>
+            <span className={`odznaka-pozycji ${klasaTypu(k.odpowiedz - 1)}`}>
+              {k.stawka > 0 ? `stawia ${liczba(k.stawka)} na ${k.odpowiedz_tekst}` : `typ: ${k.odpowiedz_tekst}`}
             </span>
           ) : null}
           {k.powod ? <span className="znacznik">{POWODY.find((r) => r.wartosc === k.powod)?.etykieta ?? k.powod}</span> : null}
@@ -132,10 +136,12 @@ function Komentarze({
   pid,
   komentarze,
   odswiez,
+  miejsca,
 }: {
   pid: number;
   komentarze: Komentarz[];
   odswiez: () => Promise<void>;
+  miejsca: Map<string, number>;
 }) {
   const { stan, konto, otworzModal } = useSesja();
   const [tekst, setTekst] = useState("");
@@ -182,13 +188,13 @@ function Komentarze({
       )}
       {komentarze.length === 0 ? <p className="pusto">Jeszcze nikt nie skomentował. Twój komentarz może być pierwszy.</p> : null}
       {komentarze.map((k) => (
-        <WpisKomentarza key={k.id} k={k} />
+        <WpisKomentarza key={k.id} k={k} miejsce={miejsca.get(k.nick)} />
       ))}
     </div>
   );
 }
 
-function NajwieksiGracze({ odpowiedzi, lista }: { odpowiedzi: string[]; lista: NajwiekszyGracz[] }) {
+function NajwieksiGracze({ odpowiedzi, lista, miejsca }: { odpowiedzi: string[]; lista: NajwiekszyGracz[]; miejsca: Map<string, number> }) {
   if (lista.length === 0) return <p className="pusto">Nikt jeszcze nie ma udziałów.</p>;
   return (
     <div className="najwieksi">
@@ -204,6 +210,7 @@ function NajwieksiGracze({ odpowiedzi, lista }: { odpowiedzi: string[]; lista: N
                   <span className="gracz-kom">
                     <Awatar nick={g.nick} />
                     <Link to={`/u/${encodeURIComponent(g.nick)}`}>{g.nick}</Link>
+                    <OdznakaMiejsca miejsce={miejsca.get(g.nick)} />
                   </span>
                   <b>{liczba(g.udzialy, 1)} udz.</b>
                 </li>
@@ -242,6 +249,22 @@ interface PanelProps {
   udzialyMoje: { odpowiedz: number; udzialy: number; wydane: number }[];
   wydaneRazem: number;
   poZmianie: () => Promise<void>;
+  /** Adres rynku do karty udostępniania. */
+  url: string;
+}
+
+/** Zmiana miejsca w rankingu po transakcji (nic, gdy bez zmian). */
+function Awans({ przed, po, graczy }: { przed: number | null; po: number | null; graczy?: number }) {
+  if (po == null || przed === po) return null;
+  if (przed == null)
+    return (
+      <p className="awans gora">
+        Wejście do rankingu: miejsce {po}
+        {graczy ? ` z ${graczy}` : ""}
+      </p>
+    );
+  if (po < przed) return <p className="awans gora">Awans w rankingu: {przed} → {po}</p>;
+  return <p className="awans dol">Ranking: {przed} → {po}</p>;
 }
 
 /** Kurs na kuponie: startuje od kursu sprzed prognozy i dochodzi do nowego, żeby było widać własny ruch. */
@@ -254,10 +277,10 @@ function KursPoZmianie({ przed, po }: { przed: number; po: number }) {
   return <LiczbaZywa wartosc={kurs * 100} format={jakoProcent} czas={700} />;
 }
 
-function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelProps) {
+function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie, url }: PanelProps) {
   const { gracz, konto, stan, otworzModal, uruchom, odswiezGracza } = useSesja();
   const [tryb, setTryb] = useState<"kup" | "sprzedaj">("kup");
-  const [stawka, setStawka] = useState(10);
+  const [stawka, setStawka] = useState(SZYBKIE_STAWKI[0]);
   const [powod, setPowod] = useState<Powod | null>(null);
   const [komentarz, setKomentarz] = useState("");
   const [wynik, setWynik] = useState<WynikZakladu | null>(null);
@@ -301,6 +324,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
     return p.kursy[odp - 1];
   })();
   const podglad = kursWybranej != null ? podgladZakladu(kursWybranej, stawkaOk) : null;
+  const mnoznik = podglad ? podglad.udzialy / stawkaOk : null;
   const brakPowodu = miasto && !powod;
   const pozycjaSprzedaz = posiadane.find((z) => z.odpowiedz === odpSprzedaz) ?? posiadane[0] ?? null;
   const kursSprzedazy = pozycjaSprzedaz && p.kursy ? p.kursy[pozycjaSprzedaz.odpowiedz - 1] : null;
@@ -485,12 +509,25 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             </p>
           ) : null}
           <p>
-            Twoja prognoza przesunęła kurs z {procent(wynik.kurs_przed)} na {procent(wynik.kurs_po)}.
+            Twój ruch przesunął kurs {procent(wynik.kurs_przed)} → {procent(wynik.kurs_po)}.
           </p>
           <p>
-            Masz <b>{liczba(wynik.udzialy, 1)} udziałów</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz, każdy udział
-            wypłaci 1 punkt. Saldo: {punkty(wynik.saldo)}.
+            Masz <b>{liczba(wynik.udzialy, 1)} udz.</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz:{" "}
+            <b className="zysk">+{liczba(wynik.udzialy, 1)} pkt</b> (×{liczba(wynik.udzialy / wynik.stawka, 2)}). Saldo: {punkty(wynik.saldo)}.
           </p>
+          <Awans przed={wynik.miejsce_przed} po={wynik.miejsce_po} graczy={wynik.graczy_w_rankingu} />
+          <div className="kupon-akcje">
+            <PrzyciskUdostepnij
+              dane={{
+                tresc: p.tresc,
+                odpowiedz: p.odpowiedzi[wynik.odpowiedz - 1],
+                indeks: wynik.odpowiedz - 1,
+                kurs: wynik.kurs_po,
+                nick: gracz?.nick ?? null,
+                url,
+              }}
+            />
+          </div>
         </div>
       ) : null}
       {wynikSprzedazy ? (
@@ -500,9 +537,10 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             Sprzedano {liczba(wynikSprzedazy.udzialy, 1)} udz. za {liczba(wynikSprzedazy.zwrot, 1)} pkt
           </div>
           <p>
-            Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł z {procent(wynikSprzedazy.kurs_przed)} na{" "}
-            {procent(wynikSprzedazy.kurs_po)}. Saldo: {punkty(wynikSprzedazy.saldo)}.
+            Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł {procent(wynikSprzedazy.kurs_przed)} → {procent(wynikSprzedazy.kurs_po)}.
+            Saldo: {punkty(wynikSprzedazy.saldo)}.
           </p>
+          <Awans przed={wynikSprzedazy.miejsce_przed} po={wynikSprzedazy.miejsce_po} />
         </div>
       ) : null}
 
@@ -551,32 +589,23 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                 />
                 <span>pkt</span>
               </div>
-              <div className="stawka-chipy">
-                {CHIPY.map((c) => (
+              <div className="stawka-chipy stawka-szybkie" role="group" aria-label="Szybka stawka">
+                {SZYBKIE_STAWKI.map((c) => (
                   <button
                     type="button"
                     key={c}
-                    disabled={stawkaOk >= maks}
+                    className={`cyfry ${c <= maks && stawkaOk === c ? "wybrany" : ""}`}
+                    disabled={c > maks && stawkaOk === maks}
                     onClick={(e) => {
-                      setStawka(Math.min(maks, stawkaOk + c));
-                      uniesTekst(e.currentTarget, `+${Math.min(c, maks - stawkaOk)}`, "akcent");
+                      const nowa = Math.min(maks, c);
+                      if (nowa !== stawkaOk) uniesTekst(e.currentTarget, `${nowa}`, "akcent");
+                      setStawka(nowa);
                       wibruj(6);
                     }}
                   >
-                    +{c}
+                    {c}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className={stawkaOk === maks ? "wybrany" : ""}
-                  onClick={() => {
-                    setStawka(maks);
-                    if (stawkaOk < maks && refStawki.current) fala(refStawki.current, "", 150);
-                    wibruj(12);
-                  }}
-                >
-                  Maks
-                </button>
               </div>
               <Suwak min={1} max={maks} wartosc={stawkaOk} etykieta="Suwak stawki" naZmiane={setStawka} />
             </div>
@@ -619,23 +648,27 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             <div className="wygrana" style={{ "--waga": Math.min(1, stawkaOk / LIMIT_NA_PYTANIE).toFixed(2) } as CSSProperties}>
               {podglad ? (
                 <>
+                  <div className="wiersz-pod">
+                    <span>Udziały</span>
+                    <b>≈ {liczba(podglad.udzialy, 1)}</b>
+                  </div>
+                  <div className="wiersz-pod">
+                    <span>Kurs po transakcji</span>
+                    <b>
+                      {procent(kursWybranej)} → {procent(podglad.kursPo)}
+                    </b>
+                  </div>
                   <div className="wygrana-glowna">
-                    <span>Wygrasz, jeśli trafisz</span>
-                    <span className="cyfry" ref={refWygranej}>
-                      <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `≈ ${liczba(n, 1)}`} czas={220} />
-                      <small>pkt</small>
+                    <span>Jeśli trafisz</span>
+                    <span className="cyfry zysk" ref={refWygranej}>
+                      <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `+${liczba(n, 1)}`} czas={220} />
+                      <small>pkt (×{liczba(mnoznik ?? 0, 2)})</small>
                     </span>
                   </div>
                   <div className="wiersz-pod">
                     <span>Zysk ponad stawkę</span>
                     <b className="zysk">
                       +{liczba(podglad.udzialy - stawkaOk, 1)} pkt (+{Math.round((podglad.udzialy / stawkaOk - 1) * 100)}%)
-                    </b>
-                  </div>
-                  <div className="wiersz-pod">
-                    <span>Kurs po Twojej prognozie</span>
-                    <b>
-                      {procent(kursWybranej)} → {procent(podglad.kursPo)}
                     </b>
                   </div>
                 </>
@@ -792,8 +825,9 @@ export default function Pytanie() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const pid = Number(id);
-  const { stan } = useSesja();
+  const { stan, gracz, pozycje: moje } = useSesja();
   const zalogowany = stan === "gotowy";
+  const miejsca = useMiejsca();
 
   const { dane: p, blad: bladPytania, laduje, odswiez: odswiezPytanie } = usePolling(() => pobierzPytanie(pid), 5000, pid);
   const { dane: historia, odswiez: odswiezHistorie } = usePolling(() => pobierzHistorie(pid), 10000, pid);
@@ -801,11 +835,6 @@ export default function Pytanie() {
   const { dane: aktywnosc, odswiez: odswiezAktywnosc } = usePolling(() => pobierzAktywnosc(pid, 30), 10000, pid);
   const { dane: najwieksi, odswiez: odswiezNajwiekszych } = usePolling(() => pobierzNajwiekszych(pid), 15000, pid);
   const { dane: wszystkie } = usePolling(pobierzPytania, 30000, "podobne");
-  const { dane: moje, odswiez: odswiezMoje } = usePolling(
-    () => (zalogowany ? pobierzMojePozycje() : Promise.resolve([])),
-    5000,
-    `${pid}-${zalogowany}`,
-  );
   const { dane: udzialyMoje, odswiez: odswiezUdzialy } = usePolling(
     () => (zalogowany ? pobierzMojeUdzialy(pid) : Promise.resolve([])),
     5000,
@@ -819,6 +848,7 @@ export default function Pytanie() {
   const [refPanelu, panelWidoczny] = useWidoczny<HTMLElement>();
   const t = params.get("tab");
   const zakladka: Zakladka = t === "gracze" || t === "moje" || t === "aktywnosc" ? t : "komentarze";
+  const rozstrzygniecie = useRozstrzygniecieDoPokazania(gracz?.nick ?? null, moje, pid);
 
   useEffect(() => {
     const z = Number(params.get("odp"));
@@ -846,6 +876,12 @@ export default function Pytanie() {
   const brakuje = Math.max(0, p.prog_widocznosci - p.liczba_prognoz);
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
+  const url = `${window.location.origin}/pytanie/${pid}`;
+  // karta „Daję X%”: mój główny typ, a bez pozycji pierwsza odpowiedź
+  const indeksKarty = moja ? moja.odpowiedz_glowna - 1 : 0;
+  const kursKarty = p.kursy ? p.kursy[indeksKarty] : p.kursy_otwarcia ? p.kursy_otwarcia[indeksKarty] : null;
+  const daneKarty: DaneKarty | null =
+    kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, nick: gracz?.nick ?? null, url } : null;
   const podobne = (wszystkie ?? []).filter((q) => q.id !== pid && q.kategoria === p.kategoria && q.status === "otwarte").slice(0, 3);
   const obserwowany = obserwowane.includes(pid);
 
@@ -874,17 +910,10 @@ export default function Pytanie() {
     setObserwowane(nowe);
     zapiszObserwowane(nowe);
   };
+  // Zaraz po RPC (nie przy następnym odpytaniu): własny nick w aktywności i wśród największych graczy, nowy punkt na wykresie.
   const poZmianie = async () => {
     // razem z samym rynkiem: duży kurs nad wykresem rusza od razu po prognozie, bez czekania na odpytanie
-    await Promise.all([
-      odswiezPytanie(),
-      odswiezMoje(),
-      odswiezUdzialy(),
-      odswiezHistorie(),
-      odswiezAktywnosc(),
-      odswiezKomentarze(),
-      odswiezNajwiekszych(),
-    ]);
+    await Promise.all([odswiezPytanie(), odswiezUdzialy(), odswiezHistorie(), odswiezAktywnosc(), odswiezKomentarze(), odswiezNajwiekszych()]);
   };
 
   return (
@@ -926,6 +955,7 @@ export default function Pytanie() {
                 <IkGwiazdka pelna={obserwowany} />
               </button>
               {skopiowano ? <span className="typ-tak">Skopiowano link</span> : null}
+              {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} etykieta="Karta „Daję X%”" klasa="przycisk-tekst" /> : null}
             </div>
           </header>
 
@@ -935,6 +965,7 @@ export default function Pytanie() {
                 <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
                 <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
                 {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
+                {otwarte ? <ZmianaOdGodziny p={p} pelna /> : null}
               </>
             ) : (
               <>
@@ -1037,7 +1068,7 @@ export default function Pytanie() {
         </div>
 
         <aside className="panel-kolumna" ref={refPanelu}>
-          <Panel p={p} odp={odp} setOdp={wybierz} udzialyMoje={udzialyMoje ?? []} wydaneRazem={wydaneRazem} poZmianie={poZmianie} />
+          <Panel p={p} odp={odp} setOdp={wybierz} udzialyMoje={udzialyMoje ?? []} wydaneRazem={wydaneRazem} poZmianie={poZmianie} url={url} />
         </aside>
 
         <div className="rynek-reszta">
@@ -1084,8 +1115,8 @@ export default function Pytanie() {
               Aktywność
             </button>
           </div>
-          {zakladka === "komentarze" ? <Komentarze pid={pid} komentarze={komentarze ?? []} odswiez={odswiezKomentarze} /> : null}
-          {zakladka === "gracze" ? <NajwieksiGracze odpowiedzi={p.odpowiedzi} lista={najwieksi ?? []} /> : null}
+          {zakladka === "komentarze" ? <Komentarze pid={pid} komentarze={komentarze ?? []} odswiez={odswiezKomentarze} miejsca={miejsca} /> : null}
+          {zakladka === "gracze" ? <NajwieksiGracze odpowiedzi={p.odpowiedzi} lista={najwieksi ?? []} miejsca={miejsca} /> : null}
           {zakladka === "moje" ? (
             moja ? (
               <div className="tabela-owijka">
@@ -1094,28 +1125,43 @@ export default function Pytanie() {
                     <tr>
                       <th>Odpowiedź</th>
                       <th className="liczba">Udziały</th>
-                      <th className="liczba">Wydane</th>
+                      <th className="liczba">Koszt</th>
                       <th className="liczba">Kurs</th>
+                      <th className="liczba">Wartość</th>
+                      <th className="liczba">Zysk/strata</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(udzialyMoje ?? [])
                       .filter((z) => z.udzialy >= 0.05 || z.wydane > 0)
-                      .map((z) => (
-                        <tr key={z.odpowiedz}>
-                          <td className={klasaTypu(z.odpowiedz - 1)}>{p.odpowiedzi[z.odpowiedz - 1]}</td>
-                          <td className="liczba">{liczba(z.udzialy, 1)}</td>
-                          <td className="liczba">{pkt(z.wydane)}</td>
-                          <td className="liczba">{p.kursy ? procent(p.kursy[z.odpowiedz - 1]) : "ukryty"}</td>
-                        </tr>
-                      ))}
+                      .map((z) => {
+                        const k = p.kursy ? p.kursy[z.odpowiedz - 1] : null;
+                        const wartosc =
+                          p.status === "rozstrzygniete" ? (p.wynik === z.odpowiedz ? z.udzialy : 0) : k != null ? z.udzialy * k : z.wydane;
+                        return (
+                          <tr key={z.odpowiedz}>
+                            <td className={klasaTypu(z.odpowiedz - 1)}>{p.odpowiedzi[z.odpowiedz - 1]}</td>
+                            <td className="liczba">{liczba(z.udzialy, 1)}</td>
+                            <td className="liczba">{pkt(z.wydane)}</td>
+                            <td className="liczba">{k != null ? procent(k) : "ukryty"}</td>
+                            <td className="liczba">{liczba(wartosc, 1)} pkt</td>
+                            <td className="liczba">
+                              <ZyskStrata wartosc={wartosc - z.wydane} miejsca={1} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     <tr>
                       <td>
                         <b>Razem</b>
                       </td>
                       <td className="liczba">{liczba(moja.udzialy_glowne, 1)} (główny typ)</td>
                       <td className="liczba">{pkt(moja.wydane)}</td>
-                      <td className="liczba">wartość {liczba(moja.wartosc, 1)} pkt</td>
+                      <td className="liczba" />
+                      <td className="liczba">{liczba(moja.wartosc, 1)} pkt</td>
+                      <td className="liczba">
+                        <ZyskStrata wartosc={moja.wartosc - moja.wydane} miejsca={1} />
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -1130,7 +1176,7 @@ export default function Pytanie() {
             ) : (
               <div>
                 {(aktywnosc ?? []).map((a) => (
-                  <WpisAktywnosci key={a.id} a={a} />
+                  <WpisAktywnosci key={a.id} a={a} miejsce={miejsca.get(a.nick)} />
                 ))}
               </div>
             )
@@ -1149,6 +1195,9 @@ export default function Pytanie() {
         </div>
       </div>
 
+      {rozstrzygniecie.pozycja ? (
+        <EkranRozstrzygniecia moja={rozstrzygniecie.pozycja} pytanie={p} onClose={() => rozstrzygniecie.oznacz(rozstrzygniecie.pozycja!.pytanie)} />
+      ) : null}
       {otwarte ? (
         <div className={`szybki-pasek ${panelWidoczny ? "schowany" : ""}`} aria-hidden={panelWidoczny}>
           {p.odpowiedzi.map((o, i) => (

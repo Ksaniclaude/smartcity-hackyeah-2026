@@ -59,6 +59,10 @@ export interface Pytanie {
   kursy_otwarcia: number[] | null;
   /** Miasto rynku („Polska” dla rynków ogólnokrajowych). */
   miasto: string;
+  /** Kurs sprzed godziny (albo kurs otwarcia, gdy rynek młodszy); null, gdy kurs ukryty lub rynek zakończony. */
+  kursy_1h: number[] | null;
+  /** Po rozstrzygnięciu: ilu graczy miało pozycję i ilu trafiło. */
+  gracze_rynku: { graczy: number; trafilo: number } | null;
 }
 
 /** Wiersz tabeli pytania (tylko admin, przez RPC admin_pytania). */
@@ -81,6 +85,8 @@ export interface PytanieAdmin {
   utworzono: string;
   rozstrzygnieto: string | null;
   miasto: string;
+  /** Próg ukrycia kursu nadpisany przez admina (null = domyślny). */
+  prog_widocznosci: number | null;
 }
 
 export interface Gracz {
@@ -101,9 +107,13 @@ export interface WynikZakladu {
   saldo: number;
   liczba_prognoz: number;
   obrot: number;
-  /** Udziały na innych odpowiedziach sprzedane automatycznie przed zakupem (jedna strona rynku na gracza). */
+  /** Jedna strona rynku: udziały na innych odpowiedziach sprzedane w tej samej transakcji. */
   sprzedano: { odpowiedz: number; odpowiedz_tekst: string; udzialy: number; zwrot: number }[];
   zwrot_ze_sprzedazy: number;
+  /** Miejsce w rankingu przed i po (null przed = gracz nie był jeszcze w rankingu). */
+  miejsce_przed: number | null;
+  miejsce_po: number | null;
+  graczy_w_rankingu: number;
 }
 
 /** Wynik RPC sprzedaj_udzialy. */
@@ -117,6 +127,8 @@ export interface WynikSprzedazy {
   kursy: number[];
   saldo: number;
   udzialy_pozostale: number;
+  miejsce_przed: number | null;
+  miejsce_po: number | null;
 }
 
 /** Pozycja na publicznym profilu gracza. */
@@ -146,6 +158,8 @@ export interface ProfilPubliczny {
   najwieksza_wygrana: number;
   trafione: number;
   rozstrzygniete: number;
+  /** Miejsce w rankingu (null, gdy gracz nic nie postawił). */
+  miejsce: number | null;
   pozycje: PozycjaPubliczna[];
   aktywnosc: Aktywnosc[];
 }
@@ -236,7 +250,7 @@ export interface NajwiekszyGracz {
   wydane: number;
 }
 
-/** Wiersz RPC ranking. */
+/** Wiersz RPC ranking (wiersze w kolejności miejsc: miejsce = indeks + 1). */
 export interface WpisRankingu {
   nick: string;
   saldo: number;

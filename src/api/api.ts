@@ -194,8 +194,11 @@ export async function postawPrognoze(args: {
     ...w,
     saldo: Number(w.saldo),
     obrot: Number(w.obrot ?? 0),
-    sprzedano: (w.sprzedano ?? []).map((z) => ({ ...z, udzialy: Number(z.udzialy), zwrot: Number(z.zwrot) })),
+    sprzedano: (w.sprzedano ?? []).map((z) => ({ ...z, zwrot: Number(z.zwrot) })),
     zwrot_ze_sprzedazy: Number(w.zwrot_ze_sprzedazy ?? 0),
+    miejsce_przed: w.miejsce_przed ?? null,
+    miejsce_po: w.miejsce_po ?? null,
+    graczy_w_rankingu: Number(w.graczy_w_rankingu ?? 0),
   };
 }
 
@@ -242,7 +245,7 @@ export async function sprzedajUdzialy(args: { pytanie: number; odpowiedz: number
     p_udzialy: args.udzialy,
   });
   const w = sprawdz<WynikSprzedazy>(r);
-  return { ...w, saldo: Number(w.saldo), zwrot: Number(w.zwrot) };
+  return { ...w, saldo: Number(w.saldo), zwrot: Number(w.zwrot), miejsce_przed: w.miejsce_przed ?? null, miejsce_po: w.miejsce_po ?? null };
 }
 
 /** Publiczny profil gracza po nicku (pozycje, aktywność, statystyki); null, gdy nie ma takiego nicku. */
@@ -253,6 +256,7 @@ export async function pobierzProfilPubliczny(nick: string): Promise<ProfilPublic
   return {
     ...p,
     obrot: Number(p.obrot),
+    miejsce: p.miejsce ?? null,
     pozycje: (p.pozycje ?? []).map((z) => ({ ...z, wydane: Number(z.wydane) })),
     aktywnosc: (p.aktywnosc ?? []).map((a) => ({ ...a, stawka: Number(a.stawka) })),
   };
@@ -358,6 +362,18 @@ export async function adminUniewaznij(pytanie: number, komentarz: string): Promi
 export async function adminKomentarzUrzedu(pytanie: number, komentarz: string): Promise<void> {
   const r = await supabase.rpc("admin_komentarz_urzedu", { p_pytanie: pytanie, p_komentarz: komentarz });
   sprawdz(r);
+}
+
+/** Próg ukrycia kursu dla jednego rynku (null = domyślny). */
+export async function adminUstawProg(pytanie: number, prog: number | null): Promise<void> {
+  const r = await supabase.rpc("admin_ustaw_prog", { p_pytanie: pytanie, p_prog: prog });
+  sprawdz(r);
+}
+
+/** Domyślny próg ukrycia kursu dla wszystkich rynków (zapis w ustawieniach). */
+export async function adminUstawProgDomyslny(prog: number): Promise<number> {
+  const r = await supabase.rpc("admin_ustaw_prog_domyslny", { p_prog: prog });
+  return sprawdz<number>(r);
 }
 
 export async function adminZmienTermin(pytanie: number, nowyTermin: string, link: string): Promise<void> {
