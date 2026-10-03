@@ -441,9 +441,15 @@ button.wynik:active { transform: scale(0.98); }
 .rynek-dol .rynek-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rynek-dol .prawy { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex: none; }
 .rynek-dol .znacznik { flex: none; }
-/* na wąskiej karcie (telefon, boczna kolumna) „bez zmian / 1 h” ustępuje miejsca: termin ma być widać cały */
+/* Wąska stopka karty (telefon, boczna kolumna): termin ma być widać cały, więc ustępują rzeczy mniej ważne.
+   Znika „bez zmian” i okres „/ 1 h” przy zmianie kursu, a na nowym rynku znacznik „nowy” zastępuje liczbę prognoz. */
 .rynek-dol { container-type: inline-size; }
-@container (max-width: 330px) { .rynek-dol .zmiana.zero { display: none; } }
+.rynek-dol .rynek-miasto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.zmiana-okres { white-space: pre; }
+@container (max-width: 330px) {
+  .rynek-dol .zmiana.zero, .rynek-dol .zmiana-okres { display: none; }
+  .rynek-dol:has(.znacznik-nowy) .rynek-meta { display: none; }
+}
 .termin { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .termin svg { width: 14px; height: 14px; flex: none; }
 .termin.wkrotce { color: var(--akcent-tekst); }
