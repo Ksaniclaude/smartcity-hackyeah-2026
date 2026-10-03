@@ -40,3 +40,9 @@ Format jest szerszy niż `data/pytania_startowe.csv` o kolumny `miasto`, `horyzo
 kolumny `miasto` ani zamykania rynku o godzinie (kolumna `termin` to `date`), więc import wymaga najpierw migracji
 opisanej w rozmowie: `pytania.miasto`, `pytania.zamkniecie timestamptz`, limity otwartych rynków per miasto,
 niższe `b` i zerowy próg widoczności kursu dla rynków krótkich.
+
+## Stan: wgrane na produkcję 3.10.2026
+
+142 rynki z tego katalogu (bez czterech warszawskich dubli rynków nr 27, 28, 32, 34 i bez rewanżowych derbów) zostały
+wstawione do żywej bazy jako otwarte, z kursem otwarcia 34/33/33 („miasto”) albo 50/50 („luz”). Zastrzeżenie o
+weryfikacji źródeł nadal obowiązuje: błędny termin poprawia się w /admin („zmień termin”), błędne pytanie unieważnia.
