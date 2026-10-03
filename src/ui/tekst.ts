@@ -19,6 +19,12 @@ export function punkty(n: number): string {
 }
 
 /** Liczba z odstępem tysięcy, bez miejsc po przecinku: 1240 → "1 240". */
+/** Zaokrąglenie w dół do `miejsca` po przecinku (4,3332 → 4,3); epsilon chroni przed 0,3·10 = 2,9999… */
+export function wDol(n: number, miejsca = 1): number {
+  const m = 10 ** miejsca;
+  return Math.floor(n * m + 1e-9) / m;
+}
+
 export function liczba(n: number, miejsca = 0): string {
   return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: miejsca, minimumFractionDigits: miejsca }).format(n);
 }
