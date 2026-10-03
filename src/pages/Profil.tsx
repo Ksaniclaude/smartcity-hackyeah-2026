@@ -8,6 +8,7 @@ import { useAkcja, usePolling } from "@/ui/hooks";
 import { IkKsiezyc, IkSlonce } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, Odznaka, OdznakaStatusu, formatujDateKrotko, useMotyw } from "@/ui/komponenty";
 import { czasTemu, liczba, pkt } from "@/ui/tekst";
+import { LiczbaZywa } from "@/ui/zywe";
 import { klasaTypu } from "@/pages/Aktywnosc";
 import { zeZnakiem } from "@/pages/Ranking";
 
@@ -45,15 +46,15 @@ function WpisTransakcji({ t, nick }: { t: MojaTransakcja; nick: string }) {
         <div className="kto">
           {sprzedaz ? (
             <span>
-              sprzedałeś <b>{liczba(-t.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(t.stawka)} pkt</b>
+              sprzedane <b>{liczba(-t.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(t.stawka)} pkt</b>
             </span>
           ) : (
             <span>
-              postawiłeś <b>{liczba(t.stawka)} pkt</b> na {typ}
+              postawione <b>{liczba(t.stawka)} pkt</b> na {typ}
             </span>
           )}
-          <span>
-            · kurs {procent(t.kurs_przed)} → {procent(t.kurs_po)}
+          <span className="znacznik">
+            kurs {procent(t.kurs_przed)} → {procent(t.kurs_po)}
           </span>
           <span className="prawy">{czasTemu(t.czas)}</span>
         </div>
@@ -70,7 +71,7 @@ function Historia({ nick }: { nick: string }) {
   const { dane, blad, laduje } = usePolling(() => pobierzMojeTransakcje(100), 10000);
   const wpisy = dane ?? [];
   return (
-    <div className="waska" style={{ maxWidth: 820 }}>
+    <div className="waska">
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
       {dane && wpisy.length === 0 ? (
@@ -103,7 +104,7 @@ function Ustawienia() {
   const bezZmian = czysty === (gracz?.nick ?? "");
 
   return (
-    <div className="waska" style={{ maxWidth: 560 }}>
+    <div className="waska-2">
       <div className="karta">
         <h3>Nick</h3>
         <form
@@ -148,7 +149,7 @@ function Ustawienia() {
       <div className="karta">
         <h3>Wygląd</h3>
         <button type="button" className="przycisk przycisk-drugi przycisk-glowny" onClick={przelaczMotyw}>
-          {motyw === "ciemny" ? <IkSlonce width={18} height={18} /> : <IkKsiezyc width={18} height={18} />}
+          {motyw === "ciemny" ? <IkSlonce /> : <IkKsiezyc />}
           {motyw === "ciemny" ? "Jasny motyw" : "Ciemny motyw"}
         </button>
       </div>
@@ -205,13 +206,13 @@ export default function Profil() {
 
   return (
     <main className="kontener">
-      <div className="profil-naglowek" style={{ flexWrap: "wrap" }}>
+      <div className="profil-naglowek">
         <Awatar nick={nick} duzy />
         <div>
           <h1>{nick}</h1>
           <div className="pod">{konto?.email}</div>
         </div>
-        <div className="przyciski akcje" style={{ marginLeft: "auto", marginTop: 0 }}>
+        <div className="akcje">
           <button
             type="button"
             className="przycisk przycisk-maly przycisk-drugi"
@@ -226,12 +227,14 @@ export default function Profil() {
       <div className="staty">
         <div className="stat">
           <div className="etykieta">Wartość portfela</div>
-          <div className="wartosc">{dane ? pkt(portfel) : "–"}</div>
+          <div className="wartosc">{dane ? <LiczbaZywa wartosc={portfel} format={(n) => pkt(Math.round(n))} /> : "–"}</div>
           <div className="pod">punkty + udziały po kursie</div>
         </div>
         <div className="stat">
           <div className="etykieta">Punkty</div>
-          <div className="wartosc">{liczba(saldo)}</div>
+          <div className="wartosc">
+            <LiczbaZywa wartosc={saldo} format={(n) => liczba(Math.round(n))} />
+          </div>
           <div className="pod">do postawienia</div>
         </div>
         <div className="stat">
@@ -241,8 +244,8 @@ export default function Profil() {
         </div>
         <div className="stat">
           <div className="etykieta">Trafność</div>
-          <div className="wartosc">{dane ? `${trafione} z ${rozstrzygniete.length}` : "–"}</div>
-          <div className="pod">rozstrzygnięte rynki</div>
+          <div className="wartosc">{dane && rozstrzygniete.length > 0 ? `${trafione} z ${rozstrzygniete.length}` : "–"}</div>
+          <div className="pod">{dane && rozstrzygniete.length === 0 ? "brak rozstrzygniętych rynków" : "rozstrzygnięte rynki"}</div>
         </div>
       </div>
 
@@ -260,7 +263,7 @@ export default function Profil() {
             onClick={() => ustawTab(z.klucz)}
           >
             {z.etykieta}
-            {z.klucz === "pozycje" && dane ? <span className="licznik">{pozycje.length}</span> : null}
+            {z.klucz === "pozycje" && pozycje.length > 0 ? <span className="licznik">{pozycje.length}</span> : null}
           </button>
         ))}
       </div>
@@ -274,44 +277,48 @@ export default function Profil() {
             </p>
           ) : null}
           {pozycje.length > 0 ? (
-            <div className="tabela-owijka">
-              <table className="tabela">
-                <thead>
-                  <tr>
-                    <th>Rynek</th>
-                    <th>Twój typ</th>
-                    <th className="liczba">Udziały</th>
-                    <th className="liczba">Kurs teraz</th>
-                    <th className="liczba">Wartość</th>
-                    <th>Wynik</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pozycje.map((p) => {
-                    const i = p.odpowiedz_glowna - 1;
-                    return (
-                      <tr key={p.pytanie}>
-                        <td>
-                          <Link to={`/pytanie/${p.pytanie}`}>{p.tresc}</Link>
-                          <div className="pomoc">
-                            <Odznaka kategoria={p.kategoria} /> <OdznakaStatusu status={p.status} />
-                          </div>
-                        </td>
-                        <td>
-                          <span className={klasaTypu(i)}>{p.odpowiedzi[i]}</span>
-                        </td>
-                        <td className="liczba">{liczba(p.udzialy_glowne, 1)}</td>
-                        <td className="liczba">{p.kursy ? procent(p.kursy[i]) : <span className="mala">ukryty</span>}</td>
-                        <td className="liczba">{liczba(p.wartosc, 1)} pkt</td>
-                        <td>
-                          <Wynik p={p} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="tabela tabela-pozycje">
+              <thead>
+                <tr>
+                  <th>Rynek</th>
+                  <th>Twój typ</th>
+                  <th className="liczba">Udziały</th>
+                  <th className="liczba">Kurs teraz</th>
+                  <th className="liczba">Wartość</th>
+                  <th>Wynik</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pozycje.map((p) => {
+                  const i = p.odpowiedz_glowna - 1;
+                  return (
+                    <tr key={p.pytanie}>
+                      <td className="kol-rynek">
+                        <Link to={`/pytanie/${p.pytanie}`}>{p.tresc}</Link>
+                        <div className="pomoc">
+                          <Odznaka kategoria={p.kategoria} /> <OdznakaStatusu status={p.status} />
+                        </div>
+                      </td>
+                      <td data-etykieta="Twój typ">
+                        <span className={klasaTypu(i)}>{p.odpowiedzi[i]}</span>
+                      </td>
+                      <td className="liczba" data-etykieta="Udziały">
+                        {liczba(p.udzialy_glowne, 1)}
+                      </td>
+                      <td className="liczba" data-etykieta="Kurs teraz">
+                        {p.kursy ? procent(p.kursy[i]) : <span className="mala">ukryty</span>}
+                      </td>
+                      <td className="liczba" data-etykieta="Wartość">
+                        {liczba(p.wartosc, 1)} pkt
+                      </td>
+                      <td data-etykieta="Wynik">
+                        <Wynik p={p} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           ) : null}
         </>
       ) : tab === "historia" ? (

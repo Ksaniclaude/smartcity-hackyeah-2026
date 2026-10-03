@@ -84,6 +84,20 @@ const pytania = [
     kurs_widoczny: false, kursy: null, prog_widocznosci: 10, liczba_zmian_terminu: 0, obrot: 60, otwarto: iso(50), kursy_otwarcia: [0.5, 0.5],
   },
 ];
+// Propozycje widzi tylko admin: 21 i 22 się otworzą, 23 odrzuci serwer (minięta data), 24 nie ma kryterium.
+const propozycja = (id: number, kategoria: "miasto" | "luz", kryterium: string) => ({
+  id, tresc: `Propozycja testowa nr ${id}?`, kategoria,
+  odpowiedzi: kategoria === "miasto" ? ["w terminie", "po terminie", "wstrzymane lub anulowane"] : ["tak", "nie"],
+  kryterium, link_zrodla: "https://example.invalid/propozycja", termin: "2027-06-30", status: "propozycja", wynik: null,
+  link_rozstrzygniecia: null, komentarz_urzedu: null, liczba_prognoz: 0, utworzono: iso(10), rozstrzygnieto: null,
+  obrot: 0, otwarto: null as string | null, kursy_otwarcia: null,
+});
+const propozycje = [
+  propozycja(21, "miasto", "Komunikat ZDMK o zakończeniu robót."),
+  propozycja(22, "luz", "Tak, jeśli BIP potwierdzi."),
+  propozycja(23, "luz", "Tak, jeśli BIP potwierdzi."),
+  propozycja(24, "miasto", ""),
+];
 const powody = [
   { pytanie: 1, powod: "wykonawca", liczba: 5, punkty: 120 },
   { pytanie: 1, powod: "pieniadze", liczba: 3, punkty: 60 },
@@ -216,6 +230,18 @@ async function mock(route: Route) {
     if (!stan.gracz) return json(route, { message: "Najpierw podaj nick" }, 400);
     if (body.p_pytanie === 1 && !body.p_powod) return json(route, { message: "Podaj powód" }, 400);
     stan.prognozy++;
+    // jedna strona rynku na gracza: inne odpowiedzi są sprzedawane przed zakupem
+    const sprzedano: { odpowiedz: number; odpowiedz_tekst: string; udzialy: number; zwrot: number }[] = [];
+    const pyt = pytania.find((x) => x.id === body.p_pytanie)!;
+    for (const z of stan.pozycje.values()) {
+      if (z.pytanie === body.p_pytanie && z.odpowiedz !== body.p_odpowiedz && z.udzialy > 0) {
+        const zwrot = Math.round(z.udzialy * 0.42 * 10000) / 10000;
+        sprzedano.push({ odpowiedz: z.odpowiedz, odpowiedz_tekst: pyt.odpowiedzi[z.odpowiedz - 1], udzialy: z.udzialy, zwrot });
+        stan.gracz.saldo += zwrot;
+        z.udzialy = 0;
+        z.wydane = 0;
+      }
+    }
     stan.gracz.saldo -= body.p_stawka;
     const klucz = `${body.p_pytanie}-${body.p_odpowiedz}`;
     const z = stan.pozycje.get(klucz) ?? { pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, udzialy: 0, wydane: 0 };
@@ -228,6 +254,7 @@ async function mock(route: Route) {
     return json(route, {
       pytanie: body.p_pytanie, odpowiedz: body.p_odpowiedz, stawka: body.p_stawka, udzialy: 23.7,
       kurs_przed: 0.41, kurs_po: 0.44, kursy: q.odpowiedzi.length === 2 ? [0.44, 0.56] : [0.41, 0.47, 0.12], saldo: stan.gracz.saldo, liczba_prognoz: 12, obrot: q.obrot + body.p_stawka,
+      sprzedano, zwrot_ze_sprzedazy: sprzedano.reduce((s, x) => s + x.zwrot, 0),
     });
   }
   if (p === "/rest/v1/rpc/sprzedaj_udzialy") {
@@ -254,7 +281,17 @@ async function mock(route: Route) {
     if (ok && stan.gracz) stan.gracz.czy_admin = true;
     return json(route, ok);
   }
-  if (p === "/rest/v1/rpc/admin_pytania") return json(route, pytania.map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null })));
+  if (p === "/rest/v1/rpc/admin_pytania")
+    return json(route, [...pytania, ...propozycje].map((q) => ({ ...q, q: [0, 0, 0].slice(0, q.odpowiedzi.length), b: 1000, zaproponowal: null })));
+  if (p === "/rest/v1/rpc/admin_otworz") {
+    const body = req.postDataJSON() as { p_pytanie: number; p_kurs_otwarcia: number[] | null };
+    const q = propozycje.find((x) => x.id === body.p_pytanie);
+    if (!q || q.status !== "propozycja") return json(route, { message: "Otworzyć można tylko propozycję" }, 400);
+    if (q.id === 23) return json(route, { message: "Data rozstrzygnięcia już minęła" }, 400);
+    q.status = "otwarte";
+    q.otwarto = new Date().toISOString();
+    return json(route, null);
+  }
   if (p === "/rest/v1/rpc/admin_dodaj_pytanie") return json(route, 5);
   console.log(`  (brak mocka) ${m} ${p}${url.search}`);
   return json(route, { message: `brak mocka dla ${p}` }, 404);
@@ -339,7 +376,8 @@ async function main() {
     await page.goto(`${ADRES}/`);
     await oczekuj(page, "Czy miasto zdąży?");
     await oczekuj(page, "41%");
-    await oczekuj(page, "pkt obrotu");
+    await oczekuj(page, "12 prognoz");
+    await oczekuj(page, "3/10 prognoz");
     await oczekuj(page, "tłum się pomylił");
     await zrzut(page, "rynki_gosc");
 
@@ -358,6 +396,13 @@ async function main() {
     await page.getByRole("button", { name: /^Postaw/ }).first().click();
     await oczekuj(page, "przesunęła kurs z 41% na 44%");
     await zrzut(page, "prognoza_ok");
+
+    console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
+    await page.locator(".wybor-odp .odp-przycisk").nth(1).click();
+    await oczekuj(page, "Rynek ma jedną stronę na gracza");
+    await page.getByRole("button", { name: /^Sprzedaj „tak” i postaw nie/ }).click();
+    await oczekuj(page, /Sprzedano 23,7 udz. „tak”/);
+    await zrzut(page, "zmiana_strony");
 
     console.log("3. Rynek „miasto”: powód obowiązkowy, komentarz przy zakładzie");
     await page.goto(`${ADRES}/pytanie/1?odp=2`);
@@ -439,7 +484,21 @@ async function main() {
     await page.getByRole("button", { name: "Zaloguj" }).click();
     await oczekuj(page, "Dodaj pytanie");
     await oczekuj(page, "Każdy temat jest dozwolony");
+    await oczekujNaglowka(page, "Propozycje (kolejka) (4)");
+    await oczekuj(page, "do uzupełnienia przed otwarciem: 1");
     await zrzut(page, "admin");
+    let pytanieOtwarcia = "";
+    page.once("dialog", async (d) => {
+      pytanieOtwarcia = d.message();
+      await d.accept();
+    });
+    await page.getByRole("button", { name: "Otwórz wszystkie (3)" }).click();
+    await oczekuj(page, "Otwarto 2 z 3.");
+    await oczekuj(page, "nr 23: Data rozstrzygnięcia już minęła");
+    await oczekujNaglowka(page, "Propozycje (kolejka) (2)");
+    if (!pytanieOtwarcia.startsWith("Otworzyć 3 propozycje?")) throw new Error(`Złe pytanie przed otwarciem: ${pytanieOtwarcia}`);
+    console.log(`  ✓ „${pytanieOtwarcia}”`);
+    await zrzut(page, "admin_otwarte");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });
 

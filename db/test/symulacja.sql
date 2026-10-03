@@ -39,6 +39,9 @@ declare
   v_suma_wydanych numeric;
   v_suma_udzialow double precision;
   v_powod public.powod;
+  v_zwrot_s numeric;
+  v_sprzedazy integer := 0;
+  v_netto numeric;
 begin
   -- admin testowy
   v_admin := gen_random_uuid();
@@ -74,16 +77,23 @@ begin
       then (array['wykonawca', 'decyzja_polityczna', 'pieniadze', 'formalnosci', 'inne'])[1 + floor(random() * 5)::int]::public.powod
       else null end;
 
-    select coalesce(sum(wydane_punkty), 0) into v_wydane from public.pozycje where gracz = v_id and pytanie = v_pyt;
+    -- udziały na innych odpowiedziach zostaną sprzedane przed zakupem (jedna strona rynku na gracza)
+    select coalesce(sum(wydane_punkty), 0) into v_wydane from public.pozycje where gracz = v_id and pytanie = v_pyt and odpowiedz = v_odp;
     select saldo into v_saldo from public.gracze where id = v_id;
 
     begin
       v_wynik := public.postaw_prognoze(v_pyt, v_odp, v_stawka, v_powod, 'komentarz ' || k);
       v_liczba := v_liczba + 1;
+      v_zwrot_s := coalesce((v_wynik ->> 'zwrot_ze_sprzedazy')::numeric, 0);
+      v_sprzedazy := v_sprzedazy + jsonb_array_length(coalesce(v_wynik -> 'sprzedano', '[]'::jsonb));
 
-      -- limit 200 na pytanie i saldo muszą być respektowane
-      if v_wydane + v_stawka > 200 or v_saldo < v_stawka then
+      -- limit 200 na pytanie i saldo (po zwrocie ze sprzedaży) muszą być respektowane
+      if v_wydane + v_stawka > 200 or v_saldo + v_zwrot_s < v_stawka then
         raise exception 'Zakład przeszedł mimo limitu (wydane %, stawka %, saldo %)', v_wydane, v_stawka, v_saldo;
+      end if;
+      -- po zakupie gracz ma udziały tylko na jednej odpowiedzi
+      if (select count(*) from public.pozycje where gracz = v_id and pytanie = v_pyt and udzialy > 0) > 1 then
+        raise exception 'Gracz ma udziały na dwóch odpowiedziach naraz';
       end if;
 
       -- kursy sumują się do 1
@@ -92,12 +102,12 @@ begin
         raise exception 'Kursy nie sumują się do 1: %', v_suma;
       end if;
 
-      -- koszt C(q_po) - C(q_przed) = stawka (sprawdzenie wzoru LMSR)
+      -- koszt C(q_po) - C(q_przed) = stawka - zwroty ze sprzedaży (zwrot zaokrąglany w dół do 0,0001)
       select q into v_q_po from public.pytania where id = v_pyt;
       v_koszt := v_b * ln((select sum(exp(x / v_b)) from unnest(v_q_po) as x))
                - v_b * ln((select sum(exp(x / v_b)) from unnest(v_q_przed) as x));
-      if abs(v_koszt - v_stawka) > 1e-6 then
-        raise exception 'Koszt % nie zgadza się ze stawką %', v_koszt, v_stawka;
+      if abs(v_koszt - (v_stawka - v_zwrot_s)) > 1e-6 + 1.5e-4 * jsonb_array_length(coalesce(v_wynik -> 'sprzedano', '[]'::jsonb)) then
+        raise exception 'Koszt % nie zgadza się ze stawką % minus zwrot %', v_koszt, v_stawka, v_zwrot_s;
       end if;
 
       -- kurs postawionej odpowiedzi rośnie
@@ -120,11 +130,12 @@ begin
     end if;
   end loop;
 
-  -- suma sald + suma wydanych = suma początkowa (punkty nie giną)
+  -- bilans: ubytek sald = zakupy - zwroty ze sprzedaży (punkty nie giną)
   select sum(saldo) into v_suma_sald_po from public.gracze where id = any(v_gracze);
-  select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where gracz = any(v_gracze);
-  if abs(v_suma_sald_przed - v_suma_sald_po - v_suma_wydanych) > 1e-6 then
-    raise exception 'Bilans się nie zgadza: % - % <> %', v_suma_sald_przed, v_suma_sald_po, v_suma_wydanych;
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_netto
+    from public.transakcje where gracz = any(v_gracze);
+  if abs(v_suma_sald_przed - v_suma_sald_po - v_netto) > 1e-6 then
+    raise exception 'Bilans się nie zgadza: % - % <> %', v_suma_sald_przed, v_suma_sald_po, v_netto;
   end if;
 
   -- rozstrzygnięcie pytania z 3 odpowiedziami: wypłata = suma udziałów trafionej odpowiedzi
@@ -137,10 +148,11 @@ begin
   if abs((v_suma_sald_po - v_suma_sald_przed) - v_suma_udzialow) > 0.0001 * 100 then
     raise exception 'Wypłata % nie zgadza się z udziałami %', v_suma_sald_po - v_suma_sald_przed, v_suma_udzialow;
   end if;
-  -- strata animatora ograniczona przez b*ln(n)
-  select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where pytanie = v_pyt3;
-  if v_suma_udzialow - v_suma_wydanych > 1000 * ln(3) + 1e-6 then
-    raise exception 'Strata animatora % przekracza b*ln(3)', v_suma_udzialow - v_suma_wydanych;
+  -- strata animatora (wypłata minus wpływy netto) ograniczona przez b*ln(1/p0) dla trafionej odpowiedzi (p0 = 0,44)
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_netto
+    from public.transakcje where pytanie = v_pyt3;
+  if v_suma_udzialow - v_netto > 1000 * ln(1 / 0.44) + 1e-6 then
+    raise exception 'Strata animatora % przekracza b*ln(1/0,44)', v_suma_udzialow - v_netto;
   end if;
 
   -- unieważnienie pytania z 2 odpowiedziami: pełny zwrot
@@ -161,8 +173,8 @@ begin
     if sqlerrm not like 'Pytanie nie jest otwarte%' then raise; end if;
   end;
 
-  raise notice 'SYMULACJA OK: % zakładów przyjętych, % odrzuconych limitem, wypłata %, zwrot %',
-    v_liczba, v_bledy, v_wyplata, v_zwrot;
+  raise notice 'SYMULACJA OK: % zakładów przyjętych (w tym % automatycznych sprzedaży przy zmianie strony), % odrzuconych limitem, wypłata %, zwrot %',
+    v_liczba, v_sprzedazy, v_bledy, v_wyplata, v_zwrot;
 end $$;
 
 rollback;

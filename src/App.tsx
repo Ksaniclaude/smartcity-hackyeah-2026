@@ -13,6 +13,7 @@ import Ranking from "@/pages/Ranking";
 import Start from "@/pages/Start";
 import Zaproponuj from "@/pages/Zaproponuj";
 import { DolnaNawigacja, Komunikat, Ladowanie, Modale, Naglowek, StopkaStrony } from "@/ui/komponenty";
+import { useEfektyDotyku } from "@/ui/zywe";
 
 /** Ekrany wymagające gracza z nickiem (profil, propozycje, admin). Rynki są publiczne. */
 function WymagaGracza({ children }: { children: ReactNode }) {
@@ -35,6 +36,7 @@ function WymagaGracza({ children }: { children: ReactNode }) {
 
 function Uklad() {
   useUruchomSesje();
+  useEfektyDotyku();
   const { pathname } = useLocation();
   const { stan, konto, gracz, modal, otworzModal } = useSesja();
   const pelnyEkran = pathname === "/qr";

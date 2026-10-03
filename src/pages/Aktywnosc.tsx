@@ -13,10 +13,7 @@ export function klasaTypu(indeks: number): string {
   return KLASY_TYPU[indeks] ?? "typ-trzeci";
 }
 
-/** Nick jako link w kolorze tekstu (brak reguły `.wpis .kto a` w styles.css). */
-const STYL_NICKU = { color: "inherit", textDecoration: "none" } as const;
-
-/** Jeden wiersz aktywności: „nick postawił 25 pkt na Tak · kurs 44% · 5 min temu”. */
+/** Jeden wiersz aktywności: „nick stawia 25 pkt na tak · kurs 44% · 5 min temu”. */
 export function WpisAktywnosci({ wpis }: { wpis: WpisAkt }) {
   const sprzedaz = wpis.udzialy < 0;
   const typ = <span className={klasaTypu(wpis.odpowiedz - 1)}>{wpis.odpowiedz_tekst}</span>;
@@ -27,21 +24,19 @@ export function WpisAktywnosci({ wpis }: { wpis: WpisAkt }) {
       <div>
         <div className="kto">
           <b>
-            <Link to={`/u/${encodeURIComponent(wpis.nick)}`} style={STYL_NICKU}>
-              {wpis.nick}
-            </Link>
+            <Link to={`/u/${encodeURIComponent(wpis.nick)}`}>{wpis.nick}</Link>
           </b>
           {sprzedaz ? (
             <span>
-              sprzedał <b>{liczba(-wpis.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(wpis.stawka)} pkt</b>
+              sprzedaje <b>{liczba(-wpis.udzialy, 1)} udz.</b> na {typ} za <b>{liczba(wpis.stawka)} pkt</b>
             </span>
           ) : (
             <span>
-              postawił <b>{liczba(wpis.stawka)} pkt</b> na {typ}
+              stawia <b>{liczba(wpis.stawka)} pkt</b> na {typ}
             </span>
           )}
-          {wpis.kurs_po != null ? <span>· kurs {procent(wpis.kurs_po)}</span> : null}
-          {powod ? <span>· powód: {powod}</span> : null}
+          {wpis.kurs_po != null ? <span className="znacznik">kurs {procent(wpis.kurs_po)}</span> : null}
+          {powod ? <span className="znacznik">powód: {powod}</span> : null}
           <span className="prawy">{czasTemu(wpis.czas)}</span>
         </div>
         <div className="tresc">
@@ -78,7 +73,7 @@ export default function Aktywnosc() {
 
   return (
     <main className="kontener">
-      <div className="waska" style={{ maxWidth: 820 }}>
+      <div className="waska">
         <h1>Aktywność</h1>
         <p className="mala">Ostatnie prognozy i sprzedaże udziałów wszystkich graczy. Lista odświeża się co 5 sekund.</p>
         <div className="chipy" role="tablist" aria-label="Kategoria">
@@ -103,7 +98,7 @@ export default function Aktywnosc() {
           <p className="pusto">Brak aktywności w tej kategorii.</p>
         ) : null}
         {wpisy.length > 0 ? (
-          <div style={{ marginTop: 8 }}>
+          <div>
             {wpisy.map((w) => (
               <WpisAktywnosci key={w.id} wpis={w} />
             ))}

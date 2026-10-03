@@ -122,8 +122,6 @@ create or replace function public.limit_na_pytanie() returns numeric
   language sql immutable set search_path = public, pg_temp as $$ select 200::numeric $$;
 create or replace function public.prog_widocznosci_kursu() returns integer
   language sql immutable set search_path = public, pg_temp as $$ select 10 $$;
-create or replace function public.limit_otwartych(p_kategoria public.kategoria) returns integer
-  language sql immutable set search_path = public, pg_temp as $$ select case p_kategoria when 'miasto' then 3 else 5 end $$;
 
 -- ---------------------------------------------------------------------------
 -- LMSR
@@ -270,6 +268,10 @@ declare
   v_kurs_po double precision;
   v_kursy double precision[];
   v_komentarz text := nullif(btrim(coalesce(p_komentarz, '')), '');
+  r record;
+  v_s jsonb;
+  v_sprzedano jsonb := '[]'::jsonb;
+  v_zwrot_s numeric := 0;
 begin
   -- 1. blokada pytania (kolejne zakłady czekają)
   select * into p from public.pytania where id = p_pytanie for update;
@@ -299,6 +301,23 @@ begin
   end if;
   if v_komentarz is not null and char_length(v_komentarz) > 200 then
     raise exception 'Komentarz: najwyżej 200 znaków';
+  end if;
+
+  -- 2b. jedna strona rynku na gracza (jak na giełdach prognoz): udziały na innych
+  -- odpowiedziach są najpierw sprzedawane po bieżącym kursie, w tej samej transakcji
+  for r in
+    select z.odpowiedz, z.udzialy from public.pozycje z
+     where z.gracz = v_gracz and z.pytanie = p_pytanie and z.odpowiedz <> p_odpowiedz and z.udzialy > 0
+     order by z.odpowiedz
+  loop
+    v_s := public.sprzedaj_udzialy(p_pytanie, r.odpowiedz, r.udzialy);
+    v_sprzedano := v_sprzedano || jsonb_build_object(
+      'odpowiedz', r.odpowiedz, 'odpowiedz_tekst', p.odpowiedzi[r.odpowiedz],
+      'udzialy', r.udzialy, 'zwrot', (v_s ->> 'zwrot')::numeric);
+    v_zwrot_s := v_zwrot_s + (v_s ->> 'zwrot')::numeric;
+  end loop;
+  if jsonb_array_length(v_sprzedano) > 0 then
+    select * into p from public.pytania where id = p_pytanie;  -- stan po sprzedaży (wiersz już zablokowany)
   end if;
 
   select saldo into v_saldo from public.gracze where id = v_gracz for update;
@@ -356,7 +375,9 @@ begin
     'kursy', to_jsonb(v_kursy),
     'saldo', v_saldo - p_stawka,
     'liczba_prognoz', p.liczba_prognoz + 1,
-    'obrot', p.obrot + p_stawka
+    'obrot', p.obrot + p_stawka,
+    'sprzedano', v_sprzedano,
+    'zwrot_ze_sprzedazy', v_zwrot_s
   );
 end $$;
 
@@ -384,6 +405,7 @@ declare
   v_kursy double precision[];
   v_saldo numeric;
   v_wydane_po numeric;
+  v_wszystko boolean;
 begin
   select * into p from public.pytania where id = p_pytanie for update;
   if not found then raise exception 'Nie ma takiego pytania'; end if;
@@ -395,8 +417,11 @@ begin
    where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz for update;
   if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
   v_udzialy := least(coalesce(p_udzialy, 0), z.udzialy);
-  if v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
-  if z.udzialy - v_udzialy < 1e-6 then v_udzialy := z.udzialy; end if;
+  if v_udzialy <= 0 then raise exception 'Podaj liczbę udziałów'; end if;
+  -- resztka poniżej 0,05 udziału nie ma sensu (suwak i pole liczą co 0,1): sprzedajemy wszystko
+  if z.udzialy - v_udzialy < 0.05 then v_udzialy := z.udzialy; end if;
+  v_wszystko := (v_udzialy = z.udzialy);
+  if not v_wszystko and v_udzialy < 0.01 then raise exception 'Podaj liczbę udziałów (co najmniej 0,01)'; end if;
   select saldo into v_saldo from public.gracze where id = v_gracz for update;
 
   -- C(q) i C(q') przez log-sum-exp
@@ -410,9 +435,19 @@ begin
   v_zwrot_d := p.b * ((m + ln(s)) - (m2 + ln(s2)));
   if v_zwrot_d is null or v_zwrot_d <= 0 then raise exception 'Błąd liczenia zwrotu'; end if;
   v_zwrot := floor(v_zwrot_d * 10000)::numeric / 10000;
-  if v_zwrot <= 0 then raise exception 'Za mało udziałów, żeby coś odzyskać'; end if;
   v_kursy := public.kursy(v_q, p.b);
   v_kurs_po := v_kursy[p_odpowiedz];
+  if v_zwrot <= 0 then
+    if not v_wszystko then raise exception 'Za mało udziałów, żeby coś odzyskać'; end if;
+    -- resztka warta mniej niż 0,0001 pkt: zerujemy pozycję bez zwrotu i bez wpisu w transakcjach
+    update public.pytania set q = v_q where id = p_pytanie;
+    update public.pozycje set udzialy = 0, wydane_punkty = 0
+     where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz;
+    return jsonb_build_object(
+      'pytanie', p_pytanie, 'odpowiedz', p_odpowiedz, 'udzialy', v_udzialy, 'zwrot', 0,
+      'kurs_przed', v_kurs_przed, 'kurs_po', v_kurs_po, 'kursy', to_jsonb(v_kursy),
+      'saldo', v_saldo, 'udzialy_pozostale', 0);
+  end if;
   v_wydane_po := case when z.udzialy - v_udzialy <= 0 then 0
                       else round(z.wydane_punkty * ((z.udzialy - v_udzialy) / z.udzialy)::numeric, 4) end;
 
@@ -592,26 +627,19 @@ begin
    where id = p_pytanie;
 end $$;
 
--- Otwarcie: wymaga kompletu pól i pilnuje limitu otwartych pytań na kategorię.
+-- Otwarcie: wymaga kompletu pól. Liczba otwartych pytań nie jest ograniczona.
 create or replace function public.admin_otworz(p_pytanie bigint, p_kurs_otwarcia double precision[] default null)
 returns void
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_admin uuid := public.biezacy_admin();
   p public.pytania;
-  v_otwarte integer;
 begin
   select * into p from public.pytania where id = p_pytanie for update;
   if not found then raise exception 'Nie ma takiego pytania'; end if;
   if p.status <> 'propozycja' then raise exception 'Otworzyć można tylko propozycję'; end if;
   perform public.sprawdz_komplet(p);
   if p.termin < current_date then raise exception 'Data rozstrzygnięcia już minęła'; end if;
-  select count(*) into v_otwarte from public.pytania
-   where status = 'otwarte' and kategoria = p.kategoria;
-  if v_otwarte >= public.limit_otwartych(p.kategoria) then
-    raise exception 'Naraz może być otwartych najwyżej % pytań w kategorii %',
-      public.limit_otwartych(p.kategoria), p.kategoria;
-  end if;
   if p_kurs_otwarcia is not null then
     if array_length(p_kurs_otwarcia, 1) <> array_length(p.odpowiedzi, 1) then
       raise exception 'Kurs otwarcia musi mieć tyle wartości, ile odpowiedzi';
@@ -1087,7 +1115,6 @@ grant select on public.v_moje_pozycje to authenticated;
 grant execute on function public.kursy_pytania(bigint) to anon, authenticated;
 grant execute on function public.prog_widocznosci_kursu() to anon, authenticated;
 grant execute on function public.limit_na_pytanie() to anon, authenticated;
-grant execute on function public.limit_otwartych(public.kategoria) to anon, authenticated;
 grant execute on function public.rozklad_powodow() to anon, authenticated;
 grant execute on function public.komentarze_pytania(bigint, integer) to anon, authenticated;
 grant execute on function public.historia_kursu(bigint) to anon, authenticated;

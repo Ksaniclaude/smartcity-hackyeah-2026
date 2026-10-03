@@ -91,6 +91,9 @@ export interface WynikZakladu {
   saldo: number;
   liczba_prognoz: number;
   obrot: number;
+  /** Udziały na innych odpowiedziach sprzedane automatycznie przed zakupem (jedna strona rynku na gracza). */
+  sprzedano: { odpowiedz: number; odpowiedz_tekst: string; udzialy: number; zwrot: number }[];
+  zwrot_ze_sprzedazy: number;
 }
 
 /** Wynik RPC sprzedaj_udzialy. */
