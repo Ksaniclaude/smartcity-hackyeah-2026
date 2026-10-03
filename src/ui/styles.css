@@ -162,7 +162,7 @@ code { font-size: 0.9em; background: #eef0f3; padding: 1px 5px; border-radius: 4
 .powody button.wybrany { border-color: var(--akcent); background: var(--akcent); color: #fff; font-weight: 600; }
 
 .zestawienie { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
-.zestawienie div { background: #fff; border: 1px solid var(--linia); border-radius: var(--r); padding: 10px 12px; }
+.zestawienie > div { background: #fff; border: 1px solid var(--linia); border-radius: var(--r); padding: 10px 12px; }
 .zestawienie .etykieta { font-size: 0.72rem; color: var(--mute); text-transform: uppercase; letter-spacing: 0.06em; }
 .zestawienie .wartosc { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
 
