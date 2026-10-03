@@ -122,6 +122,7 @@ to 34/33/33.
 ```bash
 npm run test:db                     # lokalny Postgres: schemat, dostęp ról, symulacja 100 graczy, 8 równoległych procesów, sprzedaż
 npm run build && npm run test:ui    # Chromium: ścieżka gracza na zamockowanym Supabase (bez sieci), zrzuty ekranu
+npm run zrzuty -- --watch           # podgląd: dev server + Chromium na mockach, zrzuty w data/zrzuty_dev odnawiane po każdej zmianie w src/
 ```
 
 `db/test/symulacja.sql` sprawdza po każdym z 600 losowych zakładów (rynek z 2 i z 3 odpowiedziami), że kursy sumują

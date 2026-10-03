@@ -12,7 +12,8 @@
     "terminowosc": "tsx scripts/terminowosc.ts",
     "pytania": "tsx scripts/pytania_startowe.ts",
     "test:db": "bash scripts/test_db_local.sh",
-    "test:ui": "tsx scripts/test_ui.ts"
+    "test:ui": "tsx scripts/test_ui.ts",
+    "zrzuty": "tsx scripts/zrzuty.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
