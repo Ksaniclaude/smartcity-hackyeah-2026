@@ -34,6 +34,10 @@ czy miejskie sprawy zdążą na czas. Zasady gry i architektura: [README.md](REA
 - Nowa funkcja API: `create function public.app_xxx(...) ... security definer set search_path = ''`, pełne nazwy
   (`game.tabela`, `extensions.crypt`), na końcu `revoke all ... from public` i `grant execute ... to anon, authenticated, service_role`.
   Funkcje modyfikujące dane same sprawdzają sesję (`game.require_user(p_token)` / `game.require_admin(p_token)`).
+- **Nigdy nie rób zbiorczych `revoke ... on all functions/tables in schema public`.** Odbiera to rolom `anon`/`authenticated`
+  dostęp do funkcji `app_*`, z których korzysta produkcja (tak padła 3.10 — naprawa: migracja `*_zdaza_regrant_api.sql`).
+  Uprawnienia nadawaj i odbieraj tylko na konkretnych, własnych obiektach.
+- Po każdej migracji sprawdź, że produkcja żyje: `curl -s -o /dev/null -w '%{http_code}' https://zdaza-mauve.vercel.app/` → `200`.
 - Błąd dla użytkownika: `raise exception 'Komunikat po polsku.'` — trafia do UI jako `GameError` (kod P0001).
 - Liczby gry są w dwóch miejscach: `game.cfg()` w bazie i [src/lib/config.ts](src/lib/config.ts). Zmieniaj oba.
 - Dane demo: `game.reset_demo()` (albo „Reset danych demo” w panelu admina) kasuje **wszystko**, także konta
