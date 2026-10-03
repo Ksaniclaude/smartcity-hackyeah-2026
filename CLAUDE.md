@@ -6,7 +6,9 @@
 
 - Projekt Vercel **`zdaza`** (zespół „ksaniclaude's projects”) jest podpięty do tego repo.
   **Push do `main` = automatyczny deploy na produkcję**; każda inna gałąź i PR dostaje podgląd (chroniony logowaniem do Vercela).
-- Produkcja: **https://zdaza-mauve.vercel.app** (docelowo `zdaza.vercel.app`, gdy domena zostanie przeniesiona do tego projektu).
+- Produkcja: **https://zdaza.com** (domena w Spaceship, rekord A na adres z panelu Vercela; `www.zdaza.com` przekierowuje 308 na
+  `zdaza.com`). Zapasowe adresy tego samego deployu: `zdaza.vercel.app`, `zdaza-mauve.vercel.app`.
+  Planowane: `zdaza.pl` (home.pl) jako przekierowanie 308 na `zdaza.com`, dodane w Vercelu jako „Redirect to Another Domain”.
 - Build ustawia [vercel.json](vercel.json): `framework: vite`, `npm run build`, katalog `dist`, przepisanie wszystkich ścieżek na `index.html`.
 - Zmienne w Vercelu (Production i Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`. Vite wkleja je do kodu podczas buildu,
   więc po zmianie wartości w panelu trzeba zrobić nowy deploy. Nowa zmienna = dodaj w Vercelu **i** w `.env.example`.
@@ -19,7 +21,7 @@
 - Projekt `smartcity-hackyeah-2026` (ref `xozaczdzfkzsbrnucsik`). **Jedna baza dla produkcji, podglądów i lokalnego `npm run dev`**,
   więc każda zmiana w schemacie albo danych działa od razu u wszystkich — także na produkcji.
 - Zmiany w `db/schema.sql` trzeba też wgrać do tego projektu (SQL Editor albo `apply_migration` z MCP Supabase), a potem
-  sprawdzić produkcję: `curl -s -o /dev/null -w '%{http_code}' https://zdaza-mauve.vercel.app/` → `200`.
+  sprawdzić produkcję: `curl -s -o /dev/null -w '%{http_code}' https://zdaza.com/` → `200`.
 - W bazie zostały obiekty poprzedniej wersji (schemat `game`, funkcje `public.app_*`). Aplikacja ich nie używa; nie opieraj
   się na nich. Usunięcie wymaga zgody zespołu (to operacja nieodwracalna).
 - Logowanie anonimowe Supabase musi być włączone (Authentication → Sign In / Providers). Hasło admina jest w

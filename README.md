@@ -4,9 +4,9 @@ Polski rynek prognoz w stylu giełd prognoz (Polymarket), ale o punkty zamiast z
 co wydarzy się w Polsce, od terminów miejskich inwestycji po celebrytów, a kurs pokazuje, ile w to wierzą.
 Projekt na HackYeah 2026, zadanie otwarte Smart City.
 
-- **Demo:** https://zdaza.vercel.app
-- **Ranking:** https://zdaza.vercel.app/ranking · **Aktywność:** https://zdaza.vercel.app/aktywnosc
-- **Kod QR na prezentację:** https://zdaza.vercel.app/qr · **Panel admina:** https://zdaza.vercel.app/admin
+- **Demo:** https://zdaza.com
+- **Ranking:** https://zdaza.com/ranking · **Aktywność:** https://zdaza.com/aktywnosc
+- **Kod QR na prezentację:** https://zdaza.com/qr · **Panel admina:** https://zdaza.com/admin
 
 Dwie kategorie rynków:
 
