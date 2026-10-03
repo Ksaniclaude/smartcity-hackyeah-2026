@@ -145,7 +145,7 @@ function mojePozycje() {
     const glowna = [...lista].sort((a, b) => b.wydane - a.wydane)[0];
     const wydane = lista.reduce((s, z) => s + z.wydane, 0);
     const wyplata = p.status === "rozstrzygniete" ? lista.filter((z) => z.odpowiedz === p.wynik).reduce((s, z) => s + z.udzialy, 0) : 0;
-    const wartosc = p.status === "rozstrzygniete" ? wyplata : p.kursy ? lista.reduce((s, z) => s + z.udzialy * (p.kursy![z.odpowiedz - 1] ?? 0), 0) : wydane;
+    const wartosc = p.status === "rozstrzygniete" ? wyplata : p.kursy ? -1000 * Math.log(1 - lista.reduce((s, z) => s + (p.kursy![z.odpowiedz - 1] ?? 0) * (1 - Math.exp(-z.udzialy / 1000)), 0)) : wydane;
     return {
       pytanie: pid, tresc: p.tresc, kategoria: p.kategoria, odpowiedzi: p.odpowiedzi, status: p.status, termin: p.termin, wynik: p.wynik,
       odpowiedz_glowna: glowna.odpowiedz, wydane, wyplata, trafione: p.status === "rozstrzygniete" ? glowna.odpowiedz === p.wynik : null,
@@ -220,7 +220,7 @@ async function mock(route: Route) {
     if (body.p_nick !== "podgorze_7") return json(route, null);
     return json(route, {
       nick: "podgorze_7", utworzono: iso(60 * 24 * 10), prognozy: 4, obrot: 120, wartosc_pozycji: 96.4, najwieksza_wygrana: 61.9, trafione: 2, rozstrzygniete: 2, miejsce: 1,
-      pozycje: [{ pytanie: 1, tresc: pytania[0].tresc, kategoria: "miasto", odpowiedzi: pytania[0].odpowiedzi, status: "otwarte", wynik: null, odpowiedz: 2, udzialy: 108.3, wydane: 50, kurs: 0.44, wartosc: 47.6 }],
+      pozycje: [{ pytanie: 1, tresc: pytania[0].tresc, kategoria: "miasto", odpowiedzi: pytania[0].odpowiedzi, status: "otwarte", wynik: null, odpowiedz: 2, udzialy: 108.3, wydane: 50, kurs: 0.44, wartosc: 46.2 }],
       aktywnosc: aktywnosc.filter((a) => a.nick === "podgorze_7"),
     });
   }

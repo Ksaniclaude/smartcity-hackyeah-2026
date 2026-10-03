@@ -144,7 +144,7 @@ export interface PozycjaPubliczna {
   wydane: number;
   /** Bieżący kurs wybranej odpowiedzi (null, gdy ukryty). */
   kurs: number | null;
-  /** Wartość: udziały × kurs; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu. */
+  /** Wartość: ile da sprzedaż teraz (C(q) − C(q − s)); po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu. */
   wartosc: number;
 }
 
@@ -179,7 +179,7 @@ export interface MojaPozycja {
   trafione: boolean | null;
   kursy: number[] | null;
   udzialy_glowne: number;
-  /** Bieżąca wartość udziałów (po kursie; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu). */
+  /** Bieżąca wartość udziałów (ile da sprzedaż teraz; po koszcie, gdy kurs ukryty; wypłata po rozstrzygnięciu). */
   wartosc: number;
 }
 

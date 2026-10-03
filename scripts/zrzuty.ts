@@ -136,7 +136,7 @@ const mojePozycje =
   DANE === "zywy"
     ? [{
         pytanie: 4, tresc: pytania[3].tresc, kategoria: "luz", odpowiedzi: DWIE, status: "otwarte", termin: pytania[3].termin, wynik: null,
-        odpowiedz_glowna: 1, wydane: 25, wyplata: 0, trafione: null, kursy: [0.41, 0.59], udzialy_glowne: 58.6, wartosc: 24,
+        odpowiedz_glowna: 1, wydane: 25, wyplata: 0, trafione: null, kursy: [0.41, 0.59], udzialy_glowne: 58.6, wartosc: 23.6,
       }]
     : [];
 const mojeTransakcje =

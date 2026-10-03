@@ -1136,8 +1136,15 @@ export default function Pytanie() {
                       .filter((z) => z.udzialy >= 0.05 || z.wydane > 0)
                       .map((z) => {
                         const k = p.kursy ? p.kursy[z.odpowiedz - 1] : null;
+                        // wartość = ile da sprzedaż teraz (sprzedaż obniża kurs), nie udziały × kurs
                         const wartosc =
-                          p.status === "rozstrzygniete" ? (p.wynik === z.odpowiedz ? z.udzialy : 0) : k != null ? z.udzialy * k : z.wydane;
+                          p.status === "rozstrzygniete"
+                            ? p.wynik === z.odpowiedz
+                              ? z.udzialy
+                              : 0
+                            : k != null
+                              ? podgladSprzedazy(k, z.udzialy).zwrot
+                              : z.wydane;
                         return (
                           <tr key={z.odpowiedz}>
                             <td className={klasaTypu(z.odpowiedz - 1)}>{p.odpowiedzi[z.odpowiedz - 1]}</td>
