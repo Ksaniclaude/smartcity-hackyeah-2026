@@ -105,12 +105,11 @@ function PoleKursu({
                 n[i] = Number(e.target.value);
                 onChange(n);
               }}
-              style={{ width: "100%", font: "inherit", padding: 8, borderRadius: 8, border: "1px solid #c9d1d9" }}
             />
           </label>
         ))}
       </div>
-      <div className="pomoc" style={{ color: Math.abs(suma - 100) > 0.11 ? "var(--zle)" : undefined }}>
+      <div className={`pomoc ${Math.abs(suma - 100) > 0.11 ? "chybione" : ""}`}>
         suma: {suma}% {Math.abs(suma - 100) > 0.11 ? "(musi być 100%)" : ""}
         {kategoria === "miasto" && terminowosc.ogolem.odsetek != null
           ? ` · „w terminie” z zamówień publicznych: ${Math.round(terminowosc.ogolem.odsetek * 100)}%`

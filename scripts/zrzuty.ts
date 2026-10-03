@@ -9,8 +9,10 @@
 //   npm run zrzuty -- --dane=pusty       # stan jak na starcie produkcji: rynki bez prognoz, kursy otwarcia
 //   npm run zrzuty -- --gracz            # zalogowany gracz z nickiem i saldem
 //   npm run zrzuty -- --motyw=jasny
-//   npm run zrzuty -- --strony=/,/pytanie/1,/profil --urzadzenia=desktop
+//   npm run zrzuty -- --strony=/,/pytanie/1,/profil --urzadzenia=desktop   # urządzenia: desktop, desktop-cala, tel, tel-ekran
 //   npm run zrzuty -- --out=data/zrzuty_dev
+//   npm run zrzuty -- --strony=/ --klik="Jak to działa"                      # zrzut po kliknięciu przycisku (modal)
+//   npm run zrzuty -- --gracz --strony="/pytanie/4?odp=1" --klik="^Postaw"   # kupon po przyjętej prognozie
 //
 // Pliki: <out>/<urzadzenie>_<strona>.png, np. data/zrzuty_dev/desktop_rynki.png (nadpisywane).
 
@@ -33,13 +35,19 @@ const MOTYW = arg("motyw") ?? "";
 const STRONY = (arg("strony") ?? "/,/pytanie/1,/pytanie/4").split(",").map((s) => s.trim()).filter(Boolean);
 const URZADZENIA = (arg("urzadzenia") ?? "desktop,tel").split(",").map((s) => s.trim()).filter(Boolean);
 const OUT = path.resolve(arg("out") ?? "data/zrzuty_dev");
+/** Wyrażenie regularne na nazwę przycisku, który ma zostać kliknięty po wczytaniu strony (stany po interakcji). */
+const KLIK = arg("klik") ?? "";
 const PORT = 4175;
 const ADRES = `http://127.0.0.1:${PORT}`;
 const SUPABASE = "https://test.supabase.local";
 
+// „tel” to cała przewinięta strona; „tel-ekran” to sam ekran telefonu, na którym widać elementy przyklejone
+// (dolna nawigacja, pasek odpowiedzi nad nią) tam, gdzie widzi je gracz.
 const WYMIARY: Record<string, { width: number; height: number; cala: boolean }> = {
   desktop: { width: 1440, height: 900, cala: false },
+  "desktop-cala": { width: 1440, height: 900, cala: true },
   tel: { width: 390, height: 844, cala: true },
+  "tel-ekran": { width: 390, height: 844, cala: false },
 };
 
 /* ---------- dane ---------- */
@@ -119,6 +127,21 @@ const powody = [
   { pytanie: 1, powod: "pieniadze", liczba: 3, punkty: 60 },
 ];
 const gracz = { id: UID, nick: "krowodrza_42", saldo: 940, czy_admin: false };
+// Gracz w stanie „żywym” ma jedną pozycję (rynek 4, „tak”), żeby było widać portfel, „Twój typ” i sprzedaż.
+const mojePozycje =
+  DANE === "zywy"
+    ? [{
+        pytanie: 4, tresc: pytania[3].tresc, kategoria: "luz", odpowiedzi: DWIE, status: "otwarte", termin: pytania[3].termin, wynik: null,
+        odpowiedz_glowna: 1, wydane: 25, wyplata: 0, trafione: null, kursy: [0.41, 0.59], udzialy_glowne: 58.6, wartosc: 24,
+      }]
+    : [];
+const mojeTransakcje =
+  DANE === "zywy"
+    ? [{
+        id: 9, pytanie: 4, odpowiedz: 1, stawka: 25, udzialy: 58.6, kurs_przed: 0.42, kurs_po: 0.44, powod: null, komentarz: null, typ: "kupno",
+        czas: iso(60 * 2), pytania: { tresc: pytania[3].tresc, odpowiedzi: DWIE, status: "otwarte", wynik: null },
+      }]
+    : [];
 
 /* ---------- mock Supabase (auth + PostgREST) ---------- */
 
@@ -146,6 +169,13 @@ async function mock(route: Route) {
     return json(route, sesja);
   }
   if (p === "/rest/v1/gracze") return json(route, GRACZ ? [gracz] : []);
+  if (p === "/rest/v1/v_moje_pozycje") return json(route, GRACZ ? mojePozycje : []);
+  if (p === "/rest/v1/transakcje") return json(route, GRACZ ? mojeTransakcje : []);
+  if (p === "/rest/v1/pozycje") {
+    const pid = url.searchParams.get("pytanie")?.replace("eq.", "");
+    const moje = GRACZ ? mojePozycje.filter((z) => String(z.pytanie) === pid) : [];
+    return json(route, moje.map((z) => ({ odpowiedz: z.odpowiedz_glowna, udzialy: z.udzialy_glowne, wydane_punkty: z.wydane })));
+  }
   if (p === "/rest/v1/v_pytania") {
     const id = url.searchParams.get("id")?.replace("eq.", "");
     const lista = id ? pytania.filter((q) => String(q.id) === id) : pytania;
@@ -165,6 +195,21 @@ async function mock(route: Route) {
   if (p === "/rest/v1/rpc/najwieksi_gracze") return json(route, DANE === "zywy" ? najwieksi : []);
   if (p === "/rest/v1/rpc/ranking") return json(route, DANE === "zywy" ? ranking : []);
   if (p === "/rest/v1/rpc/rozklad_powodow") return json(route, DANE === "zywy" ? powody : []);
+  if (p === "/rest/v1/rpc/postaw_prognoze") {
+    // Wynik liczony tym samym wzorem LMSR co podgląd w panelu (b = 1000), żeby kupon pokazywał spójne liczby.
+    const body = (req.postDataJSON() ?? {}) as { p_pytanie?: number; p_odpowiedz?: number; p_stawka?: number };
+    const q = pytania.find((x) => x.id === body.p_pytanie);
+    const i = (body.p_odpowiedz ?? 1) - 1;
+    const stawka = body.p_stawka ?? 10;
+    const kurs = q?.kursy?.[i] ?? 0.5;
+    const e = Math.exp(stawka / 1000);
+    const kursPo = (e - 1 + kurs) / e;
+    return json(route, {
+      pytanie: body.p_pytanie, odpowiedz: i + 1, stawka, udzialy: 1000 * Math.log((e - 1 + kurs) / kurs),
+      kurs_przed: kurs, kurs_po: kursPo, kursy: q?.kursy ?? null, saldo: gracz.saldo - stawka,
+      liczba_prognoz: (q?.liczba_prognoz ?? 0) + 1, obrot: (q?.obrot ?? 0) + stawka,
+    });
+  }
   if (p === "/rest/v1/rpc/profil_publiczny") return json(route, { nick: "podgorze_7", saldo: 950, prognozy: 4, trafione: 2, rozstrzygniete: 2, zysk: 46.4, od: iso(60 * 24 * 9) });
   if (p.startsWith("/rest/v1/rpc/")) return json(route, {});
   return json(route, []);
@@ -224,6 +269,9 @@ async function czekajNaSerwer() {
   throw new Error(`Dev server nie wstał pod ${ADRES}`);
 }
 
+/** Strony, które wyrzuciły błąd (np. w połowie edycji kilku plików): HMR ich nie podniesie, więc przed zrzutem przeładowanie. */
+const zepsute = new Set<Page>();
+
 async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: BrowserContext; strony: Map<string, Page> }> {
   const w = WYMIARY[urzadzenie];
   if (!w) throw new Error(`Nieznane urządzenie „${urzadzenie}”; dostępne: ${Object.keys(WYMIARY).join(", ")}`);
@@ -235,8 +283,15 @@ async function otworz(browser: Browser, urzadzenie: string): Promise<{ ctx: Brow
   const strony = new Map<string, Page>();
   for (const s of STRONY) {
     const page = await ctx.newPage();
-    page.on("pageerror", (e) => console.error(`  ! ${urzadzenie} ${s}: ${e.message}`));
+    page.on("pageerror", (e) => {
+      console.error(`  ! ${urzadzenie} ${s}: ${e.message}`);
+      zepsute.add(page);
+    });
     await page.goto(`${ADRES}${s}`);
+    if (KLIK) {
+      await page.getByRole("button", { name: new RegExp(KLIK) }).first().click({ timeout: 8000 });
+      await page.waitForTimeout(1500); // animacje wejścia modala albo kuponu
+    }
     strony.set(s, page);
   }
   return { ctx, strony };
@@ -247,6 +302,7 @@ async function zrzuty(konteksty: Map<string, { strony: Map<string, Page> }>) {
   const pliki: string[] = [];
   for (const [urzadzenie, { strony }] of konteksty) {
     for (const [s, page] of strony) {
+      if (zepsute.delete(page)) await page.reload().catch(() => undefined);
       await page.waitForLoadState("networkidle").catch(() => undefined);
       await page.waitForTimeout(300);
       const plik = path.join(OUT, `${urzadzenie}_${slug(s)}.png`);

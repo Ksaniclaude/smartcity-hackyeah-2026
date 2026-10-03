@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   dodajKomentarz,
@@ -27,25 +27,17 @@ import {
   type WynikZakladu,
 } from "@/api/types";
 import { useAkcja, usePolling } from "@/ui/hooks";
-import { IkKalendarz, IkLink } from "@/ui/ikony";
-import {
-  Awatar,
-  KafelekKategorii,
-  Komunikat,
-  Ladowanie,
-  OdznakaStatusu,
-  Wskaznik,
-  formatujDate,
-  formatujDateKrotko,
-  opisPrognoz,
-} from "@/ui/komponenty";
-import { czasTemu, liczba, odmien, pkt, punkty } from "@/ui/tekst";
+import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
+import { Awatar, Komunikat, Ladowanie, OdznakaStatusu, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
+import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, jakoProcent, klasaOdp } from "@/ui/rynek";
+import { czasTemu, dniDo, liczba, odmien, pkt, punkty, zmianaPp } from "@/ui/tekst";
 import { Wykres } from "@/ui/wykres";
+import { Iskry, LiczbaZywa, useWidoczny } from "@/ui/zywe";
 
 const LIMIT_NA_PYTANIE = 200;
+/** Punkty na start: goście liczą nimi podgląd wygranej, zanim założą konto. */
+const PUNKTY_NA_START = 1000;
 const CHIPY = [10, 25, 50, 100];
-const KLASY = ["tak", "nie", "trzeci"] as const;
-const KOLORY_LINII = ["var(--tak)", "var(--nie)", "var(--trzeci)"];
 type Okres = "1d" | "1t" | "1m" | "all";
 type Zakladka = "komentarze" | "gracze" | "moje" | "aktywnosc";
 const KLUCZ_OBSERWOWANE = "zdaza.obserwowane";
@@ -67,7 +59,7 @@ function zapiszObserwowane(lista: number[]) {
 }
 
 function klasaTypu(i: number) {
-  return `typ-${KLASY[i] ?? "trzeci"}`;
+  return `typ-${klasaOdp(i)}`;
 }
 
 /** Zawęża historię do okresu; pierwszy punkt to stan na początku okna. */
@@ -79,14 +71,6 @@ function wytnijOkres(h: PunktHistorii[], okres: Okres): PunktHistorii[] {
   const po = h.filter((x) => new Date(x.czas).getTime() >= od);
   const start = przed.length ? [{ czas: new Date(od).toISOString(), kursy: przed[przed.length - 1].kursy }] : [];
   return [...start, ...po];
-}
-
-function IkGwiazdka({ pelna }: { pelna: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill={pelna ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round" aria-hidden="true">
-      <path d="m12 3 2.8 5.9 6.4.8-4.7 4.5 1.2 6.4L12 17.5l-5.7 3.1 1.2-6.4L2.8 9.7l6.4-.8L12 3z" />
-    </svg>
-  );
 }
 
 /* ---------- zakładki pod rynkiem ---------- */
@@ -111,7 +95,7 @@ function WpisAktywnosci({ a }: { a: Aktywnosc }) {
               stawia {liczba(a.stawka)} pkt na <span className={klasaTypu(a.odpowiedz - 1)}>{a.odpowiedz_tekst}</span>
             </span>
           )}
-          {a.kurs_po != null ? <span>· kurs {procent(a.kurs_po)}</span> : null}
+          {a.kurs_po != null ? <span className="znacznik">kurs {procent(a.kurs_po)}</span> : null}
           <span className="prawy">{czasTemu(a.czas)}</span>
         </div>
         {a.komentarz ? <div className="tresc">„{a.komentarz}”</div> : null}
@@ -131,11 +115,11 @@ function WpisKomentarza({ k }: { k: Komentarz }) {
           </b>
           {k.odpowiedz != null && k.odpowiedz_tekst ? (
             <span>
+              {k.stawka > 0 ? `${liczba(k.stawka)} pkt na ` : "typ: "}
               <span className={klasaTypu(k.odpowiedz - 1)}>{k.odpowiedz_tekst}</span>
-              {k.stawka > 0 ? ` · ${liczba(k.stawka)} pkt` : ""}
             </span>
           ) : null}
-          {k.powod ? <span>· {POWODY.find((r) => r.wartosc === k.powod)?.etykieta ?? k.powod}</span> : null}
+          {k.powod ? <span className="znacznik">{POWODY.find((r) => r.wartosc === k.powod)?.etykieta ?? k.powod}</span> : null}
           <span className="prawy">{czasTemu(k.czas)}</span>
         </div>
         <div className="tresc">{k.komentarz}</div>
@@ -164,31 +148,25 @@ function Komentarze({
     <div>
       {stan === "gotowy" ? (
         <form
-          className="karta"
+          className="komentarz-form"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
             if (tekst.trim().length > 0) void dodaj.wykonaj();
           }}
         >
-          <label className="pole" style={{ margin: 0 }}>
-            <span className="etykieta">Twój komentarz</span>
-            <textarea
-              value={tekst}
-              maxLength={500}
-              onChange={(e) => setTekst(e.target.value)}
-              placeholder="Napisz komentarz…"
-              rows={2}
-            />
-          </label>
+          <textarea
+            value={tekst}
+            maxLength={500}
+            onChange={(e) => setTekst(e.target.value)}
+            placeholder="Napisz komentarz…"
+            aria-label="Twój komentarz"
+            rows={1}
+          />
+          <button type="submit" className="przycisk przycisk-maly" disabled={dodaj.trwa || tekst.trim().length === 0}>
+            {dodaj.trwa ? "Chwila…" : "Dodaj komentarz"}
+          </button>
+          {tekst.length > 0 ? <span className="mala">{tekst.length}/500</span> : null}
           {dodaj.blad ? <Komunikat typ="blad">{dodaj.blad}</Komunikat> : null}
-          <div className="przyciski">
-            <button type="submit" className="przycisk przycisk-maly" disabled={dodaj.trwa || tekst.trim().length === 0}>
-              {dodaj.trwa ? "Chwila…" : "Dodaj komentarz"}
-            </button>
-            <span className="mala" style={{ alignSelf: "center" }}>
-              {tekst.length}/500
-            </span>
-          </div>
         </form>
       ) : (
         <div className="panel-info">
@@ -236,6 +214,23 @@ function NajwieksiGracze({ odpowiedzi, lista }: { odpowiedzi: string[]; lista: N
 
 /* ---------- panel prognozy ---------- */
 
+/** Suwak z torem wypełnionym do bieżącej wartości (szerokość wypełnienia idzie do arkusza jako zmienna). */
+function Suwak({ min, max, step, wartosc, etykieta, naZmiane }: { min: number; max: number; step?: number; wartosc: number; etykieta: string; naZmiane: (n: number) => void }) {
+  const wypelnienie = max > min ? ((wartosc - min) / (max - min)) * 100 : 0;
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={wartosc}
+      aria-label={etykieta}
+      style={{ "--wypelnienie": `${wypelnienie.toFixed(1)}%` } as CSSProperties}
+      onChange={(e) => naZmiane(Number(e.target.value))}
+    />
+  );
+}
+
 interface PanelProps {
   p: Rynek;
   odp: number | null;
@@ -243,6 +238,16 @@ interface PanelProps {
   udzialyMoje: { odpowiedz: number; udzialy: number; wydane: number }[];
   wydaneRazem: number;
   poZmianie: () => Promise<void>;
+}
+
+/** Kurs na kuponie: startuje od kursu sprzed prognozy i dochodzi do nowego, żeby było widać własny ruch. */
+function KursPoZmianie({ przed, po }: { przed: number; po: number }) {
+  const [kurs, setKurs] = useState(przed);
+  useEffect(() => {
+    const id = window.setTimeout(() => setKurs(po), 200);
+    return () => window.clearTimeout(id);
+  }, [po]);
+  return <LiczbaZywa wartosc={kurs * 100} format={jakoProcent} czas={700} />;
 }
 
 function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelProps) {
@@ -255,13 +260,16 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
   const [odpSprzedaz, setOdpSprzedaz] = useState<number | null>(null);
   const [udzialySprzedaz, setUdzialySprzedaz] = useState(0);
   const [wynikSprzedazy, setWynikSprzedazy] = useState<WynikSprzedazy | null>(null);
+  const [nrKuponu, setNrKuponu] = useState(0);
   const kup = useAkcja(postawPrognoze);
   const sprzedaj = useAkcja(sprzedajUdzialy);
 
   const otwarte = p.status === "otwarte";
   const miasto = p.kategoria === "miasto";
+  const gotowy = stan === "gotowy";
   const saldo = Math.floor(gracz?.saldo ?? 0);
-  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneRazem), saldo));
+  // Gość liczy podgląd tak, jakby miał już punkty na start; postawić może dopiero po założeniu konta.
+  const maks = Math.max(0, Math.min(LIMIT_NA_PYTANIE - Math.floor(wydaneRazem), gotowy ? saldo : PUNKTY_NA_START));
   const stawkaOk = Math.max(1, Math.min(Math.round(stawka) || 1, Math.max(1, maks)));
   const kursWybranej = odp != null && p.kursy ? p.kursy[odp - 1] : null;
   const podglad = kursWybranej != null ? podgladZakladu(kursWybranej, stawkaOk) : null;
@@ -279,6 +287,10 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
     if (pozycjaSprzedaz && udzialySprzedaz === 0) setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * 10) / 10);
   }, [pozycjaSprzedaz, udzialySprzedaz]);
 
+  const potwierdz = () => {
+    setNrKuponu((n) => n + 1);
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(12);
+  };
   const wyslij = async (e: FormEvent) => {
     e.preventDefault();
     if (odp == null || maks < 1 || brakPowodu) return;
@@ -293,6 +305,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
       setWynik(w);
       setWynikSprzedazy(null);
       setKomentarz("");
+      potwierdz();
       await Promise.all([odswiezGracza(), poZmianie()]);
     }
   };
@@ -304,14 +317,13 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
       setWynikSprzedazy(w);
       setWynik(null);
       setUdzialySprzedaz(0);
+      potwierdz();
       await Promise.all([odswiezGracza(), poZmianie()]);
     }
   };
 
   const mojaPozycja = posiadane.length
-    ? posiadane
-        .map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`)
-        .join(", ")
+    ? posiadane.map((z) => `${liczba(z.udzialy, 1)} udz. na „${p.odpowiedzi[z.odpowiedz - 1]}”`).join(", ")
     : null;
 
   if (!otwarte) {
@@ -337,36 +349,57 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
   return (
     <div className="panel" id="panel">
       <div className="panel-naglowek">
-        <span style={{ color: "var(--tekst)", fontWeight: 700, fontSize: "1rem" }}>Prognoza</span>
+        Prognoza
         {mojaPozycja ? <span>Masz {mojaPozycja}</span> : null}
       </div>
       {posiadane.length > 0 ? (
-        <div className="modal-zakladki" role="tablist">
-          <button type="button" role="tab" className={tryb === "kup" ? "aktywna" : ""} onClick={() => setTryb("kup")}>
+        <div className="przelacznik" role="tablist">
+          <button type="button" role="tab" aria-selected={tryb === "kup"} className={tryb === "kup" ? "aktywna" : ""} onClick={() => setTryb("kup")}>
             Kup
           </button>
-          <button type="button" role="tab" className={tryb === "sprzedaj" ? "aktywna" : ""} onClick={() => setTryb("sprzedaj")}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tryb === "sprzedaj"}
+            className={tryb === "sprzedaj" ? "aktywna" : ""}
+            onClick={() => setTryb("sprzedaj")}
+          >
             Sprzedaj
           </button>
         </div>
       ) : null}
 
       {wynik ? (
-        <div className="panel-sukces">
-          <b>
-            Twoja prognoza przesunęła kurs z {procent(wynik.kurs_przed)} na {procent(wynik.kurs_po)}
-          </b>
-          Masz {liczba(wynik.udzialy, 1)} udziałów na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz, każdy udział
-          wypłaci 1 punkt. Saldo: {punkty(wynik.saldo)}.
+        <div className="kupon" role="status" key={nrKuponu}>
+          <Iskry />
+          <div className="kupon-gora">
+            <IkPtaszek />
+            Prognoza przyjęta
+          </div>
+          <div className="kupon-kurs cyfry">
+            <span className="przed">{procent(wynik.kurs_przed)}</span>
+            <IkStrzalka />
+            <KursPoZmianie przed={wynik.kurs_przed} po={wynik.kurs_po} />
+          </div>
+          <p>
+            Twoja prognoza przesunęła kurs z {procent(wynik.kurs_przed)} na {procent(wynik.kurs_po)}.
+          </p>
+          <p>
+            Masz <b>{liczba(wynik.udzialy, 1)} udziałów</b> na „{p.odpowiedzi[wynik.odpowiedz - 1]}”. Jeśli trafisz, każdy udział
+            wypłaci 1 punkt. Saldo: {punkty(wynik.saldo)}.
+          </p>
         </div>
       ) : null}
       {wynikSprzedazy ? (
-        <div className="panel-sukces">
-          <b>
+        <div className="kupon" role="status" key={nrKuponu}>
+          <div className="kupon-gora">
+            <IkPtaszek />
             Sprzedano {liczba(wynikSprzedazy.udzialy, 1)} udz. za {liczba(wynikSprzedazy.zwrot, 1)} pkt
-          </b>
-          Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł z {procent(wynikSprzedazy.kurs_przed)} na{" "}
-          {procent(wynikSprzedazy.kurs_po)}. Saldo: {punkty(wynikSprzedazy.saldo)}.
+          </div>
+          <p>
+            Kurs „{p.odpowiedzi[wynikSprzedazy.odpowiedz - 1]}” spadł z {procent(wynikSprzedazy.kurs_przed)} na{" "}
+            {procent(wynikSprzedazy.kurs_po)}. Saldo: {punkty(wynikSprzedazy.saldo)}.
+          </p>
         </div>
       ) : null}
 
@@ -377,56 +410,55 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               <button
                 type="button"
                 key={i}
-                className={`odp-przycisk ${KLASY[i] ?? "trzeci"} ${odp === i + 1 ? "wybrana" : ""}`}
+                className={`odp-przycisk ${klasaOdp(i)} ${odp === i + 1 ? "wybrana" : ""}`}
+                aria-pressed={odp === i + 1}
                 onClick={() => setOdp(i + 1)}
               >
-                {o}
-                {p.kursy ? <small>{procent(p.kursy[i])}</small> : null}
+                <span className="nazwa">{o}</span>
+                {p.kursy ? <LiczbaZywa className="cyfry" wartosc={p.kursy[i] * 100} format={jakoProcent} /> : null}
               </button>
             ))}
           </div>
 
-          {stan === "gotowy" ? (
-            maks < 1 ? (
-              <Komunikat typ="ostrz">
-                {saldo < 1
-                  ? "Nie masz już punktów. Poczekaj na rozstrzygnięcia albo sprzedaj udziały."
-                  : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneRazem)}.`}
-              </Komunikat>
-            ) : (
-              <div className="stawka-pole">
-                <div className="etykieta">
-                  <span>Stawka</span>
-                  <span>masz {pkt(saldo)}</span>
-                </div>
-                <div className="stawka-wejscie">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={maks}
-                    value={stawkaOk}
-                    aria-label="Stawka w punktach"
-                    onChange={(e) => setStawka(Number(e.target.value))}
-                  />
-                  <span>pkt</span>
-                </div>
-                <div className="stawka-chipy">
-                  {CHIPY.map((c) => (
-                    <button type="button" key={c} onClick={() => setStawka(Math.min(maks, stawkaOk + c))} disabled={stawkaOk >= maks}>
-                      +{c}
-                    </button>
-                  ))}
-                  <button type="button" className={stawkaOk === maks ? "wybrany" : ""} onClick={() => setStawka(maks)}>
-                    Maks
-                  </button>
-                </div>
-                <input type="range" min={1} max={maks} value={stawkaOk} aria-label="Suwak stawki" onChange={(e) => setStawka(Number(e.target.value))} />
+          {stan === "blad" ? null : maks < 1 ? (
+            <Komunikat typ="ostrz">
+              {saldo < 1
+                ? "Nie masz już punktów. Poczekaj na rozstrzygnięcia albo sprzedaj udziały."
+                : `Na jeden rynek można wydać najwyżej ${LIMIT_NA_PYTANIE} punktów, a Ty masz już ${Math.floor(wydaneRazem)}.`}
+            </Komunikat>
+          ) : (
+            <div className="stawka-pole">
+              <div className="etykieta">
+                <span>Stawka</span>
+                <span>{gotowy ? `masz ${pkt(saldo)}` : `na start dostajesz ${pkt(PUNKTY_NA_START)}`}</span>
               </div>
-            )
-          ) : null}
+              <div className="stawka-wejscie">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={maks}
+                  value={stawkaOk}
+                  aria-label="Stawka w punktach"
+                  onChange={(e) => setStawka(Number(e.target.value))}
+                />
+                <span>pkt</span>
+              </div>
+              <div className="stawka-chipy">
+                {CHIPY.map((c) => (
+                  <button type="button" key={c} onClick={() => setStawka(Math.min(maks, stawkaOk + c))} disabled={stawkaOk >= maks}>
+                    +{c}
+                  </button>
+                ))}
+                <button type="button" className={stawkaOk === maks ? "wybrany" : ""} onClick={() => setStawka(maks)}>
+                  Maks
+                </button>
+              </div>
+              <Suwak min={1} max={maks} wartosc={stawkaOk} etykieta="Suwak stawki" naZmiane={setStawka} />
+            </div>
+          )}
 
-          {miasto ? (
+          {gotowy && miasto ? (
             <div className="pole">
               <span className="etykieta">Dlaczego tak myślisz?</span>
               <div className="powody">
@@ -438,32 +470,41 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               </div>
             </div>
           ) : null}
-          <label className="pole">
-            <span className="etykieta">Komentarz (opcjonalnie)</span>
-            <input
-              type="text"
-              maxLength={200}
-              value={komentarz}
-              onChange={(e) => setKomentarz(e.target.value)}
-              placeholder="Jedno zdanie komentarza (opcjonalnie)"
-            />
-          </label>
+          {gotowy ? (
+            <div className="pole">
+              <input
+                type="text"
+                maxLength={200}
+                value={komentarz}
+                aria-label="Komentarz do prognozy"
+                onChange={(e) => setKomentarz(e.target.value)}
+                placeholder="Jedno zdanie komentarza (opcjonalnie)"
+              />
+            </div>
+          ) : null}
 
-          {odp != null && stan === "gotowy" && maks >= 1 ? (
-            <div className="podsumowanie">
+          {odp != null && stan !== "blad" && maks >= 1 ? (
+            <div className="wygrana">
               {podglad ? (
                 <>
-                  <div className="wiersz-pod">
-                    <span>Udziały</span>
-                    <b>≈ {liczba(podglad.udzialy, 1)}</b>
-                  </div>
-                  <div className="wiersz-pod wygrana">
+                  <div className="wygrana-glowna">
                     <span>Wygrasz, jeśli trafisz</span>
-                    <b>≈ {liczba(podglad.udzialy, 1)} pkt</b>
+                    <span className="cyfry">
+                      <LiczbaZywa wartosc={podglad.udzialy} format={(n) => `≈ ${liczba(n, 1)}`} czas={220} />
+                      <small>pkt</small>
+                    </span>
+                  </div>
+                  <div className="wiersz-pod">
+                    <span>Zysk ponad stawkę</span>
+                    <b className="zysk">
+                      +{liczba(podglad.udzialy - stawkaOk, 1)} pkt (+{Math.round((podglad.udzialy / stawkaOk - 1) * 100)}%)
+                    </b>
                   </div>
                   <div className="wiersz-pod">
                     <span>Kurs po Twojej prognozie</span>
-                    <b>{procent(podglad.kursPo)}</b>
+                    <b>
+                      {procent(kursWybranej)} → {procent(podglad.kursPo)}
+                    </b>
                   </div>
                 </>
               ) : (
@@ -485,10 +526,11 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             </Komunikat>
           ) : null}
 
-          {stan === "gotowy" ? (
+          <div className="panel-stopka">
+          {gotowy ? (
             <button
               type="submit"
-              className={`przycisk-postaw ${odp != null ? KLASY[odp - 1] ?? "trzeci" : ""}`}
+              className={`przycisk-postaw ${odp != null ? klasaOdp(odp - 1) : ""}`}
               disabled={kup.trwa || odp == null || maks < 1 || brakPowodu}
             >
               {kup.trwa
@@ -497,9 +539,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   ? "Wybierz odpowiedź"
                   : brakPowodu
                     ? "Wybierz powód"
-                    : odp === 3
-                      ? `Postaw: ${p.odpowiedzi[2]}`
-                      : `Postaw ${p.odpowiedzi[odp - 1]}`}
+                    : `Postaw ${liczba(stawkaOk)} pkt: ${p.odpowiedzi[odp - 1]}`}
             </button>
           ) : stan === "brak_nicku" ? (
             <button type="button" className="przycisk-postaw" onClick={() => otworzModal("konto", "rejestracja")}>
@@ -511,6 +551,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
             </button>
           )}
           <p className="zastrzezenie">Gra o punkty. Punktów nie da się kupić ani wymienić.</p>
+          </div>
         </form>
       ) : (
         <form onSubmit={wyslijSprzedaz}>
@@ -519,13 +560,14 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               <button
                 type="button"
                 key={z.odpowiedz}
-                className={`odp-przycisk ${KLASY[z.odpowiedz - 1] ?? "trzeci"} ${pozycjaSprzedaz?.odpowiedz === z.odpowiedz ? "wybrana" : ""}`}
+                className={`odp-przycisk ${klasaOdp(z.odpowiedz - 1)} ${pozycjaSprzedaz?.odpowiedz === z.odpowiedz ? "wybrana" : ""}`}
+                aria-pressed={pozycjaSprzedaz?.odpowiedz === z.odpowiedz}
                 onClick={() => {
                   setOdpSprzedaz(z.odpowiedz);
                   setUdzialySprzedaz(Math.round(z.udzialy * 10) / 10);
                 }}
               >
-                {p.odpowiedzi[z.odpowiedz - 1]}
+                <span className="nazwa">{p.odpowiedzi[z.odpowiedz - 1]}</span>
                 <small>{liczba(z.udzialy, 1)} udz.</small>
               </button>
             ))}
@@ -551,7 +593,7 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
               </div>
               <div className="stawka-chipy">
                 {[25, 50, 75].map((proc) => (
-                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * proc) / 1000)}>
+                  <button type="button" key={proc} onClick={() => setUdzialySprzedaz(Math.round(pozycjaSprzedaz.udzialy * proc) / 100)}>
                     {proc}%
                   </button>
                 ))}
@@ -559,27 +601,24 @@ function Panel({ p, odp, setOdp, udzialyMoje, wydaneRazem, poZmianie }: PanelPro
                   Wszystko
                 </button>
               </div>
-              <input
-                type="range"
-                min={0.1}
-                step={0.1}
-                max={pozycjaSprzedaz.udzialy}
-                value={uSprzedaz}
-                aria-label="Suwak udziałów"
-                onChange={(e) => setUdzialySprzedaz(Number(e.target.value))}
-              />
+              <Suwak min={0.1} max={pozycjaSprzedaz.udzialy} step={0.1} wartosc={uSprzedaz} etykieta="Suwak udziałów" naZmiane={setUdzialySprzedaz} />
             </div>
           ) : null}
-          <div className="podsumowanie">
+          <div className="wygrana">
             {podgladS ? (
               <>
-                <div className="wiersz-pod wygrana">
+                <div className="wygrana-glowna">
                   <span>Zwrot</span>
-                  <b>≈ {liczba(podgladS.zwrot, 1)} pkt</b>
+                  <span className="cyfry">
+                    <LiczbaZywa wartosc={podgladS.zwrot} format={(n) => `≈ ${liczba(n, 1)}`} czas={220} />
+                    <small>pkt</small>
+                  </span>
                 </div>
                 <div className="wiersz-pod">
                   <span>Kurs po sprzedaży</span>
-                  <b>{procent(podgladS.kursPo)}</b>
+                  <b>
+                    {procent(kursSprzedazy)} → {procent(podgladS.kursPo)}
+                  </b>
                 </div>
               </>
             ) : (
@@ -631,6 +670,7 @@ export default function Pytanie() {
   const [okres, setOkres] = useState<Okres>("all");
   const [skopiowano, setSkopiowano] = useState(false);
   const [obserwowane, setObserwowane] = useState<number[]>(() => czytajObserwowane());
+  const [refPanelu, panelWidoczny] = useWidoczny<HTMLElement>();
   const t = params.get("tab");
   const zakladka: Zakladka = t === "gracze" || t === "moje" || t === "aktywnosc" ? t : "komentarze";
 
@@ -656,7 +696,8 @@ export default function Pytanie() {
   const kurs0 = p.kursy ? p.kursy[0] : null;
   const kursOtwarcia0 = p.kursy_otwarcia ? p.kursy_otwarcia[0] : null;
   const pierwszy = historia && historia.length > 0 ? historia[0].kursy[0] : null;
-  const zmiana = kurs0 != null && pierwszy != null ? Math.round((kurs0 - pierwszy) * 100) : null;
+  const zmiana = zmianaPp(kurs0, pierwszy);
+  const brakuje = Math.max(0, p.prog_widocznosci - p.liczba_prognoz);
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
   const podobne = (wszystkie ?? []).filter((q) => q.id !== pid && q.kategoria === p.kategoria && q.status === "otwarte").slice(0, 3);
@@ -693,130 +734,136 @@ export default function Pytanie() {
   return (
     <main className="kontener">
       <div className="rynek-strona">
-        <div>
+        <div className="rynek-glowna">
           <nav className="okruszki" aria-label="Okruszki">
             <Link to="/">Rynki</Link>
             <span>›</span>
             <Link to={miasto ? "/?f=miasto" : "/?f=luz"}>{miasto ? "Miasto" : "Na luzie"}</Link>
           </nav>
           <header className="naglowek-rynku">
-            <KafelekKategorii kategoria={p.kategoria} duzy />
-            <div>
-              <h1>{p.tresc}</h1>
-              <div className="meta">
+            <Piktogram tresc={p.tresc} kategoria={p.kategoria} duzy />
+            <h1>{p.tresc}</h1>
+            <div className="meta">
+              {otwarte && dniDo(p.termin) <= 45 ? <Termin termin={p.termin} zegar /> : null}
+              <OdznakaStatusu status={p.status} />
+              <span>
+                Koniec <b>{formatujDate(p.termin)}</b>
+              </span>
+              {p.liczba_zmian_terminu > 0 ? <span>termin zmieniany {odmien(p.liczba_zmian_terminu, "raz", "razy", "razy")}</span> : null}
+              <span>{opisPrognoz(p)}</span>
+              {p.obrot > 0 ? (
                 <span>
                   <b>{liczba(p.obrot)}</b> pkt obrotu
                 </span>
-                <span>
-                  <IkKalendarz />
-                  Koniec <b>{formatujDate(p.termin)}</b>
-                </span>
-                {p.liczba_zmian_terminu > 0 ? <span>termin zmieniany {odmien(p.liczba_zmian_terminu, "raz", "razy", "razy")}</span> : null}
-                <span>{odmien(p.liczba_prognoz, "prognoza", "prognozy", "prognoz")}</span>
-                <OdznakaStatusu status={p.status} />
-                <button type="button" className="przycisk-ikona" onClick={() => void udostepnij()} aria-label="Udostępnij" title="Skopiuj link">
-                  <IkLink />
-                </button>
-                <button
-                  type="button"
-                  className="przycisk-ikona"
-                  onClick={przelaczObserwowanie}
-                  aria-label="Obserwuj"
-                  aria-pressed={obserwowany}
-                  title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-                >
-                  <IkGwiazdka pelna={obserwowany} />
-                </button>
-                {skopiowano ? <span className="typ-tak">Skopiowano link</span> : null}
-              </div>
+              ) : null}
+              <button type="button" className="przycisk-ikona" onClick={() => void udostepnij()} aria-label="Udostępnij" title="Skopiuj link">
+                <IkLink />
+              </button>
+              <button
+                type="button"
+                className="przycisk-ikona"
+                onClick={przelaczObserwowanie}
+                aria-label="Obserwuj"
+                aria-pressed={obserwowany}
+                title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
+              >
+                <IkGwiazdka pelna={obserwowany} />
+              </button>
+              {skopiowano ? <span className="typ-tak">Skopiowano link</span> : null}
             </div>
           </header>
 
           <div className="kurs-naglowek">
             {kurs0 != null ? (
               <>
-                <b>{procent(kurs0)}</b>
+                <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
                 <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
-                {zmiana != null ? (
-                  <span className={`zmiana ${zmiana > 0 ? "gora" : zmiana < 0 ? "dol" : "zero"}`}>
-                    {zmiana > 0 ? `▲ ${zmiana} pkt proc. od otwarcia` : zmiana < 0 ? `▼ ${-zmiana} pkt proc. od otwarcia` : "bez zmian od otwarcia"}
-                  </span>
-                ) : null}
+                {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
               </>
             ) : (
               <>
-                <b className="ukryty">{kursOtwarcia0 != null ? procent(kursOtwarcia0) : "–"}</b>
-                <span className="co">
-                  {kursOtwarcia0 != null ? "kurs otwarcia · " : ""}kurs tłumu ukryty do {p.prog_widocznosci} prognoz ({p.liczba_prognoz}/{p.prog_widocznosci})
-                </span>
+                <span className="cyfry kurs-duzy ukryty">{kursOtwarcia0 != null ? procent(kursOtwarcia0) : "–"}</span>
+                <span className="co">{kursOtwarcia0 != null ? "kurs otwarcia" : "kurs ukryty"}</span>
               </>
             )}
           </div>
+          {kurs0 == null && otwarte ? (
+            <p className="odsloniecie-opis">
+              <Odsloniecie p={p} />
+              <span>
+                Kurs tłumu odsłoni się po {p.prog_widocznosci} prognozach.{" "}
+                {p.liczba_prognoz === 0 ? "Na razie bez prognoz." : `Brakuje ${brakuje}.`}
+              </span>
+            </p>
+          ) : null}
 
           <div className="wykres-karta">
-            <div className="wykres-naglowek">
-              {p.odpowiedzi.length === 3 ? (
-                <div className="legenda-wykresu">
-                  {p.odpowiedzi.map((o, i) => (
-                    <span key={i}>
-                      <i style={{ background: KOLORY_LINII[i] }} />
-                      {o}
-                    </span>
+            {(historia ?? []).length > 0 ? (
+              <div className="wykres-naglowek">
+                <div className="okresy" role="tablist">
+                  {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
+                    <button type="button" key={o} role="tab" aria-selected={okres === o} className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
+                      {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <div className="legenda-wykresu">
-                  <span>
-                    <i style={{ background: KOLORY_LINII[0] }} />
-                    {p.odpowiedzi[0]}
-                  </span>
-                </div>
-              )}
-              <div className="okresy" role="tablist">
-                {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
-                  <button type="button" key={o} role="tab" className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
-                    {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
-                  </button>
-                ))}
               </div>
-            </div>
-            <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} />
+            ) : null}
+            <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} zywy={otwarte} otwarcie={p.kursy_otwarcia} />
           </div>
 
-          <div className="wyniki-tabela">
-            <div className="naglowek-tab">
-              <span>Odpowiedź</span>
-              <span style={{ textAlign: "right" }}>Kurs</span>
-              <span />
-            </div>
+          {/* Dwie odpowiedzi: pojedynek po dwóch stronach jednego paska. Więcej: wiersze z paskami. */}
+          <div className={p.odpowiedzi.length === 2 ? "pojedynek" : "rozklad"}>
             {p.odpowiedzi.map((o, i) => {
               const k = p.kursy ? p.kursy[i] : null;
               const ko = p.kursy_otwarcia ? p.kursy_otwarcia[i] : null;
               const mojeU = (udzialyMoje ?? []).find((z) => z.odpowiedz === i + 1);
-              return (
-                <div key={i} className={`wynik-wiersz ${odp === i + 1 ? "wybrany" : ""} ${p.wynik === i + 1 ? "trafiony" : ""}`}>
-                  <div className="nazwa">
-                    {o}
-                    {mojeU && mojeU.udzialy > 0.005 ? <small>{liczba(mojeU.udzialy, 1)} udz. · Twój typ</small> : null}
-                    {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
+              const nazwa = (
+                <div className="nazwa">
+                  {o}
+                  {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
+                  {mojeU && mojeU.udzialy > 0.005 ? <small>Twój typ: {liczba(mojeU.udzialy, 1)} udz.</small> : null}
+                  {k == null && ko != null ? <small>kurs otwarcia</small> : null}
+                </div>
+              );
+              const kurs =
+                k != null ? (
+                  <LiczbaZywa className="cyfry kurs" wartosc={k * 100} format={jakoProcent} />
+                ) : (
+                  <span className="cyfry kurs ukryty">{ko != null ? procent(ko) : "–"}</span>
+                );
+              const wybrany = odp === i + 1 ? "wybrany" : "";
+              if (p.odpowiedzi.length === 2) {
+                return otwarte ? (
+                  <button type="button" key={i} className={`pojedynek-strona ${klasaOdp(i)} ${wybrany}`} onClick={() => wybierz(i + 1)}>
+                    {nazwa}
+                    {kurs}
+                  </button>
+                ) : (
+                  <div key={i} className={`pojedynek-strona ${klasaOdp(i)}`}>
+                    {nazwa}
+                    {kurs}
                   </div>
-                  {k != null ? (
-                    <div className={`kurs ${klasaTypu(i)}`}>{procent(k)}</div>
-                  ) : (
-                    <div className="kurs ukryty" title="kurs otwarcia">
-                      {ko != null ? procent(ko) : "–"}
-                    </div>
-                  )}
+                );
+              }
+              return (
+                <div key={i} className={`rozklad-wiersz ${klasaOdp(i)} ${wybrany}`}>
+                  {nazwa}
+                  {kurs}
                   {otwarte ? (
-                    <button type="button" className={`kup kup-${KLASY[i] ?? "trzeci"}`} onClick={() => wybierz(i + 1)}>
+                    <button type="button" className={`kup kup-${klasaOdp(i)}`} onClick={() => wybierz(i + 1)}>
                       Wybierz
                     </button>
                   ) : (
                     <span />
                   )}
+                  <span className="slupek">
+                    <i style={{ width: `${Math.round((k ?? 0) * 100)}%` }} />
+                  </span>
                 </div>
               );
             })}
+            {p.odpowiedzi.length === 2 && p.kursy ? <Podzial kursy={p.kursy} /> : null}
           </div>
 
           {p.status === "rozstrzygniete" && p.wynik ? (
@@ -831,45 +878,53 @@ export default function Pytanie() {
           ) : null}
           {p.status === "uniewaznione" ? <Komunikat typ="ostrz">Rynek unieważniony, wydane punkty wróciły do graczy.</Komunikat> : null}
           {p.status === "zamkniete" ? <Komunikat typ="info">Rynek zamknięty, czeka na rozstrzygnięcie.</Komunikat> : null}
+        </div>
 
-          <section className="karta zasady">
-            <h3>Zasady</h3>
-            <div className="etykieta">Kryterium rozstrzygnięcia</div>
-            <p>{p.kryterium}</p>
-            <div className="etykieta">Źródło</div>
-            <p>
-              <a href={p.link_zrodla} target="_blank" rel="noreferrer">
-                <IkLink style={{ width: 14, height: 14, verticalAlign: -2, marginRight: 4 }} />
-                {p.link_zrodla}
-              </a>
-            </p>
-            {p.komentarz_urzedu ? (
-              <>
-                <div className="etykieta">Komentarz urzędu</div>
-                <p>{p.komentarz_urzedu}</p>
-              </>
-            ) : null}
-            <div className="etykieta">Otwarto</div>
-            <p>{formatujDate(p.otwarto ?? p.utworzono)}</p>
-            <p className="mala" style={{ marginBottom: 0 }}>
+        <aside className="panel-kolumna" ref={refPanelu}>
+          <Panel p={p} odp={odp} setOdp={wybierz} udzialyMoje={udzialyMoje ?? []} wydaneRazem={wydaneRazem} poZmianie={poZmianie} />
+        </aside>
+
+        <div className="rynek-reszta">
+          <section className="zasady">
+            <h2 className="sekcja-tytul">Zasady</h2>
+            <dl>
+              <dt>Kryterium rozstrzygnięcia</dt>
+              <dd>{p.kryterium}</dd>
+              <dt>Źródło</dt>
+              <dd>
+                <a href={p.link_zrodla} target="_blank" rel="noreferrer">
+                  <IkLink />
+                  {p.link_zrodla}
+                </a>
+              </dd>
+              {p.komentarz_urzedu ? (
+                <>
+                  <dt>Komentarz urzędu</dt>
+                  <dd>{p.komentarz_urzedu}</dd>
+                </>
+              ) : null}
+              <dt>Otwarto</dt>
+              <dd>{formatujDate(p.otwarto ?? p.utworzono)}</dd>
+            </dl>
+            <p className="mala">
               Rozstrzyga zespół Zdążą? według publicznego źródła po terminie {formatujDateKrotko(p.termin)}. Unieważniony rynek
               zwraca punkty.
             </p>
           </section>
 
           <div className="zakladki" role="tablist">
-            <button type="button" role="tab" className={zakladka === "komentarze" ? "aktywna" : ""} onClick={() => ustawZakladke("komentarze")}>
-              Komentarze<span className="licznik">{komentarze ? komentarze.length : ""}</span>
+            <button type="button" role="tab" aria-selected={zakladka === "komentarze"} className={zakladka === "komentarze" ? "aktywna" : ""} onClick={() => ustawZakladke("komentarze")}>
+              Komentarze{komentarze && komentarze.length > 0 ? <span className="licznik">{komentarze.length}</span> : null}
             </button>
-            <button type="button" role="tab" className={zakladka === "gracze" ? "aktywna" : ""} onClick={() => ustawZakladke("gracze")}>
+            <button type="button" role="tab" aria-selected={zakladka === "gracze"} className={zakladka === "gracze" ? "aktywna" : ""} onClick={() => ustawZakladke("gracze")}>
               Najwięksi gracze
             </button>
             {zalogowany ? (
-              <button type="button" role="tab" className={zakladka === "moje" ? "aktywna" : ""} onClick={() => ustawZakladke("moje")}>
+              <button type="button" role="tab" aria-selected={zakladka === "moje"} className={zakladka === "moje" ? "aktywna" : ""} onClick={() => ustawZakladke("moje")}>
                 Moje pozycje
               </button>
             ) : null}
-            <button type="button" role="tab" className={zakladka === "aktywnosc" ? "aktywna" : ""} onClick={() => ustawZakladke("aktywnosc")}>
+            <button type="button" role="tab" aria-selected={zakladka === "aktywnosc"} className={zakladka === "aktywnosc" ? "aktywna" : ""} onClick={() => ustawZakladke("aktywnosc")}>
               Aktywność
             </button>
           </div>
@@ -929,36 +984,25 @@ export default function Pytanie() {
             <>
               <h2 className="sekcja-tytul">Podobne rynki</h2>
               <div className="siatka">
-                {podobne.map((q) => {
-                  const kq = q.kursy ? q.kursy[0] : null;
-                  const kqo = q.kursy_otwarcia ? q.kursy_otwarcia[0] : null;
-                  return (
-                    <article className="rynek rynek-kompakt" key={q.id}>
-                      <Link to={`/pytanie/${q.id}`} className="rynek-gora">
-                        <KafelekKategorii kategoria={q.kategoria} />
-                        <h3 className="rynek-tytul">{q.tresc}</h3>
-                        {kq != null ? (
-                          <Wskaznik kurs={kq} etykieta={q.kategoria === "miasto" ? "w terminie" : "szansa"} />
-                        ) : (
-                          <Wskaznik kurs={kqo} etykieta="kurs otwarcia" kolor="mute" />
-                        )}
-                      </Link>
-                      <div className="rynek-dol">
-                        <span>{opisPrognoz(q)}</span>
-                        <span className="prawy">do {formatujDateKrotko(q.termin)}</span>
-                      </div>
-                    </article>
-                  );
-                })}
+                {podobne.map((q) => (
+                  <KartaRynku key={q.id} p={q} />
+                ))}
               </div>
             </>
           ) : null}
         </div>
-
-        <aside className="panel-kolumna">
-          <Panel p={p} odp={odp} setOdp={wybierz} udzialyMoje={udzialyMoje ?? []} wydaneRazem={wydaneRazem} poZmianie={poZmianie} />
-        </aside>
       </div>
+
+      {otwarte ? (
+        <div className={`szybki-pasek ${panelWidoczny ? "schowany" : ""}`} aria-hidden={panelWidoczny}>
+          {p.odpowiedzi.map((o, i) => (
+            <button type="button" key={i} className={`kup kup-${klasaOdp(i)}`} tabIndex={panelWidoczny ? -1 : 0} onClick={() => wybierz(i + 1)}>
+              <span className="nazwa">{o}</span>
+              {p.kursy ? <span className="cyfry kurs">{procent(p.kursy[i])}</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </main>
   );
 }

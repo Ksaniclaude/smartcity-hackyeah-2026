@@ -3,6 +3,7 @@ import { pobierzRanking } from "@/api/api";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { WpisRankingu } from "@/api/types";
 import { usePolling } from "@/ui/hooks";
+import { IkDol, IkGora } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie } from "@/ui/komponenty";
 import { liczba } from "@/ui/tekst";
 
@@ -45,6 +46,7 @@ export default function Ranking() {
   const sort: Sort = s === "zysk" || s === "obrot" || s === "trafnosc" ? s : "portfel";
   const { dane, blad, laduje } = usePolling(() => pobierzRanking(100), 10000);
   const wiersze = posortuj(dane ?? [], sort);
+  const mojeMiejsce = gracz ? wiersze.findIndex((w) => w.nick === gracz.nick) + 1 : 0;
 
   const ustawSort = (k: Sort) => {
     const nowe = new URLSearchParams(params);
@@ -75,50 +77,66 @@ export default function Ranking() {
       {blad ? <Komunikat typ="blad">{blad}</Komunikat> : null}
       {laduje && !dane ? <Ladowanie /> : null}
       {dane && wiersze.length === 0 ? <p className="pusto">Jeszcze nikt nie postawił punktów.</p> : null}
+      {gracz && wiersze.length > 0 ? (
+        <p className="ranking-ja">
+          {mojeMiejsce > 0 ? (
+            <>
+              Twoje miejsce: <b className="cyfry">{mojeMiejsce}</b> z {wiersze.length}
+            </>
+          ) : (
+            <>
+              Do rankingu wchodzi się pierwszą prognozą. <Link to="/">Wybierz rynek</Link>.
+            </>
+          )}
+        </p>
+      ) : null}
 
       {wiersze.length > 0 ? (
-        <div className="tabela-owijka">
-          <table className="tabela">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Gracz</th>
-                <th className="liczba">Portfel</th>
-                <th className="liczba">Zysk</th>
-                <th className="liczba">Trafność</th>
-                <th className="liczba">Obrót</th>
-                <th className="liczba">Prognozy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wiersze.map((w, i) => {
-                const zysk = Math.round(w.zysk);
-                const ja = gracz?.nick === w.nick;
-                return (
-                  <tr key={w.nick} className={ja ? "ja" : undefined}>
-                    <td>
-                      <span className={`miejsce ${i < 3 ? "top" : ""}`}>{i + 1}</span>
-                    </td>
-                    <td>
-                      <Link to={`/u/${encodeURIComponent(w.nick)}`} className="gracz-kom">
-                        <Awatar nick={w.nick} />
-                        <span>{w.nick}</span>
-                        {ja ? <span className="odznaka odznaka-status">Ty</span> : null}
-                      </Link>
-                    </td>
-                    <td className="liczba">{liczba(Math.round(w.portfel))}</td>
-                    <td className={`liczba ${zysk > 0 ? "trafione" : zysk < 0 ? "chybione" : ""}`}>{zeZnakiem(zysk)}</td>
-                    <td className="liczba">
-                      {w.trafione} z {w.rozstrzygniete}
-                    </td>
-                    <td className="liczba">{liczba(Math.round(w.obrot))}</td>
-                    <td className="liczba">{w.prognozy}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <table className="tabela tabela-ranking">
+          <thead>
+            <tr>
+              <th className="kol-miejsce">Miejsce</th>
+              <th>Gracz</th>
+              <th className="liczba">Portfel</th>
+              <th className="liczba">Zysk</th>
+              <th className="liczba kol-dodatkowa">Trafność</th>
+              <th className="liczba kol-dodatkowa">Obrót</th>
+              <th className="liczba kol-dodatkowa">Prognozy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {wiersze.map((w, i) => {
+              const zysk = Math.round(w.zysk);
+              const ja = gracz?.nick === w.nick;
+              return (
+                <tr key={w.nick} className={ja ? "ja" : undefined}>
+                  <td className="kol-miejsce">
+                    <span className={`miejsce ${i < 3 ? "top" : ""}`}>{i + 1}</span>
+                  </td>
+                  <td>
+                    <Link to={`/u/${encodeURIComponent(w.nick)}`} className="gracz-kom">
+                      <Awatar nick={w.nick} />
+                      <span>{w.nick}</span>
+                      {ja ? <span className="znacznik znacznik-akcent">Ty</span> : null}
+                    </Link>
+                  </td>
+                  <td className="liczba">
+                    <span className="cyfry">{liczba(Math.round(w.portfel))}</span>
+                  </td>
+                  <td className="liczba">
+                    <span className={`zmiana ${zysk > 0 ? "gora" : zysk < 0 ? "dol" : "zero"}`}>
+                      {zysk > 0 ? <IkGora /> : zysk < 0 ? <IkDol /> : null}
+                      {zeZnakiem(zysk)}
+                    </span>
+                  </td>
+                  <td className="liczba kol-dodatkowa">{w.rozstrzygniete > 0 ? `${w.trafione} z ${w.rozstrzygniete}` : "–"}</td>
+                  <td className="liczba kol-dodatkowa">{liczba(Math.round(w.obrot))}</td>
+                  <td className="liczba kol-dodatkowa">{w.prognozy}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       ) : null}
 
       <p className="stopka">
