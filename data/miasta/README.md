@@ -43,7 +43,8 @@ niższe `b` i zerowy próg widoczności kursu dla rynków krótkich.
 
 ## Stan: wgrane na produkcję 3.10.2026
 
-`dodatkowe.csv` (22 rynki pod beki i viral: Drwal, masło za 2 zł, Lotto, Chajzerowie, Taylor Swift, jarmarki, Coca-Cola truck)
+`ai.csv` (22 rynki o AI: premiery modeli, ranking Arena, IPO OpenAI i Anthropic, urządzenie OpenAI, Nobel 2026, Bielik,
+Baltic AI GigaFactory, polska komisja ds. AI; miasto „Świat” dla spraw globalnych) i `dodatkowe.csv` (22 rynki pod beki i viral: Drwal, masło za 2 zł, Lotto, Chajzerowie, Taylor Swift, jarmarki, Coca-Cola truck)
 wgrane tą samą drogą; 12 rynków ma flagę `wyroznione` i idzie na początek sekcji Hot (przełącznik w /admin).
 
 
