@@ -346,6 +346,17 @@ export async function adminEdytujPytanie(args: {
   sprawdz(r);
 }
 
+export async function pobierzCzolowke(): Promise<number | null> {
+  const r = await supabase.rpc("rynek_czolowki");
+  const id = sprawdz<number | null>(r);
+  return typeof id === "number" ? id : id == null ? null : Number(id);
+}
+
+export async function adminUstawCzolowke(pytanie: number | null): Promise<void> {
+  const r = await supabase.rpc("admin_ustaw_czolowke", { p_pytanie: pytanie });
+  sprawdz(r);
+}
+
 export async function adminWyroznij(pytanie: number, wyroznione: boolean): Promise<void> {
   const r = await supabase.rpc("admin_wyroznij", { p_pytanie: pytanie, p_wyroznione: wyroznione });
   sprawdz(r);

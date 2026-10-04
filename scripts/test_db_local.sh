@@ -26,6 +26,7 @@ select * from public.aktywnosc(null, 5) limit 1;
 select * from public.najwieksi_gracze(1, 5) limit 1;
 select * from public.ranking(5) limit 1;
 select public.profil_publiczny('nikt');
+select public.rynek_czolowki();
 select * from public.szukaj_graczy('a', 5) limit 1;
 select kursy_1h, gracze_rynku, prog_widocznosci from public.v_pytania limit 1;
 select public.kurs_widoczny(1), public.prog_pytania(1), public.kursy_godzine_temu(1), public.gracze_rynku(1);

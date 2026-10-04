@@ -9,6 +9,7 @@ import {
   adminRozstrzygnij,
   adminUniewaznij,
   adminUstawProg,
+  adminUstawCzolowke,
   adminUstawProgDomyslny,
   adminWyroznij,
   adminZaloguj,
@@ -323,6 +324,16 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
             >
               {p.wyroznione ? "Hot: wyróżniony (zdejmij)" : "Wyróżnij jako hot"}
             </button>
+            {p.status === "otwarte" ? (
+              <button
+                type="button"
+                className="przycisk przycisk-maly przycisk-drugi"
+                disabled={trwa}
+                onClick={() => akcja("Na czołówce", () => adminUstawCzolowke(p.id))}
+              >
+                Na czołówkę strony głównej
+              </button>
+            ) : null}
           </div>
         ) : null}
 

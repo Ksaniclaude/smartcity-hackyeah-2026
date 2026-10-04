@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { pobierzAktywnosc, pobierzHistorie, pobierzPytania, szukajGraczy } from "@/api/api";
+import { pobierzAktywnosc, pobierzCzolowke, pobierzHistorie, pobierzPytania, szukajGraczy } from "@/api/api";
 import { procent } from "@/api/lmsr";
 import { useSesja, useUruchomSesje } from "@/api/sesja";
 import type { Aktywnosc, Pytanie } from "@/api/types";
@@ -141,9 +141,12 @@ function miastaZ(lista: Pytanie[]): string[] {
 /* ---------- czołówka: hasło dla gościa, wyróżniony rynek, taśma ostatnich prognoz ---------- */
 
 /** Rynek na czołówkę: otwarty z największym obrotem, a gdy nikt jeszcze nie grał, ten z najbliższym terminem. */
-function wybierzWyrozniony(lista: Pytanie[]): { p: Pytanie; powod: string } | null {
+function wybierzWyrozniony(lista: Pytanie[], czolowkaId: number | null): { p: Pytanie; powod: string } | null {
   const otwarte = lista.filter((p) => p.status === "otwarte");
   if (otwarte.length === 0) return null;
+  // Rynek wskazany przez admina (ustawienia.rynek_czolowki) ma pierwszeństwo.
+  const wybrany = czolowkaId != null ? otwarte.find((p) => p.id === czolowkaId) : undefined;
+  if (wybrany) return { p: wybrany, powod: "na czołówce" };
   const grane = otwarte.filter((p) => p.obrot > 0 && p.kursy != null);
   if (grane.length > 0) return { p: [...grane].sort((a, b) => b.obrot - a.obrot || a.id - b.id)[0], powod: "największy obrót" };
   return { p: [...otwarte].sort((a, b) => a.termin.localeCompare(b.termin) || a.id - b.id)[0], powod: "najbliższy termin" };
@@ -350,6 +353,8 @@ export default function Lista() {
   const sortowanie = czytajSortowanie(params.get("s"));
   const q = (params.get("q") ?? "").trim();
   const miastoParam = (params.get("m") ?? "").trim();
+  // Rynek na czołówce wskazany przez admina (odpytywany rzadko; zmienia się ręcznie).
+  const { dane: czolowkaId } = usePolling(() => (filtr === "wszystkie" && !q ? pobierzCzolowke() : Promise.resolve(null)), 30000, `cz|${filtr}|${q}`);
   // Ruch z ostatniej doby do sekcji „Hot” (tylko strona główna, odpytywane rzadziej niż rynki).
   const { dane: ruch } = usePolling(() => (filtr === "wszystkie" && !q ? pobierzAktywnosc(null, 100) : Promise.resolve([])), 15000, `${filtr}|${q}`);
   // Szukanie obejmuje też graczy (po nicku); lista rynków filtruje się lokalnie, gracze idą z bazy.
@@ -406,7 +411,7 @@ export default function Lista() {
   const wybraneMiasto = miastaKategorii.includes(miastoParam) ? miastoParam : "";
 
   const czolowka = filtr === "wszystkie" && !q;
-  const wyrozniony = czolowka ? wybierzWyrozniony(aktywne) : null;
+  const wyrozniony = czolowka ? wybierzWyrozniony(aktywne, czolowkaId ?? null) : null;
 
   const typy = new Map((moje ?? []).filter((m) => m.udzialy_glowne >= 0.05).map((m) => [m.pytanie, m.odpowiedz_glowna]));
   const listaProps = { obserwowane, przelaczObserwowanie, typy };

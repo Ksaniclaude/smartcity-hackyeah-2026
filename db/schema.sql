@@ -822,6 +822,33 @@ begin
   if not found then raise exception 'Nie ma takiego pytania'; end if;
 end $$;
 
+-- Rynek na czołówce strony głównej (ustawienia.rynek_czolowki); null, gdy nie ustawiony albo nieotwarty.
+create or replace function public.rynek_czolowki()
+returns bigint
+language sql stable security definer set search_path = public, pg_temp as $$
+  select p.id
+  from public.ustawienia u
+  join public.pytania p on p.id = nullif(u.wartosc, '')::bigint
+  where u.klucz = 'rynek_czolowki' and p.status = 'otwarte'
+$$;
+
+create or replace function public.admin_ustaw_czolowke(p_pytanie bigint)
+returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  if p_pytanie is null then
+    delete from public.ustawienia where klucz = 'rynek_czolowki';
+    return;
+  end if;
+  if not exists (select 1 from public.pytania where id = p_pytanie and status = 'otwarte') then
+    raise exception 'Na czołówkę można wziąć tylko otwarty rynek';
+  end if;
+  insert into public.ustawienia (klucz, wartosc) values ('rynek_czolowki', p_pytanie::text)
+  on conflict (klucz) do update set wartosc = excluded.wartosc;
+end $$;
+
 -- Pełny podgląd dla admina (w tym propozycje i q).
 create or replace function public.admin_pytania()
 returns setof public.pytania
@@ -1295,6 +1322,8 @@ grant execute on function public.admin_zaloguj(text) to authenticated;
 grant execute on function public.admin_dodaj_pytanie(text, public.kategoria, text[], text, text, date, double precision[], boolean, text) to authenticated;
 grant execute on function public.admin_edytuj_pytanie(bigint, text, text[], text, text, date, text) to authenticated;
 grant execute on function public.admin_wyroznij(bigint, boolean) to authenticated;
+grant execute on function public.rynek_czolowki() to anon, authenticated;
+grant execute on function public.admin_ustaw_czolowke(bigint) to authenticated;
 grant execute on function public.admin_otworz(bigint, double precision[]) to authenticated;
 grant execute on function public.admin_zamknij(bigint) to authenticated;
 grant execute on function public.admin_rozstrzygnij(bigint, integer, text) to authenticated;
