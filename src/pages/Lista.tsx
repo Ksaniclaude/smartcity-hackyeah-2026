@@ -113,7 +113,7 @@ function porownanieZakonczonych(s: Sortowanie): (a: Pytanie, b: Pytanie) => numb
 /* ---------- „Hot”: rynki z największym ruchem w ostatniej dobie ---------- */
 
 const HOT_OKNO = 24 * 60 * 60 * 1000;
-const HOT_ILE = 12;
+const HOT_ILE = 16;
 
 /**
  * Najpierw rynki wyróżnione przez admina (najśmieszniejsze, najbardziej viralowe), potem reszta: po liczbie
