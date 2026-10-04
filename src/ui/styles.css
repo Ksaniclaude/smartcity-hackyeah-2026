@@ -497,13 +497,16 @@ button.wynik:active { transform: scale(0.98); }
   .panel-kolumna { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--naglowek-h) + 20px); max-height: calc(100vh - var(--naglowek-h) - 40px); max-height: calc(100dvh - var(--naglowek-h) - 40px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 }
 .rynek-glowna, .rynek-reszta { min-width: 0; }
+/* pasek nad tytułem rynku: okruszki po lewej, „Udostępnij” i gwiazdka po prawej */
+.rynek-pasek { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; margin: 0 0 12px; }
+.rynek-pasek .okruszki { margin: 0; min-width: 0; }
 .okruszki { font-size: 13px; color: var(--mute); margin: 0 0 14px; display: flex; gap: 6px; align-items: center; }
 .okruszki a { color: var(--mute); text-decoration: none; }
 .okruszki a:hover { color: var(--tekst); }
-.naglowek-rynku { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px 12px; align-items: center; margin: 0 0 14px; }
+.naglowek-rynku { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px 12px; align-items: center; margin: 0 0 20px; }
 .naglowek-rynku .piktogram-duzy { width: 44px; height: 44px; border-radius: 12px; align-self: start; }
 .naglowek-rynku h1 { font-size: 22px; font-weight: 750; margin: 0; line-height: 1.18; }
-.naglowek-rynku .meta { grid-column: 1 / -1; }
+.naglowek-rynku .meta { grid-column: 1 / -1; gap: 8px 14px; }
 @media (min-width: 900px) {
   .naglowek-rynku { grid-template-columns: 56px minmax(0, 1fr); column-gap: 16px; }
   .naglowek-rynku .piktogram-duzy { width: 56px; height: 56px; border-radius: 14px; }
@@ -524,8 +527,13 @@ button.wynik:active { transform: scale(0.98); }
 .kurs-naglowek .zmiana { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--tlo-2); gap: 5px; }
 .kurs-naglowek .zmiana.gora { background: var(--tak-tlo); }
 .kurs-naglowek .zmiana.dol { background: var(--nie-tlo); }
-.odsloniecie-opis { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--tekst-2); margin: 0 0 8px; }
-.odsloniecie-opis .odsloniecie i { width: 8px; height: 16px; border-radius: 3px; }
+/* rynek przed odsłonięciem kursu: jedna plansza z wyjaśnieniem zamiast szarej liczby i pustego wykresu */
+.odslona { margin: 0 0 20px; padding: 16px 18px; border-radius: var(--r); background: var(--tlo-2); }
+.odslona-glowa { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: 0 0 6px; }
+.odslona-tytul { font-family: var(--wyswietlana); font-stretch: 88%; font-size: 19px; font-weight: 700; color: var(--tekst); }
+.odslona p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tekst-2); max-width: 60ch; }
+.odslona .odsloniecie i { width: 8px; height: 16px; border-radius: 3px; background: var(--linia-2); }
+.odslona .odsloniecie i.pelny { background: var(--akcent); }
 .wykres-karta { margin: 4px 0 20px; }
 .wykres-naglowek { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 12px; margin-bottom: 2px; }
 .okresy { display: flex; gap: 2px; }
@@ -567,7 +575,7 @@ button.wynik:active { transform: scale(0.98); }
 .rozklad-wiersz.tak .kurs { color: var(--tak-tekst); }
 .rozklad-wiersz.nie .kurs { color: var(--nie-tekst); }
 .rozklad-wiersz.trzeci .kurs { color: var(--trzeci-tekst); }
-.rozklad-wiersz .kurs.ukryty { color: var(--slaby); }
+.rozklad-wiersz .kurs.ukryty { color: var(--tekst-2); }
 .rozklad-wiersz .kup { grid-area: akcja; height: 40px; font-size: 14px; padding: 0 16px; }
 .rozklad-wiersz .slupek { grid-area: slupek; height: 6px; border-radius: 3px; background: var(--tlo-3); overflow: hidden; }
 .rozklad-wiersz .slupek i { display: block; height: 100%; border-radius: 3px; transition: width 0.5s ease; }
@@ -585,11 +593,14 @@ button.wynik:active { transform: scale(0.98); }
 .pojedynek-strona .kurs { font-size: 36px; }
 .pojedynek-strona.tak .kurs { color: var(--tak-tekst); }
 .pojedynek-strona.nie .kurs { color: var(--nie-tekst); }
-.pojedynek-strona .kurs.ukryty { color: var(--slaby); }
+.pojedynek-strona .kurs.ukryty { color: var(--tekst-2); }
 button.pojedynek-strona { cursor: pointer; }
 button.pojedynek-strona:hover .nazwa { text-decoration: underline; text-underline-offset: 3px; }
 .pojedynek-strona.wybrany .nazwa { color: var(--akcent-tekst); }
 .pojedynek .podzial { grid-column: 1 / -1; height: 10px; }
+/* przed odsłonięciem kursu: podpis nad listą, a paski kursów otwarcia przygaszone */
+.odpowiedzi-etykieta { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--mute); }
+.przed-odslona .podzial i, .przed-odslona .slupek i { opacity: 0.4; }
 .pojedynek .podzial i { border-radius: 5px; }
 .zasady { margin: 0 0 8px; }
 .zasady dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px 20px; }
@@ -729,6 +740,10 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .szybki-pasek .kup { height: 52px; padding: 0 8px; flex-direction: column; justify-content: center; gap: 2px; }
 .szybki-pasek .kup .nazwa { font-size: 12px; font-weight: 600; max-width: 100%; }
 .szybki-pasek .kup .kurs { font-size: 21px; }
+/* główna akcja na telefonie: pełne kolory odpowiedzi z ciemnym tekstem, nie przygaszone tła */
+.szybki-pasek .kup-tak { background: var(--tak); color: var(--na-tak); }
+.szybki-pasek .kup-nie { background: var(--nie); color: var(--na-nie); }
+.szybki-pasek .kup-trzeci { background: var(--trzeci); color: var(--na-trzecim); }
 @media (min-width: 1000px) { .szybki-pasek { display: none; } }
 
 /* ---------- staty, profil, ranking ---------- */
@@ -752,8 +767,9 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .poziom-slupek { height: 10px; border-radius: 5px; background: var(--tlo-3); overflow: hidden; }
 .poziom-slupek i { display: block; height: 100%; border-radius: 5px; background: var(--akcent); transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .poziom-pas .pomoc { margin: 8px 0 0; }
-.odznaki { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; margin: 8px 0; }
-.odznaka-kafel { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--linia); border-radius: var(--r); background: var(--karta); }
+/* równa siatka: wszystkie kafle tej samej wysokości, a pasek ze stanem zawsze przy dolnej krawędzi */
+.odznaki { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); grid-auto-rows: 1fr; gap: 12px; margin: 8px 0; }
+.odznaka-kafel { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 12px; align-items: start; padding: 14px; border: 1px solid var(--linia); border-radius: var(--r); background: var(--karta); }
 .odznaka-kafel b { display: block; font-size: 15px; color: var(--mute); }
 .odznaka-kafel span { display: block; font-size: 13px; color: var(--mute); }
 .odznaka-kafel .odznaka-ikona { width: 44px; height: 44px; border-radius: 50%; background: var(--tlo-3); color: var(--slaby); display: inline-flex; align-items: center; justify-content: center; }
@@ -761,8 +777,9 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .odznaka-kafel.zdobyta { border-color: var(--akcent); }
 .odznaka-kafel.zdobyta b { color: var(--tekst); }
 .odznaka-kafel.zdobyta .odznaka-ikona { background: var(--akcent); color: var(--na-akcencie); }
-.odznaka-postep { margin-top: 6px; font-variant-numeric: tabular-nums; }
-.odznaka-postep i { display: block; height: 5px; border-radius: 3px; margin-bottom: 4px; background: linear-gradient(90deg, var(--akcent) calc(var(--ile) * 100%), var(--tlo-3) calc(var(--ile) * 100%)); }
+.odznaka-kafel .odznaka-postep { grid-column: 1 / -1; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.odznaka-kafel.zdobyta .odznaka-postep { color: var(--akcent-tekst); }
+.odznaka-postep i { display: block; height: 5px; border-radius: 3px; margin-bottom: 6px; background: linear-gradient(90deg, var(--akcent) calc(var(--ile) * 100%), var(--tlo-3) calc(var(--ile) * 100%)); }
 /* plansza nagrody u dołu ekranu (na telefonie nad dolną nawigacją i paskiem odpowiedzi): nowa odznaka, poziom
    albo dzień serii; nie zasłania kuponu i nie przechwytuje kliknięć */
 .nagroda { position: fixed; bottom: calc(var(--dol-nav-h) + 84px + env(safe-area-inset-bottom)); left: 50%; z-index: 60; width: min(420px, calc(100vw - 24px)); margin-left: calc(min(420px, 100vw - 24px) / -2); display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px; align-items: center; padding: 14px 16px; border-radius: 16px; background: var(--karta); border: 1.5px solid var(--akcent); box-shadow: var(--cien-2); pointer-events: none; animation: wydruk 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }

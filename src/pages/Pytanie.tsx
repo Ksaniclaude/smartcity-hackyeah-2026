@@ -875,6 +875,7 @@ export default function Pytanie() {
   const pierwszy = historia && historia.length > 0 ? historia[0].kursy[0] : null;
   const zmiana = zmianaPp(kurs0, pierwszy);
   const brakuje = Math.max(0, p.prog_widocznosci - p.liczba_prognoz);
+  const ukryty = kurs0 == null && otwarte;
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
   const url = `${window.location.origin}/pytanie/${pid}`;
@@ -912,11 +913,27 @@ export default function Pytanie() {
     <main className="kontener">
       <div className="rynek-strona">
         <div className="rynek-glowna">
-          <nav className="okruszki" aria-label="Okruszki">
-            <Link to="/">Rynki</Link>
-            <span>›</span>
-            <Link to={miasto ? "/?f=miasto" : "/?f=luz"}>{miasto ? "Miasto" : "Na luzie"}</Link>
-          </nav>
+          {/* nad tytułem: gdzie jestem i co mogę zrobić z rynkiem (podać dalej, obserwować) */}
+          <div className="rynek-pasek">
+            <nav className="okruszki" aria-label="Okruszki">
+              <Link to="/">Rynki</Link>
+              <span>›</span>
+              <Link to={miasto ? "/?f=miasto" : "/?f=luz"}>{miasto ? "Miasto" : "Na luzie"}</Link>
+            </nav>
+            <span className="meta-akcje">
+              {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} /> : null}
+              <button
+                type="button"
+                className="przycisk-ikona"
+                onClick={przelaczObserwowanie}
+                aria-label="Obserwuj"
+                aria-pressed={obserwowany}
+                title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
+              >
+                <IkGwiazdka pelna={obserwowany} />
+              </button>
+            </span>
+          </div>
           <header className="naglowek-rynku">
             <Piktogram tresc={p.tresc} kategoria={p.kategoria} duzy />
             <h1>{p.tresc}</h1>
@@ -933,64 +950,63 @@ export default function Pytanie() {
                   <b>{liczba(p.obrot)}</b> pkt obrotu
                 </span>
               ) : null}
-              <span className="meta-akcje">
-                {daneKarty ? <PrzyciskUdostepnij dane={daneKarty} /> : null}
-                <button
-                  type="button"
-                  className="przycisk-ikona"
-                  onClick={przelaczObserwowanie}
-                  aria-label="Obserwuj"
-                  aria-pressed={obserwowany}
-                  title={obserwowany ? "Przestań obserwować" : "Obserwuj"}
-                >
-                  <IkGwiazdka pelna={obserwowany} />
-                </button>
-              </span>
             </div>
           </header>
 
-          <div className="kurs-naglowek">
-            {kurs0 != null ? (
-              <>
-                <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
-                <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
-                {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
-                {otwarte ? <ZmianaOdGodziny p={p} pelna /> : null}
-              </>
-            ) : (
-              <>
-                <span className="cyfry kurs-duzy ukryty">{kursOtwarcia0 != null ? procent(kursOtwarcia0) : "–"}</span>
-                <span className="co">{kursOtwarcia0 != null ? "kurs otwarcia" : "kurs ukryty"}</span>
-              </>
-            )}
-          </div>
-          {kurs0 == null && otwarte ? (
-            <p className="odsloniecie-opis">
-              <Odsloniecie p={p} />
-              <span>
-                Kurs tłumu odsłoni się {poPrognozach(p.prog_widocznosci)}.{" "}
-                {p.liczba_prognoz === 0 ? "Na razie bez prognoz." : `Brakuje ${brakuje}.`}
-              </span>
-            </p>
-          ) : null}
-
-          <div className="wykres-karta">
-            {(historia ?? []).length > 0 ? (
-              <div className="wykres-naglowek">
-                <div className="okresy" role="tablist">
-                  {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
-                    <button type="button" key={o} role="tab" aria-selected={okres === o} className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
-                      {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
-                    </button>
-                  ))}
-                </div>
+          {ukryty ? (
+            // Rynek przed odsłonięciem kursu: bez szarej liczby i pustego wykresu. Zostaje krótkie wyjaśnienie,
+            // a kursy otwarcia stoją niżej przy odpowiedziach.
+            <section className="odslona">
+              <div className="odslona-glowa">
+                <b className="odslona-tytul">Kurs tłumu jest ukryty</b>
+                {p.prog_widocznosci >= 2 ? <Odsloniecie p={p} /> : null}
               </div>
-            ) : null}
-            <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} zywy={otwarte} otwarcie={p.kursy_otwarcia} />
-          </div>
+              <p>
+                {p.liczba_prognoz === 0 ? "Nikt jeszcze nie postawił. " : ""}
+                {p.prog_widocznosci <= 1
+                  ? "Pierwsza prognoza odsłoni kurs tłumu."
+                  : `Kurs tłumu odsłoni się ${poPrognozach(p.prog_widocznosci)}, żeby pierwsi gracze typowali po swojemu.`}
+                {p.liczba_prognoz > 0 ? ` Brakuje ${brakuje}.` : ""}
+              </p>
+            </section>
+          ) : (
+            <>
+              <div className="kurs-naglowek">
+                {kurs0 != null ? (
+                  <>
+                    <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
+                    <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
+                    {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
+                    {otwarte ? <ZmianaOdGodziny p={p} pelna /> : null}
+                  </>
+                ) : (
+                  <>
+                    <span className="cyfry kurs-duzy ukryty">{kursOtwarcia0 != null ? procent(kursOtwarcia0) : "–"}</span>
+                    <span className="co">{kursOtwarcia0 != null ? "kurs otwarcia" : "kurs ukryty"}</span>
+                  </>
+                )}
+              </div>
+              <div className="wykres-karta">
+                {(historia ?? []).length > 0 ? (
+                  <div className="wykres-naglowek">
+                    <div className="okresy" role="tablist">
+                      {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
+                        <button type="button" key={o} role="tab" aria-selected={okres === o} className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
+                          {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} zywy={otwarte} otwarcie={p.kursy_otwarcia} />
+              </div>
+            </>
+          )}
 
-          {/* Dwie odpowiedzi: pojedynek po dwóch stronach jednego paska. Więcej: wiersze z paskami. */}
-          <div className={p.odpowiedzi.length === 2 ? "pojedynek" : "rozklad"}>
+          {/* Dwie odpowiedzi: pojedynek po dwóch stronach jednego paska. Więcej: wiersze z paskami.
+              Przed odsłonięciem lista pokazuje kursy otwarcia: jeden podpis nad nią, liczby i paski przygaszone. */}
+          {ukryty && p.kursy_otwarcia ? <p className="odpowiedzi-etykieta">Kurs otwarcia</p> : null}
+          <div className={`${p.odpowiedzi.length === 2 ? "pojedynek" : "rozklad"} ${ukryty ? "przed-odslona" : ""}`}>
             {p.odpowiedzi.map((o, i) => {
               const k = p.kursy ? p.kursy[i] : null;
               const ko = p.kursy_otwarcia ? p.kursy_otwarcia[i] : null;
@@ -1000,7 +1016,7 @@ export default function Pytanie() {
                   {o}
                   {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
                   {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {udzialyTekst(mojeU.udzialy)} udz.</small> : null}
-                  {k == null && ko != null ? <small>kurs otwarcia</small> : null}
+                  {k == null && ko != null && !ukryty ? <small>kurs otwarcia</small> : null}
                 </div>
               );
               const kurs =
@@ -1035,12 +1051,13 @@ export default function Pytanie() {
                     <span />
                   )}
                   <span className="slupek">
-                    <i style={{ width: `${Math.round((k ?? 0) * 100)}%` }} />
+                    <i style={{ width: `${Math.round((k ?? (ukryty ? ko : null) ?? 0) * 100)}%` }} />
                   </span>
                 </div>
               );
             })}
             {p.odpowiedzi.length === 2 && p.kursy ? <Podzial kursy={p.kursy} /> : null}
+            {p.odpowiedzi.length === 2 && ukryty && p.kursy_otwarcia ? <Podzial kursy={p.kursy_otwarcia} /> : null}
           </div>
 
           {p.status === "rozstrzygniete" && p.wynik ? (
@@ -1200,7 +1217,7 @@ export default function Pytanie() {
           {p.odpowiedzi.map((o, i) => (
             <button type="button" key={i} className={`kup kup-${klasaOdp(i)}`} tabIndex={panelWidoczny ? -1 : 0} onClick={() => wybierz(i + 1)}>
               <span className="nazwa">{o}</span>
-              {p.kursy ? <span className="cyfry kurs">{procent(p.kursy[i])}</span> : null}
+              {(p.kursy ?? p.kursy_otwarcia) ? <span className="cyfry kurs">{procent((p.kursy ?? p.kursy_otwarcia)![i])}</span> : null}
             </button>
           ))}
         </div>
