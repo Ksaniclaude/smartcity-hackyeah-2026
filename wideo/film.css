@@ -21,11 +21,6 @@ html, body { margin: 0; background: var(--tlo); overflow: hidden; }
 .slowo-maska { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.04em 0.02em 0.14em; margin: -0.04em -0.02em -0.14em; }
 .slowo { display: inline-block; will-change: transform; }
 
-/* chipy */
-.film-chip { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 26px; border-radius: 28px; background: var(--tlo-2); color: var(--tekst-2); font-size: 28px; font-weight: 600; white-space: nowrap; }
-.film-chip svg { width: 28px; height: 28px; }
-.film-chip.czas { background: var(--akcent-tlo); color: var(--akcent-tekst); }
-.film-chip.obrys { background: var(--tlo); box-shadow: inset 0 0 0 2px var(--linia-2); color: var(--tekst-2); }
 
 /* pasek podziału kursu (jak .podzial na kartach) */
 .film-podzial { display: flex; gap: 6px; height: 16px; }
@@ -62,11 +57,6 @@ html, body { margin: 0; background: var(--tlo); overflow: hidden; }
 .scena .efekty { position: absolute; inset: 0; z-index: 5; }
 .scena .efekty > * { position: absolute; }
 
-/* kroki zakładu */
-.film-krok { position: absolute; left: 150px; display: flex; align-items: center; gap: 28px; }
-.film-krok-nr { width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--tlo-2); color: var(--mute); font-family: var(--wyswietlana); font-weight: 800; font-size: 34px; }
-.film-krok.aktywny .film-krok-nr { background: var(--akcent); color: var(--na-akcencie); }
-.film-krok-tekst { font-size: 64px; }
 
 /* wykres filmowy: jak Wykres z aplikacji (schodki, pole pod linią, pulsujący koniec) */
 .film-wykres .siatka { stroke: var(--linia-2); stroke-width: 1.5; stroke-dasharray: 3 9; }
@@ -76,24 +66,13 @@ html, body { margin: 0; background: var(--tlo); overflow: hidden; }
 .film-wykres .punkt { fill: var(--tak-tekst); stroke: var(--tlo); stroke-width: 4; }
 .film-wykres .puls { fill: var(--tak-tekst); }
 
-/* plansza relacji i podpisy pod ekranami */
-.plansza { position: absolute; width: 380px; height: 676px; border-radius: 28px; overflow: hidden; box-shadow: inset 0 0 0 2px var(--film-krawedz), var(--film-cien); }
-.plansza img { display: block; width: 100%; height: 100%; }
-.podpis { position: absolute; font-size: 30px; font-weight: 600; color: var(--tekst-2); white-space: nowrap; transform: translateX(-50%); }
 
 /* adres na końcu */
 .adres-duzy { display: inline-flex; align-items: center; height: 150px; padding: 0 64px; border-radius: 75px; background: var(--akcent); color: var(--na-akcencie); font-size: 112px; }
 .stopka-marki { position: absolute; right: 56px; bottom: 44px; display: flex; align-items: center; gap: 14px; color: var(--mute); font-size: 26px; font-weight: 600; }
 .stopka-marki .znak { position: relative; width: 40px; height: 40px; }
-.film-chip.maly { height: 50px; padding: 0 22px; font-size: 26px; }
 .telefon .film-ekran img.dlugi { height: auto; }
 .pasek-gora, .pasek-dol { position: absolute; left: 0; width: 390px; height: 59px; background-size: 390px 844px; background-repeat: no-repeat; }
 .pasek-gora { top: 0; background-position: 0 0; }
 .pasek-dol { top: 785px; background-position: 0 -785px; }
 
-/* cele udostępniania (jak w arkuszu „Udostępnij prognozę”) */
-.cel { position: absolute; left: 1641px; width: 96px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.cel-ikona { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--tlo-2); color: var(--tekst); }
-.cel-ikona svg { width: 42px; height: 42px; }
-.cel.glowny .cel-ikona { background: var(--akcent); color: var(--na-akcencie); }
-.cel-nazwa { font-size: 22px; font-weight: 600; color: var(--tekst-2); white-space: nowrap; }
