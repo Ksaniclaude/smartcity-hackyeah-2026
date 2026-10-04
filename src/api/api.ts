@@ -21,6 +21,23 @@ import type {
   ZnalezionyGracz,
 } from "./types";
 
+/** Ogólny komunikat zamiast surowego błędu bazy (szczegóły idą tylko do konsoli). */
+const BLAD_OGOLNY = "Coś poszło nie tak. Spróbuj jeszcze raz.";
+
+/**
+ * Surowy błąd Postgresa albo PostgREST (kod SQLSTATE, np. 22P02, 23505, 42883, albo PGRST…), którego gracz nie powinien
+ * czytać. Przepuszczamy tylko własne komunikaty z funkcji SQL: P0001 (raise exception), 28000 (brak sesji, brak nicku)
+ * i 42501 „Tylko admin”. Kody Supabase Auth (np. invalid_credentials) nie mają formy SQLSTATE, więc tu nie wpadają.
+ */
+function surowyBladBazy(code: unknown, msg: string): boolean {
+  if (typeof code !== "string" || !code) return false;
+  if (/^PGRST/i.test(code)) return true;
+  if (!/^[0-9A-Z]{5}$/.test(code)) return false;
+  if (code === "P0001" || code === "28000") return false;
+  if (code === "42501" && /Tylko admin/i.test(msg)) return false;
+  return true;
+}
+
 /** Zamienia błąd Supabase/PostgREST na czytelny komunikat po polsku. */
 export function komunikatBledu(e: unknown): string {
   if (!e) return "Nieznany błąd";
@@ -28,18 +45,22 @@ export function komunikatBledu(e: unknown): string {
   const err = e as { message?: string; details?: string; hint?: string; code?: string };
   const msg = err.message || "Nieznany błąd";
   if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) return "Brak połączenia z serwerem";
-  if (/Anonymous sign-ins are disabled/i.test(msg))
-    return "Logowanie anonimowe jest wyłączone w Supabase (Authentication → Sign In / Providers → Allow anonymous sign-ins)";
+  if (/Anonymous sign-ins are disabled/i.test(msg)) return "Ta metoda logowania jest wyłączona";
   if (/Invalid login credentials/i.test(msg)) return "Zły e-mail albo hasło";
   if (/User already registered|already been registered/i.test(msg)) return "Ten e-mail ma już konto. Zaloguj się.";
   if (/Password should be at least/i.test(msg)) return "Hasło musi mieć co najmniej 6 znaków";
   if (/Unable to validate email|invalid format/i.test(msg)) return "Nieprawidłowy adres e-mail";
-  if (/email rate limit|over_email_send_rate_limit/i.test(msg))
-    return "Supabase wyczerpał limit wysyłki e-maili (bez własnego SMTP to ok. 2 maile na godzinę). Admin: wyłącz „Confirm email” w Authentication → Sign In / Providers → Email albo ustaw własny SMTP.";
+  if (/email rate limit|over_email_send_rate_limit/i.test(msg)) return "Za dużo e-maili w krótkim czasie. Spróbuj za godzinę.";
   if (/rate limit|too many requests/i.test(msg)) return "Za dużo prób. Spróbuj za chwilę.";
   if (/Email not confirmed/i.test(msg)) return "E-mail jeszcze niepotwierdzony. Kliknij w link z poczty i zaloguj się ponownie.";
   if (/permission denied for function|Brak sesji gracza|JWT expired/i.test(msg)) return "Zaloguj się, żeby grać.";
-  if (/Signups not allowed/i.test(msg)) return "Rejestracja e-mailem jest wyłączona w Supabase";
+  if (/Signups not allowed/i.test(msg)) return "Rejestracja jest chwilowo wyłączona";
+  // constraint linku w bazie, np. violates check constraint "pytania_link_zrodla_http"
+  if (/_http\b/i.test(msg)) return "Link musi zaczynać się od http:// albo https://";
+  if (surowyBladBazy(err.code, msg)) {
+    console.error(e);
+    return BLAD_OGOLNY;
+  }
   return msg;
 }
 
@@ -403,5 +424,17 @@ export async function adminUstawProgDomyslny(prog: number): Promise<number> {
 
 export async function adminZmienTermin(pytanie: number, nowyTermin: string, link: string): Promise<void> {
   const r = await supabase.rpc("admin_zmien_termin", { p_pytanie: pytanie, p_nowy_termin: nowyTermin, p_link: link });
+  sprawdz(r);
+}
+
+/** Moderacja: usuwa komentarz. `id` jak z komentarze_rynku (dodatnie = przy zakładzie, ujemne = bez zakładu). */
+export async function adminUsunKomentarz(id: number): Promise<void> {
+  const r = await supabase.rpc("admin_usun_komentarz", { p_id: id });
+  sprawdz(r);
+}
+
+/** Moderacja: usuwa propozycję rynku zgłoszoną przez gracza (status „propozycja”). */
+export async function adminOdrzucPropozycje(pytanie: number): Promise<void> {
+  const r = await supabase.rpc("admin_odrzuc_propozycje", { p_pytanie: pytanie });
   sprawdz(r);
 }

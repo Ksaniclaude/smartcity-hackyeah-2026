@@ -4,6 +4,7 @@ import {
   adminDodajPytanie,
   adminEdytujPytanie,
   adminKomentarzUrzedu,
+  adminOdrzucPropozycje,
   adminOtworz,
   adminPytania,
   adminRozstrzygnij,
@@ -401,6 +402,17 @@ function KartaPytania({ p, odswiez }: { p: PytanieAdmin; odswiez: () => Promise<
                 }
               >
                 Otwórz
+              </button>
+              <button
+                type="button"
+                className="przycisk przycisk-maly przycisk-zle"
+                disabled={trwa}
+                onClick={() => {
+                  if (window.confirm(`Odrzucić propozycję nr ${p.id}? Zniknie z kolejki na stałe.`))
+                    void akcja("Odrzucono", () => adminOdrzucPropozycje(p.id));
+                }}
+              >
+                Odrzuć
               </button>
             </div>
           </>

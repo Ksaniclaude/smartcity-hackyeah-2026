@@ -20,13 +20,8 @@
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://zdaza.vercel.app/og.png" />
-    <script>
-      try {
-        var m = localStorage.getItem("motyw");
-        if (m) document.documentElement.dataset.motyw = m;
-        if (m === "jasny") document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f2f4f8");
-      } catch (e) {}
-    </script>
+    <!-- motyw z localStorage przed pierwszym malowaniem; osobny plik, bo CSP (vercel.json) nie wpuszcza skryptów inline -->
+    <script src="/motyw.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -22,8 +22,9 @@
   sprawdzić produkcję: `curl -s -o /dev/null -w '%{http_code}' https://zdaza.com/` → `200`.
 - W bazie zostały obiekty poprzedniej wersji (schemat `game`, funkcje `public.app_*`). Aplikacja ich nie używa; nie opieraj
   się na nich. Usunięcie wymaga zgody zespołu (to operacja nieodwracalna).
-- Logowanie anonimowe Supabase musi być włączone (Authentication → Sign In / Providers). Hasło admina jest w
-  `public.ustawienia` (`haslo_admina`, hash bcrypt) i nie trafia do repo.
+- Logowanie anonimowe nie jest potrzebne: klient zakłada konta e-mailem, a `ustaw_nick` nie tworzy gracza z sesji
+  anonimowej (inaczej skrypt zakładałby konta po 1000 pkt). Hasło admina jest w `public.ustawienia` (`haslo_admina`,
+  hash bcrypt) i nie trafia do repo; `admin_zaloguj` ma limit prób (`public.proby_admina`).
 
 # Zdążą? — jak pracować nad wyglądem
 

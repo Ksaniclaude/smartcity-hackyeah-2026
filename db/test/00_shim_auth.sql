@@ -13,7 +13,7 @@ create schema if not exists auth;
 
 create table if not exists auth.users (
   id uuid primary key,
-  is_anonymous boolean not null default true,
+  is_anonymous boolean not null default false,  -- jak w Supabase: true tylko dla signInAnonymously
   created_at timestamptz not null default now()
 );
 

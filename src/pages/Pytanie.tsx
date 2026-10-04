@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
+  adminUsunKomentarz,
   dodajKomentarz,
   pobierzAktywnosc,
   pobierzHistorie,
@@ -30,7 +31,7 @@ import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
 import { KartaRynku, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, punkty, udzialyTekst, wDol, zmianaPp } from "@/ui/tekst";
+import { czasTemu, dniDo, liczba, linkHttp, odmien, pkt, punkty, udzialyTekst, wDol, zmianaPp } from "@/ui/tekst";
 import { PasekUdostepniania, PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { usePostep } from "@/ui/postep";
@@ -108,8 +109,19 @@ function WpisAktywnosci({ a, miejsce }: { a: Aktywnosc; miejsce?: number | null 
   );
 }
 
-/** Komentarz z odznaką pozycji autora („stawia 120 na tak”, z już zapisanej stawki) i miejscem w rankingu. */
-function WpisKomentarza({ k, miejsce }: { k: Komentarz; miejsce?: number | null }) {
+/** Komentarz z odznaką pozycji autora („stawia 120 na tak”, z już zapisanej stawki) i miejscem w rankingu.
+ *  Admin widzi przy nim „Usuń” (moderacja). */
+function WpisKomentarza({
+  k,
+  miejsce,
+  naUsun,
+  usuwa,
+}: {
+  k: Komentarz;
+  miejsce?: number | null;
+  naUsun?: () => void;
+  usuwa?: boolean;
+}) {
   return (
     <div className="wpis">
       <Awatar nick={k.nick} />
@@ -125,7 +137,14 @@ function WpisKomentarza({ k, miejsce }: { k: Komentarz; miejsce?: number | null 
             </span>
           ) : null}
           {k.powod ? <span className="znacznik">{POWODY.find((r) => r.wartosc === k.powod)?.etykieta ?? k.powod}</span> : null}
-          <span className="prawy">{czasTemu(k.czas)}</span>
+          <span className="prawy">
+            {czasTemu(k.czas)}
+            {naUsun ? (
+              <button type="button" className="przycisk-tekst usun-wpis" onClick={naUsun} disabled={usuwa} aria-label={`Usuń komentarz gracza ${k.nick}`}>
+                Usuń
+              </button>
+            ) : null}
+          </span>
         </div>
         <div className="tresc">{k.komentarz}</div>
       </div>
@@ -144,11 +163,16 @@ function Komentarze({
   odswiez: () => Promise<void>;
   miejsca: Map<string, number>;
 }) {
-  const { stan, konto, otworzModal } = useSesja();
+  const { stan, konto, gracz, otworzModal } = useSesja();
+  const admin = gracz?.czy_admin === true;
   const [tekst, setTekst] = useState("");
   const dodaj = useAkcja(async () => {
     await dodajKomentarz(pid, tekst.trim());
     setTekst("");
+    await odswiez();
+  });
+  const usun = useAkcja(async (id: number) => {
+    await adminUsunKomentarz(id);
     await odswiez();
   });
   return (
@@ -188,8 +212,21 @@ function Komentarze({
         </div>
       )}
       {komentarze.length === 0 ? <p className="pusto">Jeszcze nikt nie skomentował. Twój komentarz może być pierwszy.</p> : null}
+      {usun.blad ? <Komunikat typ="blad">{usun.blad}</Komunikat> : null}
       {komentarze.map((k) => (
-        <WpisKomentarza key={k.id} k={k} miejsce={miejsca.get(k.nick)} />
+        <WpisKomentarza
+          key={k.id}
+          k={k}
+          miejsce={miejsca.get(k.nick)}
+          usuwa={usun.trwa}
+          naUsun={
+            admin
+              ? () => {
+                  if (window.confirm(`Usunąć komentarz gracza ${k.nick}? Tego nie da się cofnąć.`)) void usun.wykonaj(k.id);
+                }
+              : undefined
+          }
+        />
       ))}
     </div>
   );
@@ -885,6 +922,9 @@ export default function Pytanie() {
     kursKarty != null ? { tresc: p.tresc, odpowiedz: p.odpowiedzi[indeksKarty], indeks: indeksKarty, kurs: kursKarty, url, rodzaj: moja ? "moja" : "rynek" } : null;
   const podobne = (wszystkie ?? []).filter((q) => q.id !== pid && q.kategoria === p.kategoria && q.status === "otwarte").slice(0, 3);
   const obserwowany = obserwowane.includes(pid);
+  // adresy z bazy trafiają do href tylko jako http(s)
+  const linkZrodla = linkHttp(p.link_zrodla);
+  const linkRozstrzygniecia = linkHttp(p.link_rozstrzygniecia);
 
   const ustawZakladke = (z: Zakladka) => {
     const n = new URLSearchParams(params);
@@ -1035,8 +1075,8 @@ export default function Pytanie() {
           {p.status === "rozstrzygniete" && p.wynik ? (
             <Komunikat typ="info">
               Rozstrzygnięte: <b>{p.odpowiedzi[p.wynik - 1]}</b>. Gracze dawali na to <b>{procent(p.kursy ? p.kursy[p.wynik - 1] : null)}</b>.{" "}
-              {p.link_rozstrzygniecia ? (
-                <a href={p.link_rozstrzygniecia} target="_blank" rel="noreferrer">
+              {linkRozstrzygniecia ? (
+                <a href={linkRozstrzygniecia} target="_blank" rel="noopener noreferrer">
                   Źródło rozstrzygnięcia
                 </a>
               ) : null}
@@ -1056,13 +1096,22 @@ export default function Pytanie() {
             <dl>
               <dt>Kryterium rozstrzygnięcia</dt>
               <dd>{p.kryterium}</dd>
-              <dt>Źródło</dt>
-              <dd>
-                <a href={p.link_zrodla} target="_blank" rel="noreferrer">
-                  <IkLink />
-                  {p.link_zrodla}
-                </a>
-              </dd>
+              {/* link tylko http(s); inny zapis źródła zostaje samym tekstem, a pustego nie pokazujemy */}
+              {linkZrodla || p.link_zrodla?.trim() ? (
+                <>
+                  <dt>Źródło</dt>
+                  <dd>
+                    {linkZrodla ? (
+                      <a href={linkZrodla} target="_blank" rel="noopener noreferrer">
+                        <IkLink />
+                        {linkZrodla}
+                      </a>
+                    ) : (
+                      p.link_zrodla.trim()
+                    )}
+                  </dd>
+                </>
+              ) : null}
               {p.komentarz_urzedu ? (
                 <>
                   <dt>Komentarz urzędu</dt>

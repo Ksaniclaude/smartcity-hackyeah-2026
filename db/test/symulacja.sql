@@ -43,6 +43,10 @@ declare
   v_sprzedazy integer := 0;
   v_netto numeric;
 begin
+  -- symulacja robi setki zakładów w jednej transakcji: limity tempa wyłączone (rollback na końcu je przywraca)
+  insert into public.ustawienia (klucz, wartosc) values ('limit_transakcji_na_minute', '1000000'), ('odstep_komentarzy_s', '0')
+  on conflict (klucz) do update set wartosc = excluded.wartosc;
+
   -- admin testowy
   v_admin := gen_random_uuid();
   insert into auth.users (id) values (v_admin);
@@ -196,13 +200,17 @@ begin
   end if;
   if (public.profil_publiczny((select nick from public.ranking(1))) ->> 'miejsce')::int <> 1 then raise exception 'Profil lidera bez miejsca 1'; end if;
 
-  -- unieważnienie pytania z 2 odpowiedziami: pełny zwrot
-  select coalesce(sum(wydane_punkty), 0) into v_suma_wydanych from public.pozycje where pytanie = v_pyt2;
+  -- unieważnienie pytania z 2 odpowiedziami: każdy dostaje wkład netto (kupna − zwroty ze sprzedaży),
+  -- saldo najwyżej do zera
+  select coalesce(sum(greatest(n.kwota, -g.saldo)), 0) into v_suma_wydanych
+    from (select gracz, sum(case when typ = 'kupno' then stawka else -stawka end) as kwota
+            from public.transakcje where pytanie = v_pyt2 group by gracz) n
+    join public.gracze g on g.id = n.gracz;
   select sum(saldo) into v_suma_sald_przed from public.gracze where id = any(v_gracze);
   v_zwrot := public.admin_uniewaznij(v_pyt2, 'test');
   select sum(saldo) into v_suma_sald_po from public.gracze where id = any(v_gracze);
   if abs((v_suma_sald_po - v_suma_sald_przed) - v_suma_wydanych) > 1e-6 then
-    raise exception 'Zwrot % nie zgadza się z wydanymi %', v_suma_sald_po - v_suma_sald_przed, v_suma_wydanych;
+    raise exception 'Zwrot % nie zgadza się z wkładem netto %', v_suma_sald_po - v_suma_sald_przed, v_suma_wydanych;
   end if;
 
   -- zakład na rozstrzygnięte pytanie musi być odrzucony

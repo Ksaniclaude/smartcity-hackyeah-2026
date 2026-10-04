@@ -617,6 +617,10 @@ button.pojedynek-strona:hover .nazwa { text-decoration: underline; text-underlin
 .wpis .tresc a { color: var(--tekst); text-decoration: none; font-weight: 500; }
 .wpis .tresc a:hover { text-decoration: underline; }
 .wpis .prawy { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* moderacja (tylko admin): ciche „Usuń” przy czasie wpisu, czerwone dopiero pod kursorem */
+.wpis .usun-wpis { font-size: 13px; padding: 0 6px; margin: 0 -6px 0 6px; }
+.wpis .usun-wpis:hover { color: var(--nie-tekst); background: var(--nie-tlo); }
+.wpis .usun-wpis:disabled { opacity: 0.5; cursor: default; }
 .typ-tak { color: var(--tak-tekst); font-weight: 600; }
 .typ-nie { color: var(--nie-tekst); font-weight: 600; }
 .typ-trzeci { color: var(--trzeci-tekst); font-weight: 600; }

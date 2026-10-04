@@ -101,6 +101,15 @@ export function zmianaPp(teraz: number | null | undefined, wczesniej: number | n
   return Math.round((teraz - wczesniej) * 100);
 }
 
+/**
+ * Adres z bazy do atrybutu href: przycięty, tylko http:// albo https://. Inny schemat (javascript:, data:…)
+ * albo pusty daje undefined, a wtedy nie renderujemy linku.
+ */
+export function linkHttp(u: string | null | undefined): string | undefined {
+  const t = (u ?? "").trim();
+  return /^https?:\/\//i.test(t) ? t : undefined;
+}
+
 /** Numer koloru awatara (1–6) wyliczony z nicku, żeby ten sam gracz miał zawsze ten sam kolor. */
 export function kolorAwatara(nick: string): number {
   let h = 0;

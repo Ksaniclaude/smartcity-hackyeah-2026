@@ -1,6 +1,6 @@
 // Test ścieżki gracza w prawdziwym Chromium (playwright-core) na zamockowanym Supabase:
 // rynki jako gość → prognoza (nick w modalu) → rynek „miasto” z powodem → komentarz → sprzedaż →
-// profil, ranking, aktywność, profil publiczny, /admin, /qr. Zrzuty: telefon,
+// profil, ranking, aktywność, profil publiczny, /admin (z moderacją), /qr. Zrzuty: telefon,
 // desktop, jasny motyw. Nie potrzebuje sieci.
 //
 // Użycie: npm run build && npm run test:ui   (build z VITE_SUPABASE_URL=https://test.supabase.local VITE_SUPABASE_KEY=test)
@@ -306,6 +306,22 @@ async function mock(route: Route) {
     q.otwarto = new Date().toISOString();
     return json(route, null);
   }
+  if (p === "/rest/v1/rpc/admin_odrzuc_propozycje") {
+    const body = req.postDataJSON() as { p_pytanie: number };
+    if (!stan.gracz?.czy_admin) return json(route, { code: "42501", message: "Tylko admin" }, 403);
+    const i = propozycje.findIndex((x) => x.id === body.p_pytanie && x.status === "propozycja");
+    if (i < 0) return json(route, { code: "P0001", message: "Odrzucić można tylko propozycję" }, 400);
+    propozycje.splice(i, 1);
+    return route.fulfill({ status: 204 });
+  }
+  if (p === "/rest/v1/rpc/admin_usun_komentarz") {
+    const body = req.postDataJSON() as { p_id: number };
+    if (!stan.gracz?.czy_admin) return json(route, { code: "42501", message: "Tylko admin" }, 403);
+    const i = stan.komentarze.findIndex((k) => k.id === body.p_id);
+    if (i < 0) return json(route, { code: "P0001", message: "Nie ma takiego komentarza" }, 400);
+    stan.komentarze.splice(i, 1);
+    return route.fulfill({ status: 204 });
+  }
   if (p === "/rest/v1/rpc/admin_dodaj_pytanie") return json(route, 5);
   if (p === "/rest/v1/rpc/admin_ustaw_prog") return json(route, null);
   if (p === "/rest/v1/rpc/admin_ustaw_prog_domyslny") return json(route, (req.postDataJSON() as { p_prog: number }).p_prog);
@@ -469,6 +485,8 @@ async function main() {
     await pole.fill("Trzymam kciuki za ZDMK");
     await page.getByRole("button", { name: "Dodaj komentarz" }).click();
     await oczekuj(page, "Trzymam kciuki za ZDMK");
+    if (await page.locator(".usun-wpis").count()) throw new Error("Gracz bez praw admina widzi „Usuń” przy komentarzach");
+    console.log("  ✓ bez praw admina nie ma „Usuń” przy komentarzach");
 
     console.log("5. Sprzedaż udziałów");
     // pozycja z ułamkiem, który zaokrąglony normalnie wychodzi w górę (np. 23,7624 → 24, więcej niż jest)
@@ -608,6 +626,27 @@ async function main() {
     if (!pytanieOtwarcia.startsWith("Otworzyć 3 propozycje?")) throw new Error(`Złe pytanie przed otwarciem: ${pytanieOtwarcia}`);
     console.log(`  ✓ „${pytanieOtwarcia}”`);
     await zrzut(page, "admin_otwarte");
+
+    console.log("8b. Moderacja: odrzucenie propozycji, usunięcie komentarza");
+    const karta24 = page.locator(".karta").filter({ hasText: "Propozycja testowa nr 24?" });
+    await karta24.locator("summary").click();
+    let pytanieOdrzucenia = "";
+    page.once("dialog", async (d) => {
+      pytanieOdrzucenia = d.message();
+      await d.accept();
+    });
+    await karta24.getByRole("button", { name: "Odrzuć", exact: true }).click();
+    await oczekujNaglowka(page, "Propozycje (kolejka) (1)");
+    if (!pytanieOdrzucenia.startsWith("Odrzucić propozycję nr 24?")) throw new Error(`Złe pytanie przed odrzuceniem: ${pytanieOdrzucenia}`);
+    console.log(`  ✓ „${pytanieOdrzucenia}”, propozycja zniknęła z kolejki`);
+    await page.goto(`${ADRES}/pytanie/1`);
+    await oczekuj(page, "Trzymam kciuki za ZDMK");
+    const wpis = page.locator(".wpis").filter({ hasText: "Trzymam kciuki za ZDMK" });
+    page.once("dialog", (d) => void d.accept());
+    await wpis.getByRole("button", { name: /^Usuń komentarz gracza/ }).click();
+    await page.getByText("Trzymam kciuki za ZDMK").first().waitFor({ state: "detached", timeout: 8000 });
+    if (stan.komentarze.some((k) => k.komentarz === "Trzymam kciuki za ZDMK")) throw new Error("Komentarz nie zniknął z mocka");
+    console.log("  ✓ admin usunął komentarz, lista odświeżona");
     await page.goto(`${ADRES}/qr`);
     await page.locator("img.qr").waitFor({ timeout: 5000 });
 

@@ -5,15 +5,18 @@
   to pozostałość po starej wersji (Next.js); są wyłączone z `tsconfig.json` i do usunięcia.
 - Baza: `db/schema.sql` (jeden plik, uruchamiany raz na pustej bazie); `db/migracje/` to delty zastosowane na żywej
   bazie. Klient tylko czyta przez widoki `v_*` i funkcje odczytu; każdy zapis przez funkcje RPC. Nie dodawaj zapisów
-  z klienta ani polityk RLS na insert/update. Po zmianie SQL dopisz grant dla `anon`/`authenticated` (test ról).
+  z klienta ani polityk RLS na insert/update. Po zmianie SQL dopisz grant dla `anon`/`authenticated` (test ról):
+  domyślnych grantów w `public` nie ma, nowa funkcja bez grantu jest niedostępna z API. Linki z bazy tylko http(s)
+  (constrainty `*_http`, w kliencie `linkHttp`).
 - Matematyka zakładu (LMSR, log-sum-exp) i rozstrzygnięcia mają być podręcznikowe. Po każdej zmianie w SQL
   uruchom `npm run test:db` (lokalny Postgres) — symulacja i test równoległy muszą przejść.
 - Interfejs po polsku, najpierw telefon. Odświeżanie przez odpytywanie co 5 s, bez realtime.
 - Design: `src/ui/styles.css` (tokeny, ciemny motyw domyślnie, jasny po wyborze), wspólne komponenty w
   `src/ui/komponenty.tsx`, karta i elementy rynku w `src/ui/rynek.tsx`, żywe liczby w `src/ui/zywe.tsx`.
   Wzorzec: giełdy prognoz (Polymarket). Bez emoji i ozdobnych gradientów.
-- Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Stare sesje
-  anonimowe są podnoszone do konta przy rejestracji (updateUser).
+- Konto: rejestracja e-mailem (nick, e-mail, hasło) przez Supabase Auth; bez konta tylko przeglądanie. Sesja
+  anonimowa nie dostaje gracza (`ustaw_nick`). Kupno i sprzedaż mają limit tempa (`sprawdz_tempo`, 30/min), komentarze
+  wspólny odstęp 10 s; testy wyłączają je w `ustawienia`.
 - Nie wymyślaj pytań, terminów, źródeł ani liczb z zamówień publicznych. Puste dane mają być widoczne jako puste.
 - Tematy rynków nie są ograniczone (sport, polityka, afery też). Trzy zasady treści (`ZASADY_PYTANIA` w
   `src/api/types.ts`): publiczne źródło z linkiem, nic zmyślonego, wypadki tylko jako śmieszna sprawa, nigdy o ofiarach.

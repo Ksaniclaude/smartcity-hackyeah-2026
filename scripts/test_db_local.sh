@@ -65,6 +65,9 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   v_pyt := public.admin_dodaj_pytanie('TEST równoległy', 'miasto', null, 'k', 'https://example.invalid', current_date + 10, array[0.4, 0.4, 0.2], true);
   insert into public.ustawienia (klucz, wartosc) values ('test_pytanie', v_pyt::text) on conflict (klucz) do update set wartosc = excluded.wartosc;
+  -- 40 zakładów na gracza w kilka sekund: limit tempa wyłączony na czas testów (blok „bezpieczeństwo” sprawdza go osobno)
+  insert into public.ustawienia (klucz, wartosc) values ('limit_transakcji_na_minute', '1000000')
+  on conflict (klucz) do update set wartosc = excluded.wartosc;
   for k in 1..8 loop
     v_id := gen_random_uuid();
     insert into auth.users (id) values (v_id);
@@ -114,7 +117,9 @@ begin
   select count(*) into v_tr from public.transakcje where pytanie = v_pyt and typ = 'kupno';
   select sum(saldo) into v_sald from public.gracze where nick like 'rown_%' and not czy_admin;
   if abs(v_suma - 1) > 1e-9 then raise exception 'kursy nie sumują się do 1: %', v_suma; end if;
-  if v_liczba <> v_tr then raise exception 'licznik prognoz % <> zakupów %', v_liczba, v_tr; end if;
+  if v_liczba <> (select count(distinct gracz) from public.transakcje where pytanie = v_pyt and typ = 'kupno') then
+    raise exception 'licznik prognoz % <> liczby graczy, którzy kupili', v_liczba;
+  end if;
   if abs(v_koszt - v_wydane) > 1e-6 + 1.5e-4 * (select count(*) from public.transakcje where pytanie = v_pyt and typ = 'sprzedaz') then
     raise exception 'koszt % <> wpływy netto % (zgubiony zakład przy równoległości)', v_koszt, v_wydane;
   end if;
@@ -303,6 +308,210 @@ begin
   end if;
   if exists (select 1 from public.v_moje_pozycje where pytanie = v_pyt) then raise exception 'Pozycja widoczna w profilu'; end if;
   raise notice 'RESZTKA OK: sprzedano %, przepadło %, zwrot % = C(q) - C(q'')', round(v_sprzedaj::numeric, 4), v_w ->> 'spalone', v_w ->> 'zwrot';
+end $$;
+SQL
+
+echo "bezpieczeństwo: unieważnienie bez punktów z niczego, limity tempa i prób, nicki, linki, moderacja"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare v_admin uuid := gen_random_uuid(); v_e uuid := gen_random_uuid(); v_f uuid := gen_random_uuid();
+        v_anon uuid := gen_random_uuid(); v_x uuid; v_pyt bigint; v_prop bigint; v_kom bigint; v_tr bigint;
+        v_u double precision; v_suma numeric; k int;
+begin
+  insert into auth.users (id) values (v_admin), (v_e), (v_f);
+  insert into auth.users (id, is_anonymous) values (v_anon, true);
+  insert into public.gracze (id, nick, czy_admin) values (v_admin, 'bezp_admin', true);
+  insert into public.gracze (id, nick) values (v_e, 'bezp_e'), (v_f, 'bezp_f');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  v_pyt := public.admin_dodaj_pytanie('TEST bezpieczeństwo', 'luz', null, 'k', 'https://example.invalid', current_date + 10, array[0.5, 0.5], true);
+
+  -- 1. unieważnienie po sprzedaży z zyskiem nie tworzy punktów: e kupuje, f podbija kurs, e sprzedaje drożej
+  perform set_config('request.jwt.claims', json_build_object('sub', v_e, 'role', 'authenticated')::text, true);
+  perform public.postaw_prognoze(v_pyt, 1, 200, null, null);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_f, 'role', 'authenticated')::text, true);
+  perform public.postaw_prognoze(v_pyt, 1, 150, null, null);
+  if (select liczba_prognoz from public.pytania where id = v_pyt) <> 2 then raise exception 'liczba prognoz <> 2 graczy'; end if;
+  perform public.postaw_prognoze(v_pyt, 1, 5, null, null);
+  if (select liczba_prognoz from public.pytania where id = v_pyt) <> 2 then raise exception 'drugi zakup tego samego gracza podbił liczbę prognoz'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_e, 'role', 'authenticated')::text, true);
+  select udzialy into v_u from public.pozycje where gracz = v_e and pytanie = v_pyt and odpowiedz = 1;
+  perform public.sprzedaj_udzialy(v_pyt, 1, v_u * 0.99);
+  if (select saldo from public.gracze where id = v_e) <= 1000 then raise exception 'scenariusz: e nie zarobił na sprzedaży'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform public.admin_uniewaznij(v_pyt, 'test');
+  select sum(saldo) into v_suma from public.gracze where id in (v_e, v_f);
+  if abs(v_suma - 2000) > 1e-6 then raise exception 'unieważnienie stworzyło punkty: e + f = % zamiast 2000', v_suma; end if;
+  if (select saldo from public.gracze where id = v_e) <> 1000 or (select saldo from public.gracze where id = v_f) <> 1000 then
+    raise exception 'po unieważnieniu salda nie wróciły do 1000';
+  end if;
+
+  -- 2. limit tempa: przy limicie 3 na minutę czwarta transakcja jest odrzucona
+  update public.ustawienia set wartosc = '3' where klucz = 'limit_transakcji_na_minute';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  v_pyt := public.admin_dodaj_pytanie('TEST tempo', 'luz', null, 'k', 'https://example.invalid', current_date + 10, array[0.5, 0.5], true);
+  v_x := gen_random_uuid();
+  insert into auth.users (id) values (v_x);
+  insert into public.gracze (id, nick) values (v_x, 'bezp_tempo');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_x, 'role', 'authenticated')::text, true);
+  for k in 1..3 loop perform public.postaw_prognoze(v_pyt, 1, 1, null, null); end loop;
+  begin
+    perform public.postaw_prognoze(v_pyt, 1, 1, null, null);
+    raise exception 'czwarta transakcja przeszła mimo limitu 3';
+  exception when others then if sqlerrm not like 'Za szybko%' then raise; end if;
+  end;
+  update public.ustawienia set wartosc = '1000000' where klucz = 'limit_transakcji_na_minute';
+
+  -- 3. odstęp komentarzy wspólny dla komentarzy z zakładem i bez
+  insert into public.ustawienia (klucz, wartosc) values ('odstep_komentarzy_s', '10') on conflict (klucz) do update set wartosc = '10';
+  perform public.dodaj_komentarz(v_pyt, 'pierwszy');
+  begin
+    perform public.postaw_prognoze(v_pyt, 1, 1, null, 'drugi zaraz po');
+    raise exception 'komentarz przy zakładzie ominął odstęp';
+  exception when others then if sqlerrm not like 'Komentarz za szybko%' then raise; end if;
+  end;
+  begin
+    perform public.dodaj_komentarz(v_pyt, 'trzeci');
+    raise exception 'drugi komentarz ominął odstęp';
+  exception when others then if sqlerrm not like 'Komentarz za szybko%' then raise; end if;
+  end;
+  perform public.postaw_prognoze(v_pyt, 1, 1, null, null);  -- zakład bez komentarza przechodzi
+  update public.ustawienia set wartosc = '0' where klucz = 'odstep_komentarzy_s';
+
+  -- 4. moderacja: admin usuwa komentarz bez zakładu (id ujemne) i przy zakładzie (id dodatnie); gracz nie może
+  select id into v_kom from public.komentarze_rynku(v_pyt, 10) where id < 0 limit 1;
+  perform public.postaw_prognoze(v_pyt, 1, 1, null, 'przy zakładzie');
+  select id into v_tr from public.komentarze_rynku(v_pyt, 10) where id > 0 limit 1;
+  if v_kom is null or v_tr is null then raise exception 'brak komentarzy do testu moderacji'; end if;
+  begin
+    perform public.admin_usun_komentarz(v_kom);
+    raise exception 'gracz usunął komentarz';
+  exception when others then if sqlerrm not like 'Tylko admin%' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform public.admin_usun_komentarz(v_kom);
+  perform public.admin_usun_komentarz(v_tr);
+  if exists (select 1 from public.komentarze_rynku(v_pyt, 10)) then raise exception 'komentarze nie zniknęły'; end if;
+  if not exists (select 1 from public.transakcje where id = v_tr) then raise exception 'usunięcie komentarza skasowało zakład'; end if;
+
+  -- 5. linki tylko http(s): propozycja gracza, rozstrzygnięcie admina, zmiana terminu
+  perform set_config('request.jwt.claims', json_build_object('sub', v_x, 'role', 'authenticated')::text, true);
+  begin
+    perform public.zaproponuj_pytanie('Czy test przejdzie?', 'luz', current_date + 5, 'javascript:alert(1)', null);
+    raise exception 'propozycja z linkiem javascript: przeszła';
+  exception when others then if sqlerrm not like 'Link musi%' then raise; end if;
+  end;
+  begin
+    perform public.zaproponuj_pytanie(repeat('x', 301), 'luz', current_date + 5, 'https://example.invalid', null);
+    raise exception 'propozycja z treścią 301 znaków przeszła';
+  exception when others then if sqlerrm not like 'Treść%' then raise; end if;
+  end;
+  begin
+    perform public.zaproponuj_pytanie('Czy test przejdzie?', 'luz', current_date + 1000, 'https://example.invalid', null);
+    raise exception 'propozycja z terminem za 1000 dni przeszła';
+  exception when others then if sqlerrm not like 'Termin najwyżej%' then raise; end if;
+  end;
+  v_prop := public.zaproponuj_pytanie('Czy test przejdzie?', 'luz', current_date + 5, 'https://example.invalid', null);
+  -- propozycji nie widać z zewnątrz także przez próg i widoczność kursu
+  if public.kurs_widoczny(v_prop) is not null or public.prog_pytania(v_prop) is not null then
+    raise exception 'kurs_widoczny/prog_pytania zdradzają istnienie propozycji';
+  end if;
+  begin
+    perform public.admin_odrzuc_propozycje(v_prop);
+    raise exception 'gracz odrzucił propozycję';
+  exception when others then if sqlerrm not like 'Tylko admin%' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  begin
+    perform public.admin_rozstrzygnij(v_pyt, 1, 'javascript:alert(1)');
+    raise exception 'rozstrzygnięcie z linkiem javascript: przeszło';
+  exception when check_violation then null;
+  end;
+  begin
+    perform public.admin_zmien_termin(v_pyt, current_date + 20, 'data:text/html,x');
+    raise exception 'zmiana terminu z linkiem data: przeszła';
+  exception when check_violation then null;
+  end;
+  perform public.admin_odrzuc_propozycje(v_prop);
+  if exists (select 1 from public.pytania where id = v_prop) then raise exception 'propozycja nie została odrzucona'; end if;
+  begin
+    perform public.admin_odrzuc_propozycje(v_pyt);
+    raise exception 'odrzucono otwarty rynek';
+  exception when others then if sqlerrm not like 'Nie ma takiej propozycji%' then raise; end if;
+  end;
+
+  -- 6. skrajny kurs otwarcia odrzucony
+  begin
+    perform public.q_z_kursu(array[0.995, 0.005], 1000);
+    raise exception 'kurs otwarcia 0,995 przeszedł';
+  exception when others then if sqlerrm not like 'Każda wartość kursu%' then raise; end if;
+  end;
+
+  -- 7. nicki: sesja anonimowa nie dostaje gracza, cyrylica, zarezerwowane, zmiana raz na 7 dni
+  perform set_config('request.jwt.claims', json_build_object('sub', v_anon, 'role', 'authenticated')::text, true);
+  begin
+    perform public.ustaw_nick('anonim_1');
+    raise exception 'sesja anonimowa założyła gracza';
+  exception when others then if sqlerrm not like 'Załóż konto%' then raise; end if;
+  end;
+  v_x := gen_random_uuid();
+  insert into auth.users (id) values (v_x);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_x, 'role', 'authenticated')::text, true);
+  begin
+    perform public.ustaw_nick('аdmin_x');  -- pierwsza litera cyrylicka
+    raise exception 'nick z cyrylicą przeszedł';
+  exception when others then if sqlerrm not like 'Nick: 2–24%' then raise; end if;
+  end;
+  begin
+    perform public.ustaw_nick('Zdaza_oficjalnie');
+    raise exception 'zarezerwowany nick przeszedł';
+  exception when others then if sqlerrm not like 'Ten nick jest zarezerwowany%' then raise; end if;
+  end;
+  perform public.ustaw_nick('Łucja_z_Łodzi');
+  perform public.ustaw_nick('Łucja_z_Łodzi');   -- ten sam nick: bez zmiany
+  perform public.ustaw_nick('lucja_2');           -- pierwsza zmiana
+  begin
+    perform public.ustaw_nick('lucja_3');
+    raise exception 'druga zmiana nicku w 7 dni przeszła';
+  exception when others then if sqlerrm not like 'Nick można zmienić%' then raise; end if;
+  end;
+
+  -- 8. limit prób hasła admina: piąta zła próba jeszcze odpowiada false, szósta jest odrzucona
+  insert into public.ustawienia (klucz, wartosc) values ('haslo_admina', extensions.crypt('dobre-haslo-testowe', extensions.gen_salt('bf', 4)))
+  on conflict (klucz) do update set wartosc = excluded.wartosc;
+  for k in 1..5 loop
+    if public.admin_zaloguj('zle') then raise exception 'złe hasło przyjęte'; end if;
+  end loop;
+  begin
+    perform public.admin_zaloguj('dobre-haslo-testowe');
+    raise exception 'szósta próba w godzinę przeszła';
+  exception when others then if sqlerrm not like 'Za dużo nieudanych prób%' then raise; end if;
+  end;
+  if (select czy_admin from public.gracze where id = v_x) then raise exception 'admin mimo blokady'; end if;
+
+  raise notice 'BEZPIECZEŃSTWO OK: unieważnienie bez zysku, limit tempa i komentarzy, moderacja, linki http(s), kurs otwarcia, nicki, limit prób admina';
+end $$;
+SQL
+
+echo "role: anon nie woła funkcji gracza, admina ani pomocniczych"
+psql -v ON_ERROR_STOP=1 -d "$DB" -q -t <<'SQL'
+do $$
+declare f text;
+begin
+  foreach f in array array[
+    'public.dodaj_komentarz(bigint, text)', 'public.sprzedaj_udzialy(bigint, integer, double precision)',
+    'public.zaproponuj_pytanie(text, public.kategoria, date, text, text)', 'public.admin_usun_komentarz(bigint)',
+    'public.admin_odrzuc_propozycje(bigint)', 'public.admin_ustaw_czolowke(bigint)', 'public.admin_wyroznij(bigint, boolean)',
+    'public.sprawdz_tempo(uuid, integer)', 'public.sprawdz_odstep_komentarzy(uuid)', 'public.ustawienie_liczba(text, integer)']
+  loop
+    if has_function_privilege('anon', f, 'execute') then raise exception 'anon może wołać %', f; end if;
+  end loop;
+  foreach f in array array['public.sprawdz_tempo(uuid, integer)', 'public.sprawdz_odstep_komentarzy(uuid)', 'public.ustawienie_liczba(text, integer)'] loop
+    if has_function_privilege('authenticated', f, 'execute') then raise exception 'authenticated może wołać %', f; end if;
+  end loop;
+  if has_table_privilege('authenticated', 'public.proby_admina', 'select,insert,update,delete') then
+    raise exception 'authenticated ma dostęp do proby_admina';
+  end if;
+  raise notice 'ROLE BEZPIECZEŃSTWA OK';
 end $$;
 SQL
 

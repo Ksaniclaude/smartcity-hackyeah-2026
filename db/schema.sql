@@ -28,8 +28,10 @@ create table public.gracze (
   saldo      numeric(14, 4) not null default 1000 check (saldo >= 0),
   czy_admin  boolean not null default false,
   utworzono  timestamptz not null default now(),
+  nick_zmieniono timestamptz,
   constraint nick_dlugosc check (char_length(nick) between 2 and 24),
-  constraint nick_znaki check (nick ~ '^[[:alnum:]_.-]+$')
+  -- bez [[:alnum:]]: przepuszczało cyrylicę i znaki pełnej szerokości (nicki udające cudze, np. „аdmin”)
+  constraint nick_znaki check (nick ~ '^[A-Za-z0-9ĄĆĘŁŃÓŚŹŻąćęłńóśźż_.-]+$')
 );
 create unique index gracze_nick_unikalny on public.gracze (lower(nick));
 
@@ -47,7 +49,7 @@ create table public.pytania (
   wynik                 smallint,
   link_rozstrzygniecia  text,
   komentarz_urzedu      text,
-  liczba_prognoz        integer not null default 0,
+  liczba_prognoz        integer not null default 0,  -- liczba graczy, którzy kupili (nie liczba zakupów)
   zaproponowal          uuid references public.gracze (id) on delete set null,
   utworzono             timestamptz not null default now(),
   rozstrzygnieto        timestamptz,
@@ -61,7 +63,12 @@ create table public.pytania (
   constraint q_dlugosc check (array_length(q, 1) = array_length(odpowiedzi, 1)),
   constraint wynik_zakres check (wynik is null or wynik between 1 and array_length(odpowiedzi, 1)),
   constraint rozstrzygniete_kompletne check
-    (status <> 'rozstrzygniete' or (wynik is not null and link_rozstrzygniecia is not null))
+    (status <> 'rozstrzygniete' or (wynik is not null and link_rozstrzygniecia is not null)),
+  -- linki trafiają do href: tylko http(s), żadnych javascript: ani data:
+  constraint link_zrodla_http check
+    (link_zrodla = '' or (link_zrodla ~* '^https?://' and char_length(link_zrodla) <= 2000)),
+  constraint link_rozstrzygniecia_http check
+    (link_rozstrzygniecia is null or (link_rozstrzygniecia ~* '^https?://' and char_length(link_rozstrzygniecia) <= 2000))
 );
 create index pytania_status on public.pytania (status, kategoria);
 create index pytania_miasto on public.pytania (miasto);
@@ -100,7 +107,8 @@ create table public.zmiany_terminow (
   stary_termin  date not null,
   nowy_termin   date not null,
   link          text not null,
-  czas          timestamptz not null default now()
+  czas          timestamptz not null default now(),
+  constraint link_http check (link ~* '^https?://' and char_length(link) <= 2000)
 );
 
 -- Komentarze bez zakładu (komentarz przy zakładzie siedzi w transakcje.komentarz).
@@ -119,11 +127,59 @@ create table public.ustawienia (
   wartosc  text not null
 );
 
+-- Próby logowania admina (limit prób w admin_zaloguj). Niedostępne z API.
+create table public.proby_admina (
+  id     bigint generated always as identity primary key,
+  gracz  uuid not null references public.gracze (id) on delete cascade,
+  udana  boolean not null,
+  czas   timestamptz not null default now()
+);
+create index proby_admina_czas on public.proby_admina (czas);
+
 -- ---------------------------------------------------------------------------
 -- Stałe gry
 -- ---------------------------------------------------------------------------
 create or replace function public.limit_na_pytanie() returns numeric
   language sql immutable set search_path = public, pg_temp as $$ select 200::numeric $$;
+
+-- Liczba z ustawień (np. limit tempa); domyślna, gdy klucza nie ma albo wartość nie jest liczbą. Tylko wewnętrzna.
+create or replace function public.ustawienie_liczba(p_klucz text, p_domyslnie integer) returns integer
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(
+    (select case when u.wartosc ~ '^[0-9]+$' then u.wartosc::integer end
+       from public.ustawienia u where u.klucz = p_klucz),
+    p_domyslnie)
+$$;
+
+-- Limit tempa kupna i sprzedaży gracza (domyślnie 30 na minutę, ustawienia.limit_transakcji_na_minute).
+-- Kupno i natychmiastowa sprzedaż nic nie kosztują, więc bez limitu skrypt pompuje obrót i komentarze.
+-- p_zapas: sprzedaż wołana z postaw_prognoze (zmiana strony) nie może zablokować zakupu, który już przeszedł limit.
+create or replace function public.sprawdz_tempo(p_gracz uuid, p_zapas integer default 0) returns void
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+begin
+  if (select count(*) from public.transakcje where gracz = p_gracz and czas > now() - interval '1 minute')
+     >= public.ustawienie_liczba('limit_transakcji_na_minute', 30) + p_zapas then
+    raise exception 'Za szybko. Odczekaj chwilę przed kolejnym ruchem.';
+  end if;
+end $$;
+
+-- Odstęp między komentarzami gracza, z zakładem i bez (domyślnie 10 s, ustawienia.odstep_komentarzy_s).
+create or replace function public.sprawdz_odstep_komentarzy(p_gracz uuid) returns void
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare
+  v_odstep integer := public.ustawienie_liczba('odstep_komentarzy_s', 10);
+  v_ostatni timestamptz;
+begin
+  if v_odstep <= 0 then return; end if;
+  select max(c) into v_ostatni from (
+    select max(czas) as c from public.komentarze where gracz = p_gracz
+    union all
+    select max(czas) from public.transakcje where gracz = p_gracz and komentarz is not null
+  ) x;
+  if v_ostatni is not null and v_ostatni > now() - make_interval(secs => v_odstep) then
+    raise exception 'Komentarz za szybko po poprzednim. Odczekaj chwilę.';
+  end if;
+end $$;
 create or replace function public.prog_widocznosci_kursu() returns integer
 language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(
@@ -135,15 +191,14 @@ $$;
 create or replace function public.prog_pytania(p_id bigint) returns integer
 language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(p.prog_widocznosci, public.prog_widocznosci_kursu())
-  from public.pytania p where p.id = p_id
+  from public.pytania p where p.id = p_id and p.status <> 'propozycja'
 $$;
 
 create or replace function public.kurs_widoczny(p_id bigint) returns boolean
 language sql stable security definer set search_path = public, pg_temp as $$
-  select p.status <> 'propozycja'
-         and (p.liczba_prognoz >= public.prog_pytania(p.id)
-              or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione'))
-  from public.pytania p where p.id = p_id
+  select p.liczba_prognoz >= public.prog_pytania(p.id)
+         or p.status in ('zamkniete', 'rozstrzygniete', 'uniewaznione')
+  from public.pytania p where p.id = p_id and p.status <> 'propozycja'
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -188,8 +243,9 @@ begin
     raise exception 'Kurs otwarcia musi mieć co najmniej 2 wartości';
   end if;
   for i in 1..n loop
-    if p_kurs[i] is null or p_kurs[i] <= 0 or p_kurs[i] >= 1 then
-      raise exception 'Każda wartość kursu otwarcia musi być w przedziale (0, 1)';
+    -- skrajny kurs otwarcia to dopłata z rynku do b*ln(1/p): przy 0,01 i b = 1000 to ok. 4600 pkt
+    if p_kurs[i] is null or p_kurs[i] < 0.01 or p_kurs[i] > 0.99 then
+      raise exception 'Każda wartość kursu otwarcia musi być w przedziale 0,01–0,99';
     end if;
     suma := suma + p_kurs[i];
   end loop;
@@ -247,7 +303,7 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Funkcje gracza
 -- ---------------------------------------------------------------------------
--- Rejestracja: tworzy gracza dla bieżącej sesji anonimowej (saldo 1000) albo zmienia nick.
+-- Rejestracja: tworzy gracza dla konta e-mail (saldo 1000) albo zmienia nick.
 create or replace function public.ustaw_nick(p_nick text)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -260,21 +316,38 @@ begin
   if v is null then
     raise exception 'Brak sesji gracza' using errcode = '28000';
   end if;
-  if char_length(v_nick) < 2 or char_length(v_nick) > 24 or v_nick !~ '^[[:alnum:]_.-]+$' then
-    raise exception 'Nick: 2–24 znaki, litery, cyfry, _ . -';
+  select * into g from public.gracze where id = v;
+  -- nowy gracz tylko z kontem e-mail: sesja anonimowa nic nie kosztuje, więc skrypt zakładałby
+  -- dowolnie wiele kont po 1000 pkt i przelewał punkty na jedno przez rynek
+  if g.id is null and exists (select 1 from auth.users u where u.id = v and u.is_anonymous) then
+    raise exception 'Załóż konto e-mailem, żeby grać';
+  end if;
+  if char_length(v_nick) < 2 or char_length(v_nick) > 24 or v_nick !~ '^[A-Za-z0-9ĄĆĘŁŃÓŚŹŻąćęłńóśźż_.-]+$' then
+    raise exception 'Nick: 2–24 znaki, litery (także polskie), cyfry, _ . -';
+  end if;
+  if g.id is not null and g.nick = v_nick then
+    return jsonb_build_object('id', g.id, 'nick', g.nick, 'saldo', g.saldo, 'czy_admin', g.czy_admin);
+  end if;
+  if (lower(v_nick) ~ '^(admin|moderat|zdaza|zdąża|zdążą|zdazy|zdąży|urzad|urząd|support|oficjaln|official)'
+      or lower(v_nick) in ('mod', 'system', 'root', 'pomoc'))
+     and (g.id is null or lower(g.nick) <> lower(v_nick)) then
+    raise exception 'Ten nick jest zarezerwowany';
+  end if;
+  if g.id is not null and g.nick_zmieniono > now() - interval '7 days' then
+    raise exception 'Nick można zmienić raz na 7 dni';
   end if;
   select gr.id into v_inny from public.gracze gr where lower(gr.nick) = lower(v_nick) and gr.id <> v limit 1;
   if v_inny is not null then
     -- nick porzuconej sesji anonimowej bez zakładów (starsza wersja gry) można przejąć
     if exists (select 1 from auth.users u where u.id = v_inny and u.is_anonymous)
        and not exists (select 1 from public.transakcje t where t.gracz = v_inny) then
-      update public.gracze set nick = nick || '_' || left(v_inny::text, 4) where id = v_inny;
+      update public.gracze set nick = left(nick, 19) || '_' || left(v_inny::text, 4) where id = v_inny;
     else
       raise exception 'Ten nick jest zajęty';
     end if;
   end if;
   insert into public.gracze (id, nick) values (v, v_nick)
-  on conflict (id) do update set nick = excluded.nick
+  on conflict (id) do update set nick = excluded.nick, nick_zmieniono = now()
   returning * into g;
   return jsonb_build_object('id', g.id, 'nick', g.nick, 'saldo', g.saldo, 'czy_admin', g.czy_admin);
 end $$;
@@ -310,6 +383,7 @@ declare
   v_sprzedano jsonb := '[]'::jsonb;
   v_zwrot_s numeric := 0;
   v_miejsce_przed integer;
+  v_nowy_gracz integer;
 begin
   -- 1. blokada pytania (kolejne zakłady czekają)
   select * into p from public.pytania where id = p_pytanie for update;
@@ -339,6 +413,10 @@ begin
   end if;
   if v_komentarz is not null and char_length(v_komentarz) > 200 then
     raise exception 'Komentarz: najwyżej 200 znaków';
+  end if;
+  perform public.sprawdz_tempo(v_gracz);
+  if v_komentarz is not null then
+    perform public.sprawdz_odstep_komentarzy(v_gracz);
   end if;
   v_miejsce_przed := public.miejsce_w_rankingu(v_gracz);
 
@@ -388,9 +466,12 @@ begin
   v_kursy := public.kursy(v_q, p.b);
   v_kurs_po := v_kursy[p_odpowiedz];
 
-  -- 4. zapis
+  -- 4. zapis (liczba prognoz = liczba graczy: kolejne zakupy tego samego gracza nie odsłaniają kursu)
+  v_nowy_gracz := case when exists (select 1 from public.transakcje t
+                                     where t.gracz = v_gracz and t.pytanie = p_pytanie and t.typ = 'kupno')
+                       then 0 else 1 end;
   update public.pytania
-     set q = v_q, liczba_prognoz = liczba_prognoz + 1, obrot = obrot + p_stawka
+     set q = v_q, liczba_prognoz = liczba_prognoz + v_nowy_gracz, obrot = obrot + p_stawka
    where id = p_pytanie;
   update public.gracze set saldo = saldo - p_stawka where id = v_gracz;
   insert into public.pozycje (gracz, pytanie, odpowiedz, udzialy, wydane_punkty)
@@ -413,7 +494,7 @@ begin
     'kurs_po', v_kurs_po,
     'kursy', to_jsonb(v_kursy),
     'saldo', v_saldo - p_stawka,
-    'liczba_prognoz', p.liczba_prognoz + 1,
+    'liczba_prognoz', p.liczba_prognoz + v_nowy_gracz,
     'obrot', p.obrot + p_stawka,
     'sprzedano', v_sprzedano,
     'zwrot_ze_sprzedazy', v_zwrot_s,
@@ -457,6 +538,7 @@ begin
   if p.termin < current_date then raise exception 'Termin pytania minął'; end if;
   n := array_length(p.odpowiedzi, 1);
   if p_odpowiedz is null or p_odpowiedz < 1 or p_odpowiedz > n then raise exception 'Nie ma takiej odpowiedzi'; end if;
+  perform public.sprawdz_tempo(v_gracz, 3);
   select * into z from public.pozycje
    where gracz = v_gracz and pytanie = p_pytanie and odpowiedz = p_odpowiedz for update;
   if not found or z.udzialy <= 0 then raise exception 'Nie masz udziałów na tę odpowiedź'; end if;
@@ -547,6 +629,15 @@ begin
   if p_termin < current_date then
     raise exception 'Termin musi być w przyszłości';
   end if;
+  if p_termin > current_date + 730 then
+    raise exception 'Termin najwyżej dwa lata od dziś';
+  end if;
+  if char_length(btrim(p_tresc)) > 300 then
+    raise exception 'Treść: najwyżej 300 znaków';
+  end if;
+  if btrim(p_link) !~* '^https?://' or char_length(btrim(p_link)) > 1000 then
+    raise exception 'Link musi zaczynać się od http:// albo https://';
+  end if;
   if (select count(*) from public.pytania where zaproponowal = v_gracz and status = 'propozycja') >= 5 then
     raise exception 'Masz już 5 propozycji w kolejce';
   end if;
@@ -567,6 +658,8 @@ end $$;
 -- Funkcje admina
 -- ---------------------------------------------------------------------------
 -- Logowanie admina hasłem (hash bcrypt w ustawieniach). Nadaje czy_admin bieżącemu graczowi.
+-- Limit prób: 5 nieudanych na gracza w godzinę i 30 nieudanych łącznie w 15 minut (zgadywanie z wielu kont).
+-- Blokada doradcza szereguje próby, żeby równoległe wywołania nie ominęły licznika.
 create or replace function public.admin_zaloguj(p_haslo text)
 returns boolean
 language plpgsql security definer set search_path = public, extensions, pg_temp as $$
@@ -574,14 +667,22 @@ declare
   v_gracz uuid := public.biezacy_gracz();
   v_hash text;
 begin
+  perform pg_advisory_xact_lock(hashtext('public.admin_zaloguj'));
+  if (select count(*) from public.proby_admina
+       where gracz = v_gracz and not udana and czas > now() - interval '1 hour') >= 5
+     or (select count(*) from public.proby_admina
+          where not udana and czas > now() - interval '15 minutes') >= 30 then
+    raise exception 'Za dużo nieudanych prób. Spróbuj później.';
+  end if;
   select wartosc into v_hash from public.ustawienia where klucz = 'haslo_admina';
   if v_hash is null then
     raise exception 'Hasło admina nie jest ustawione';
   end if;
   if extensions.crypt(coalesce(p_haslo, ''), v_hash) <> v_hash then
-    perform pg_sleep(0.5);
+    insert into public.proby_admina (gracz, udana) values (v_gracz, false);
     return false;
   end if;
+  insert into public.proby_admina (gracz, udana) values (v_gracz, true);
   update public.gracze set czy_admin = true where id = v_gracz;
   return true;
 end $$;
@@ -767,18 +868,49 @@ begin
   if p.status in ('rozstrzygniete', 'uniewaznione') then
     raise exception 'Pytanie jest już zakończone';
   end if;
+  -- zwrot = wkład netto gracza w ten rynek (kupna − zwroty ze sprzedaży), czyli rynek się cofa.
+  -- wydane_punkty po częściowej sprzedaży to koszt resztki, a nie wkład: zwrot z nich dawał punkty z niczego
+  -- temu, kto sprzedał drożej. Kto wyjął więcej, niż włożył, oddaje nadwyżkę (saldo najwyżej do zera).
   update public.gracze g
-     set saldo = g.saldo + z.suma
-    from (select gracz, sum(wydane_punkty) as suma
-            from public.pozycje where pytanie = p_pytanie group by gracz) z
-   where z.gracz = g.id;
-  select coalesce(sum(wydane_punkty), 0) into v_zwrot from public.pozycje where pytanie = p_pytanie;
+     set saldo = greatest(0, g.saldo + n.kwota)
+    from (select gracz, sum(case when typ = 'kupno' then stawka else -stawka end) as kwota
+            from public.transakcje where pytanie = p_pytanie group by gracz) n
+   where n.gracz = g.id;
+  select coalesce(sum(case when typ = 'kupno' then stawka else -stawka end), 0) into v_zwrot
+    from public.transakcje where pytanie = p_pytanie;
   update public.pytania
      set status = 'uniewaznione',
          komentarz_urzedu = coalesce(nullif(btrim(p_komentarz), ''), komentarz_urzedu),
          rozstrzygnieto = now()
    where id = p_pytanie;
   return jsonb_build_object('zwrocono', v_zwrot);
+end $$;
+
+-- Moderacja: usuwa komentarz. p_id jak w komentarze_rynku: ujemne = komentarz bez zakładu,
+-- dodatnie = komentarz przy zakładzie (sam zakład zostaje).
+create or replace function public.admin_usun_komentarz(p_id bigint)
+returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  if p_id < 0 then
+    delete from public.komentarze where id = -p_id;
+  else
+    update public.transakcje set komentarz = null where id = p_id and komentarz is not null;
+  end if;
+  if not found then raise exception 'Nie ma takiego komentarza'; end if;
+end $$;
+
+-- Moderacja: odrzuca propozycję gracza (znika z kolejki; rynków poza propozycjami nie rusza).
+create or replace function public.admin_odrzuc_propozycje(p_pytanie bigint)
+returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_admin uuid := public.biezacy_admin();
+begin
+  delete from public.pytania where id = p_pytanie and status = 'propozycja';
+  if not found then raise exception 'Nie ma takiej propozycji'; end if;
 end $$;
 
 create or replace function public.admin_komentarz_urzedu(p_pytanie bigint, p_komentarz text)
@@ -1049,17 +1181,13 @@ declare
   v_gracz uuid := public.biezacy_gracz();
   v_tresc text := btrim(coalesce(p_tresc, ''));
   v_id bigint;
-  v_ostatni timestamptz;
 begin
   if not exists (select 1 from public.pytania where id = p_pytanie and status <> 'propozycja') then
     raise exception 'Nie ma takiego pytania';
   end if;
   if char_length(v_tresc) < 1 then raise exception 'Komentarz jest pusty'; end if;
   if char_length(v_tresc) > 500 then raise exception 'Komentarz: najwyżej 500 znaków'; end if;
-  select max(czas) into v_ostatni from public.komentarze where gracz = v_gracz;
-  if v_ostatni is not null and v_ostatni > now() - interval '10 seconds' then
-    raise exception 'Za szybko, odczekaj chwilę';
-  end if;
+  perform public.sprawdz_odstep_komentarzy(v_gracz);
   insert into public.komentarze (pytanie, gracz, tresc) values (p_pytanie, v_gracz, v_tresc) returning id into v_id;
   return v_id;
 end $$;
@@ -1268,11 +1396,18 @@ alter table public.transakcje enable row level security;
 alter table public.zmiany_terminow enable row level security;
 alter table public.ustawienia enable row level security;
 alter table public.komentarze enable row level security;
+alter table public.proby_admina enable row level security;
 
 -- Supabase domyślnie daje anon/authenticated pełne prawa do nowych tabel: cofamy.
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all functions in schema public from public, anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
+-- …także dla obiektów tworzonych później w migracjach: każdy grant dopisujemy jawnie.
+alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
+alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated;
+alter default privileges for role postgres in schema public revoke execute on functions from anon, authenticated;
+-- wykonanie dla PUBLIC jest domyślne globalnie (per schemat można tylko dodawać), więc bez „in schema”
+alter default privileges for role postgres revoke execute on functions from public;
 
 -- Odczyt własnego wiersza gracza, własnych pozycji i transakcji; zmiany terminów publiczne.
 grant select on public.gracze, public.pozycje, public.transakcje to authenticated;
@@ -1313,7 +1448,7 @@ grant execute on function public.ranking(integer) to anon, authenticated;
 grant execute on function public.profil_publiczny(text) to anon, authenticated;
 grant execute on function public.szukaj_graczy(text, integer) to anon, authenticated;
 
--- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated).
+-- Funkcje gracza: tylko zalogowani (sesja anonimowa ma rolę authenticated, ale ustaw_nick nie tworzy jej gracza).
 grant execute on function public.ustaw_nick(text) to authenticated;
 grant execute on function public.postaw_prognoze(bigint, integer, integer, public.powod, text) to authenticated;
 grant execute on function public.sprzedaj_udzialy(bigint, integer, double precision) to authenticated;
@@ -1328,6 +1463,8 @@ grant execute on function public.admin_otworz(bigint, double precision[]) to aut
 grant execute on function public.admin_zamknij(bigint) to authenticated;
 grant execute on function public.admin_rozstrzygnij(bigint, integer, text) to authenticated;
 grant execute on function public.admin_uniewaznij(bigint, text) to authenticated;
+grant execute on function public.admin_usun_komentarz(bigint) to authenticated;
+grant execute on function public.admin_odrzuc_propozycje(bigint) to authenticated;
 grant execute on function public.admin_komentarz_urzedu(bigint, text) to authenticated;
 grant execute on function public.admin_zmien_termin(bigint, date, text) to authenticated;
 grant execute on function public.admin_pytania() to authenticated;
