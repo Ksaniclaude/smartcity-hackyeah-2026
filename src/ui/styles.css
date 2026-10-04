@@ -323,6 +323,7 @@ code { font-size: 0.9em; background: var(--tlo-2); padding: 1px 5px; border-radi
 .wyrozniony .kurs-naglowek { margin: 0; }
 .wyrozniony .rynek-dol { min-height: 0; }
 .wyrozniony-wykres { min-width: 0; }
+.wyrozniony-tresc:last-child { grid-column: 1 / -1; }
 /* gdy obok etykiety zostaje mniej niż 420 px (telefon), wpisy schodzą do własnego wiersza na całą szerokość */
 .tasma { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; min-width: 0; }
 .tasma-etykieta { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; flex: none; }
@@ -527,13 +528,6 @@ button.wynik:active { transform: scale(0.98); }
 .kurs-naglowek .zmiana { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--tlo-2); gap: 5px; }
 .kurs-naglowek .zmiana.gora { background: var(--tak-tlo); }
 .kurs-naglowek .zmiana.dol { background: var(--nie-tlo); }
-/* rynek przed odsłonięciem kursu: jedna plansza z wyjaśnieniem zamiast szarej liczby i pustego wykresu */
-.odslona { margin: 0 0 20px; padding: 16px 18px; border-radius: var(--r); background: var(--tlo-2); }
-.odslona-glowa { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: 0 0 6px; }
-.odslona-tytul { font-family: var(--wyswietlana); font-stretch: 88%; font-size: 19px; font-weight: 700; color: var(--tekst); }
-.odslona p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tekst-2); max-width: 60ch; }
-.odslona .odsloniecie i { width: 8px; height: 16px; border-radius: 3px; background: var(--linia-2); }
-.odslona .odsloniecie i.pelny { background: var(--akcent); }
 .wykres-karta { margin: 4px 0 20px; }
 .wykres-naglowek { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 12px; margin-bottom: 2px; }
 .okresy { display: flex; gap: 2px; }
@@ -558,13 +552,9 @@ button.wynik:active { transform: scale(0.98); }
 .wykres-punkt.seria-nie circle { fill: var(--nie-tekst); }
 .wykres-punkt.seria-trzeci circle { fill: var(--trzeci-tekst); }
 .wykres-punkt .wykres-puls { stroke: none; transform-box: fill-box; transform-origin: center; animation: puls 1.8s ease-out infinite; }
-.wykres-otwarcie { stroke: var(--slaby); stroke-width: 2; stroke-dasharray: 6 6; }
 .wykres-odczyt { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--mute); margin-bottom: 4px; min-height: 20px; align-items: baseline; }
 .wykres-odczyt b { font-size: 16px; margin-left: 2px; }
 .wykres-czas { color: var(--mute); font-variant-numeric: tabular-nums; }
-.wykres-uwaga { position: absolute; left: 0; right: 40px; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; color: var(--mute); font-size: 13px; padding: 0 16px; }
-.wykres-uwaga::before { content: ""; position: absolute; inset: -6px 10%; background: var(--tlo); opacity: 0.85; border-radius: 8px; z-index: -1; }
-.wyrozniony .wykres-uwaga::before { background: var(--karta); }
 /* odpowiedzi na stronie rynku: nazwa, kurs, wybór; pod spodem pasek kursu */
 .rozklad { margin: 0 0 24px; border-top: 1px solid var(--linia); }
 .rozklad-wiersz { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "nazwa kurs akcja" "slupek slupek slupek"; align-items: center; gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--linia); }
@@ -598,7 +588,7 @@ button.pojedynek-strona { cursor: pointer; }
 button.pojedynek-strona:hover .nazwa { text-decoration: underline; text-underline-offset: 3px; }
 .pojedynek-strona.wybrany .nazwa { color: var(--akcent-tekst); }
 .pojedynek .podzial { grid-column: 1 / -1; height: 10px; }
-/* przed odsłonięciem kursu: podpis nad listą, a paski kursów otwarcia przygaszone */
+/* bez kursu tłumu: podpis „Kurs otwarcia” nad listą odpowiedzi, a paski kursów otwarcia przygaszone */
 .odpowiedzi-etykieta { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--mute); }
 .przed-odslona .podzial i, .przed-odslona .slupek i { opacity: 0.4; }
 .pojedynek .podzial i { border-radius: 5px; }

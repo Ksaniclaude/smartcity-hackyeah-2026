@@ -6,7 +6,7 @@
 
 - Projekt Vercel **`zdaza`** (zespół „ksaniclaude's projects”) jest podpięty do tego repo.
   **Push do `main` = automatyczny deploy na produkcję**; każda inna gałąź i PR dostaje podgląd (chroniony logowaniem do Vercela).
-- Produkcja: **https://zdaza-mauve.vercel.app** (docelowo `zdaza.vercel.app`, gdy domena zostanie przeniesiona do tego projektu).
+- Produkcja: **https://zdaza.com**.
 - Build ustawia [vercel.json](vercel.json): `framework: vite`, `npm run build`, katalog `dist`, przepisanie wszystkich ścieżek na `index.html`.
 - Zmienne w Vercelu (Production i Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`. Vite wkleja je do kodu podczas buildu,
   więc po zmianie wartości w panelu trzeba zrobić nowy deploy. Nowa zmienna = dodaj w Vercelu **i** w `.env.example`.
@@ -19,7 +19,7 @@
 - Projekt `smartcity-hackyeah-2026` (ref `xozaczdzfkzsbrnucsik`). **Jedna baza dla produkcji, podglądów i lokalnego `npm run dev`**,
   więc każda zmiana w schemacie albo danych działa od razu u wszystkich — także na produkcji.
 - Zmiany w `db/schema.sql` trzeba też wgrać do tego projektu (SQL Editor albo `apply_migration` z MCP Supabase), a potem
-  sprawdzić produkcję: `curl -s -o /dev/null -w '%{http_code}' https://zdaza-mauve.vercel.app/` → `200`.
+  sprawdzić produkcję: `curl -s -o /dev/null -w '%{http_code}' https://zdaza.com/` → `200`.
 - W bazie zostały obiekty poprzedniej wersji (schemat `game`, funkcje `public.app_*`). Aplikacja ich nie używa; nie opieraj
   się na nich. Usunięcie wymaga zgody zespołu (to operacja nieodwracalna).
 - Logowanie anonimowe Supabase musi być włączone (Authentication → Sign In / Providers). Hasło admina jest w
@@ -93,3 +93,19 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   też w wąskich kolumnach („Podobne rynki”). Karta ma co najmniej 360 px: na szerokim ekranie w rzędzie i w siatce
   mieszczą się trzy, żeby tytuł pokazał całe pytanie.
 - Nie pokazuj zer jako danych („0 pkt obrotu”, „(0/10)”): pusty stan dostaje słowa („bez prognoz”).
+- Czego nie ma, tego nie pokazujemy i o tym nie piszemy: rynek bez kursu tłumu nie ma dużej liczby, wykresu ani
+  planszy „kurs ukryty”, tylko kursy otwarcia przy odpowiedziach. Pusty wykres z wyjaśnieniem to błąd.
+- Wykres kursu (`src/ui/wykres.tsx`) to gładka linia przez próbki w równych krokach (`probkuj`): krok dobiera się
+  do zakresu czasu i szerokości, od minuty do doby, żeby kilka prognoz na godzinę dawało zwykłą linię. Bez stałego
+  kroku i bez schodków na każdą transakcję (kupno i sprzedaż w jednym kroku nie mają zostawiać igły).
+
+# Film promocyjny: `npm run wideo`
+
+- `wideo/` to 25-sekundowy film 1920×1080, 60 kl./s: kompozycja w React (`wideo/film.tsx`) na tokenach i krojach
+  aplikacji, każdy kadr liczony z numeru klatki. `npm run wideo` renderuje klatki w Chromium i składa
+  `wideo/out/zdaza-25s.mp4` (potrzebny ffmpeg: `brew install ffmpeg` albo `FFMPEG_PATH=…`); `-- --klatki=300,900`
+  robi same podglądy do `wideo/out/podglad/`. Podgląd na żywo: `npm run dev`, potem `/wideo/index.html?graj`.
+- Materiał z aplikacji (zrzuty, karty, zakład z monetami, kuponem i nowym poziomem) nagrywa `npm run wideo:nagraj`
+  do `wideo/kadry/` na mocku z `wideo/dane.ts`: prawdziwe rynki z produkcji, kursy i gracze na pokaz. Animacje są
+  nagrywane klatka po klatce (zegar Playwrighta i zatrzymane animacje Web Animations), więc wyglądają jak
+  w aplikacji. Po zmianie wyglądu aplikacji nagraj materiał od nowa; wykres w filmie rysuje `krzywa` z `wykres.tsx`.

@@ -1,0 +1,78 @@
+/* Film Zdążą?: kolory i kroje z arkusza aplikacji (src/ui/styles.css, ciemny motyw), tu tylko układ kadrów. */
+:root {
+  --film-ramka: #05070d;
+  --film-krawedz: #2a3552;
+  --film-cien: 0 50px 120px rgba(0, 0, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+html, body { margin: 0; background: var(--tlo); overflow: hidden; }
+#film { width: 1920px; height: 1080px; }
+
+.scena { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--tlo); color: var(--tekst); font-family: var(--tekstowa); }
+.warstwa { position: absolute; inset: 0; }
+.wysw { font-family: var(--wyswietlana); font-weight: 800; font-stretch: 88%; letter-spacing: -0.02em; line-height: 1.02; }
+.film-cyfry { font-family: var(--wyswietlana); font-weight: 800; font-stretch: 75%; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 0.9; }
+.akcent { color: var(--akcent); }
+.mute { color: var(--mute); }
+.tak-tekst { color: var(--tak-tekst); }
+.nie-tekst { color: var(--nie-tekst); }
+.trzeci-tekst { color: var(--trzeci-tekst); }
+
+/* słowa wjeżdżające spod maski */
+.slowo-maska { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.04em 0.02em 0.14em; margin: -0.04em -0.02em -0.14em; }
+.slowo { display: inline-block; will-change: transform; }
+
+
+/* pasek podziału kursu (jak .podzial na kartach) */
+.film-podzial { display: flex; gap: 6px; height: 16px; }
+.film-podzial i { display: block; border-radius: 8px; }
+.film-podzial .tak { background: var(--tak); }
+.film-podzial .nie { background: var(--nie); }
+.film-podzial .trzeci { background: var(--trzeci); }
+
+/* znak: żółty kafel z zegarem (jak favicon) */
+.znak { position: absolute; border-radius: 22%; background: var(--akcent); color: var(--na-akcencie); display: flex; align-items: center; justify-content: center; }
+.znak svg { width: 70%; height: 70%; overflow: visible; }
+
+/* telefon */
+.telefon { position: absolute; width: 418px; height: 872px; padding: 14px; border-radius: 64px; background: var(--film-ramka); box-shadow: inset 0 0 0 2px var(--film-krawedz), var(--film-cien); transform-origin: 50% 50%; }
+.telefon .film-ekran { position: relative; width: 390px; height: 844px; border-radius: 50px; overflow: hidden; background: var(--tlo); }
+.telefon .film-ekran img { display: block; width: 390px; height: 844px; }
+.telefon.bez-cienia { box-shadow: inset 0 0 0 2px var(--film-krawedz); }
+
+/* przeglądarka */
+.przegladarka { position: absolute; width: 1440px; border-radius: 18px; overflow: hidden; background: var(--film-ramka); box-shadow: inset 0 0 0 2px var(--film-krawedz), var(--film-cien); transform-origin: 50% 0; }
+.przegladarka-pasek { height: 54px; display: flex; align-items: center; gap: 18px; padding: 0 22px; }
+.przegladarka-pasek .kropki { display: flex; gap: 10px; }
+.przegladarka-pasek .kropki i { width: 14px; height: 14px; border-radius: 50%; background: var(--tlo-3); }
+.przegladarka-pasek .adres { flex: 1; height: 34px; border-radius: 17px; background: var(--tlo-2); display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--tekst-2); font-size: 18px; font-weight: 600; }
+.przegladarka-pasek .adres svg { width: 16px; height: 16px; color: var(--mute); }
+.przegladarka img { display: block; width: 1440px; height: 900px; }
+
+/* dotknięcie palca na nagraniu z telefonu */
+.dotyk { position: absolute; border-radius: 50%; pointer-events: none; }
+.dotyk.palec { width: 44px; height: 44px; margin: -22px 0 0 -22px; background: rgba(243, 246, 252, 0.28); box-shadow: 0 0 0 2px rgba(243, 246, 252, 0.75); }
+.dotyk.krag { border: 3px solid rgba(243, 246, 252, 0.8); }
+
+/* efekty: te same monety, fale i drobiny co w aplikacji, tylko w warstwie kadru */
+.scena .efekty { position: absolute; inset: 0; z-index: 5; }
+.scena .efekty > * { position: absolute; }
+
+
+/* wykres filmowy: jak Wykres z aplikacji (schodki, pole pod linią, pulsujący koniec) */
+.film-wykres .siatka { stroke: var(--linia-2); stroke-width: 1.5; stroke-dasharray: 3 9; }
+.film-wykres .os { fill: var(--mute); font-size: 22px; font-family: var(--tekstowa); }
+.film-wykres .linia { fill: none; stroke: var(--tak-tekst); stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; }
+.film-wykres .pole { fill: var(--tak-tlo); }
+.film-wykres .punkt { fill: var(--tak-tekst); stroke: var(--tlo); stroke-width: 4; }
+.film-wykres .puls { fill: var(--tak-tekst); }
+
+
+/* adres na końcu */
+.adres-duzy { display: inline-flex; align-items: center; height: 150px; padding: 0 64px; border-radius: 75px; background: var(--akcent); color: var(--na-akcencie); font-size: 112px; }
+.stopka-marki { position: absolute; right: 56px; bottom: 44px; display: flex; align-items: center; gap: 14px; color: var(--mute); font-size: 26px; font-weight: 600; }
+.stopka-marki .znak { position: relative; width: 40px; height: 40px; }
+.telefon .film-ekran img.dlugi { height: auto; }
+.pasek-gora, .pasek-dol { position: absolute; left: 0; width: 390px; height: 59px; background-size: 390px 844px; background-repeat: no-repeat; }
+.pasek-gora { top: 0; background-position: 0 0; }
+.pasek-dol { top: 785px; background-position: 0 -785px; }
+
