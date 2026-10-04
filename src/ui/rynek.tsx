@@ -123,6 +123,8 @@ export function Odsloniecie({ p }: { p: Pick<Pytanie, "liczba_prognoz" | "prog_w
   useEffect(() => {
     poprzednie.current = pelne;
   }, [pelne]);
+  // przy progu jednej prognozy licznik byłby pojedynczą kreską, która nic nie mówi
+  if (p.prog_widocznosci < 2) return null;
   return (
     <span className="odsloniecie" title={`Kurs tłumu pokaże się ${poPrognozach(p.prog_widocznosci)}`}>
       {Array.from({ length: kropki }, (_, i) => (

@@ -93,3 +93,8 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
   też w wąskich kolumnach („Podobne rynki”). Karta ma co najmniej 360 px: na szerokim ekranie w rzędzie i w siatce
   mieszczą się trzy, żeby tytuł pokazał całe pytanie.
 - Nie pokazuj zer jako danych („0 pkt obrotu”, „(0/10)”): pusty stan dostaje słowa („bez prognoz”).
+- Czego nie ma, tego nie pokazujemy i o tym nie piszemy: rynek bez kursu tłumu nie ma dużej liczby, wykresu ani
+  planszy „kurs ukryty”, tylko kursy otwarcia przy odpowiedziach. Pusty wykres z wyjaśnieniem to błąd.
+- Wykres kursu (`src/ui/wykres.tsx`) to gładka linia przez próbki w równych krokach (`probkuj`): krok dobiera się
+  do zakresu czasu i szerokości, od minuty do doby, żeby kilka prognoz na godzinę dawało zwykłą linię. Bez stałego
+  kroku i bez schodków na każdą transakcję (kupno i sprzedaż w jednym kroku nie mają zostawiać igły).
