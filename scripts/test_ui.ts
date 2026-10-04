@@ -441,7 +441,7 @@ async function main() {
     await page.locator(".modal").getByRole("button", { name: "Kopiuj link" }).waitFor({ timeout: 3000 });
     await zrzut(page, "karta_udostepniania", false);
     await page.getByRole("button", { name: "Zamknij" }).click();
-    await page.locator(".naglowek-rynku").getByRole("button", { name: "Udostępnij", exact: true }).waitFor({ timeout: 3000 });
+    await page.locator(".rynek-pasek").getByRole("button", { name: "Udostępnij", exact: true }).waitFor({ timeout: 3000 });
 
     console.log("2b. Zmiana strony: kupno „nie” najpierw sprzedaje „tak”");
     await page.locator(".wybor-odp .odp-przycisk").nth(1).click();

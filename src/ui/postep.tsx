@@ -367,13 +367,12 @@ export function TablicaOdznak() {
             <div>
               <b>{o.nazwa}</b>
               <span>{o.opis}</span>
-              {!o.zdobyta && o.cel > 1 && o.ile > 0 ? (
-                <span className="odznaka-postep">
-                  <i style={{ "--ile": (o.ile / o.cel).toFixed(2) } as CSSProperties} />
-                  {o.ile} z {o.cel}
-                </span>
-              ) : null}
             </div>
+            {/* każdy kafel ma ten sam dół (pasek i stan), żeby siatka była równa */}
+            <span className="odznaka-postep">
+              <i style={{ "--ile": (o.ile / o.cel).toFixed(2) } as CSSProperties} />
+              {o.zdobyta ? "zdobyta" : o.ile > 0 ? `${o.ile} z ${o.cel}` : "do zdobycia"}
+            </span>
           </div>
         ))}
       </div>
