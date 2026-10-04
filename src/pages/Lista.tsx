@@ -177,7 +177,7 @@ function Wyrozniony({ p, powod }: { p: Pytanie; powod: string }) {
           ) : (
             <>
               <span className="cyfry kurs-duzy ukryty">{o0 != null ? procent(o0) : "–"}</span>
-              <span className="co">{o0 != null ? "kurs otwarcia, " : ""}kurs tłumu jeszcze ukryty</span>
+              {o0 != null ? <span className="co">kurs otwarcia</span> : null}
             </>
           )}
         </div>
@@ -188,9 +188,12 @@ function Wyrozniony({ p, powod }: { p: Pytanie; powod: string }) {
           {p.obrot > 0 ? <span>{pkt(p.obrot)} obrotu</span> : null}
         </div>
       </div>
-      <div className="wyrozniony-wykres">
-        <Wykres historia={historia ?? []} odpowiedzi={p.odpowiedzi} wysokosc={250} zywy kompakt otwarcie={p.kursy_otwarcia} />
-      </div>
+      {/* bez historii kursu (rynek przed odsłonięciem) nie ma wykresu, a treść zajmuje całą szerokość */}
+      {(historia ?? []).length > 0 ? (
+        <div className="wyrozniony-wykres">
+          <Wykres historia={historia ?? []} odpowiedzi={p.odpowiedzi} wysokosc={250} zywy kompakt />
+        </div>
+      ) : null}
     </article>
   );
 }

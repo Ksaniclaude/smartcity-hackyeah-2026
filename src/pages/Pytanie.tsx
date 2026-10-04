@@ -29,8 +29,8 @@ import { useAkcja, useMiejsca, usePolling } from "@/ui/hooks";
 import { IkGwiazdka, IkLink, IkPtaszek, IkStrzalka } from "@/ui/ikony";
 import { Awatar, Komunikat, Ladowanie, OdznakaMiejsca, OdznakaStatusu, ZyskStrata, formatujDate, formatujDateKrotko, opisPrognoz } from "@/ui/komponenty";
 import { EkranRozstrzygniecia, useRozstrzygniecieDoPokazania } from "@/ui/rozstrzygniecie";
-import { KartaRynku, Odsloniecie, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
-import { czasTemu, dniDo, liczba, odmien, pkt, poPrognozach, punkty, udzialyTekst, wDol, zmianaPp } from "@/ui/tekst";
+import { KartaRynku, Piktogram, Podzial, Termin, Zmiana, ZmianaOdGodziny, jakoProcent, klasaOdp } from "@/ui/rynek";
+import { czasTemu, dniDo, liczba, odmien, pkt, punkty, udzialyTekst, wDol, zmianaPp } from "@/ui/tekst";
 import { PasekUdostepniania, PrzyciskUdostepnij, type DaneKarty } from "@/ui/udostepnij";
 import { Wykres } from "@/ui/wykres";
 import { usePostep } from "@/ui/postep";
@@ -871,11 +871,10 @@ export default function Pytanie() {
   const miasto = p.kategoria === "miasto";
   const otwarte = p.status === "otwarte";
   const kurs0 = p.kursy ? p.kursy[0] : null;
-  const kursOtwarcia0 = p.kursy_otwarcia ? p.kursy_otwarcia[0] : null;
   const pierwszy = historia && historia.length > 0 ? historia[0].kursy[0] : null;
   const zmiana = zmianaPp(kurs0, pierwszy);
-  const brakuje = Math.max(0, p.prog_widocznosci - p.liczba_prognoz);
-  const ukryty = kurs0 == null && otwarte;
+  /** Kursu tłumu nie ma (rynek przed odsłonięciem): strona pokazuje kursy otwarcia, bez dużej liczby i bez wykresu. */
+  const bezKursu = kurs0 == null;
   const moja = moje?.find((m) => m.pytanie === pid);
   const wydaneRazem = (udzialyMoje ?? []).reduce((s, z) => s + z.wydane, 0);
   const url = `${window.location.origin}/pytanie/${pid}`;
@@ -953,60 +952,34 @@ export default function Pytanie() {
             </div>
           </header>
 
-          {ukryty ? (
-            // Rynek przed odsłonięciem kursu: bez szarej liczby i pustego wykresu. Zostaje krótkie wyjaśnienie,
-            // a kursy otwarcia stoją niżej przy odpowiedziach.
-            <section className="odslona">
-              <div className="odslona-glowa">
-                <b className="odslona-tytul">Kurs tłumu jest ukryty</b>
-                {p.prog_widocznosci >= 2 ? <Odsloniecie p={p} /> : null}
+          {/* Przed odsłonięciem kursu nie ma dużej liczby ani wykresu i nic o tym nie piszemy: niżej stoją kursy otwarcia. */}
+          {kurs0 != null ? (
+            <div className="kurs-naglowek">
+              <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
+              <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
+              {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
+              {otwarte ? <ZmianaOdGodziny p={p} pelna /> : null}
+            </div>
+          ) : null}
+          {kurs0 != null && (historia ?? []).length > 0 ? (
+            <div className="wykres-karta">
+              <div className="wykres-naglowek">
+                <div className="okresy" role="tablist">
+                  {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
+                    <button type="button" key={o} role="tab" aria-selected={okres === o} className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
+                      {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p>
-                {p.liczba_prognoz === 0 ? "Nikt jeszcze nie postawił. " : ""}
-                {p.prog_widocznosci <= 1
-                  ? "Pierwsza prognoza odsłoni kurs tłumu."
-                  : `Kurs tłumu odsłoni się ${poPrognozach(p.prog_widocznosci)}, żeby pierwsi gracze typowali po swojemu.`}
-                {p.liczba_prognoz > 0 ? ` Brakuje ${brakuje}.` : ""}
-              </p>
-            </section>
-          ) : (
-            <>
-              <div className="kurs-naglowek">
-                {kurs0 != null ? (
-                  <>
-                    <LiczbaZywa className="cyfry kurs-duzy" wartosc={kurs0 * 100} format={jakoProcent} />
-                    <span className="co">{miasto ? `szans, że ${p.odpowiedzi[0]}` : `szans na „${p.odpowiedzi[0]}”`}</span>
-                    {zmiana === 0 ? <span className="zmiana zero">bez zmian od otwarcia</span> : <Zmiana pp={zmiana} pelna />}
-                    {otwarte ? <ZmianaOdGodziny p={p} pelna /> : null}
-                  </>
-                ) : (
-                  <>
-                    <span className="cyfry kurs-duzy ukryty">{kursOtwarcia0 != null ? procent(kursOtwarcia0) : "–"}</span>
-                    <span className="co">{kursOtwarcia0 != null ? "kurs otwarcia" : "kurs ukryty"}</span>
-                  </>
-                )}
-              </div>
-              <div className="wykres-karta">
-                {(historia ?? []).length > 0 ? (
-                  <div className="wykres-naglowek">
-                    <div className="okresy" role="tablist">
-                      {(["1d", "1t", "1m", "all"] as Okres[]).map((o) => (
-                        <button type="button" key={o} role="tab" aria-selected={okres === o} className={okres === o ? "aktywny" : ""} onClick={() => setOkres(o)}>
-                          {o === "1d" ? "1D" : o === "1t" ? "1T" : o === "1m" ? "1M" : "Wszystko"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} zywy={otwarte} otwarcie={p.kursy_otwarcia} />
-              </div>
-            </>
-          )}
+              <Wykres historia={historiaOkres} odpowiedzi={p.odpowiedzi} zywy={otwarte} />
+            </div>
+          ) : null}
 
           {/* Dwie odpowiedzi: pojedynek po dwóch stronach jednego paska. Więcej: wiersze z paskami.
-              Przed odsłonięciem lista pokazuje kursy otwarcia: jeden podpis nad nią, liczby i paski przygaszone. */}
-          {ukryty && p.kursy_otwarcia ? <p className="odpowiedzi-etykieta">Kurs otwarcia</p> : null}
-          <div className={`${p.odpowiedzi.length === 2 ? "pojedynek" : "rozklad"} ${ukryty ? "przed-odslona" : ""}`}>
+              Bez kursu tłumu lista pokazuje kursy otwarcia: jeden podpis nad nią, liczby i paski przygaszone. */}
+          {bezKursu && p.kursy_otwarcia ? <p className="odpowiedzi-etykieta">Kurs otwarcia</p> : null}
+          <div className={`${p.odpowiedzi.length === 2 ? "pojedynek" : "rozklad"} ${bezKursu ? "przed-odslona" : ""}`}>
             {p.odpowiedzi.map((o, i) => {
               const k = p.kursy ? p.kursy[i] : null;
               const ko = p.kursy_otwarcia ? p.kursy_otwarcia[i] : null;
@@ -1016,7 +989,6 @@ export default function Pytanie() {
                   {o}
                   {p.wynik === i + 1 ? <small className="typ-tak">wynik</small> : null}
                   {mojeU && mojeU.udzialy >= 0.05 ? <small>Twój typ: {udzialyTekst(mojeU.udzialy)} udz.</small> : null}
-                  {k == null && ko != null && !ukryty ? <small>kurs otwarcia</small> : null}
                 </div>
               );
               const kurs =
@@ -1051,13 +1023,13 @@ export default function Pytanie() {
                     <span />
                   )}
                   <span className="slupek">
-                    <i style={{ width: `${Math.round((k ?? (ukryty ? ko : null) ?? 0) * 100)}%` }} />
+                    <i style={{ width: `${Math.round((k ?? ko ?? 0) * 100)}%` }} />
                   </span>
                 </div>
               );
             })}
             {p.odpowiedzi.length === 2 && p.kursy ? <Podzial kursy={p.kursy} /> : null}
-            {p.odpowiedzi.length === 2 && ukryty && p.kursy_otwarcia ? <Podzial kursy={p.kursy_otwarcia} /> : null}
+            {p.odpowiedzi.length === 2 && bezKursu && p.kursy_otwarcia ? <Podzial kursy={p.kursy_otwarcia} /> : null}
           </div>
 
           {p.status === "rozstrzygniete" && p.wynik ? (

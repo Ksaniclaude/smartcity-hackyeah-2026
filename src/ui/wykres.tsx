@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { PunktHistorii } from "@/api/types";
 
 const KLASY = ["tak", "nie", "trzeci"];
-const GODZINA = 60 * 60 * 1000;
-/** Krok wykresu: kurs w przedziałach co 15 minut. */
-const KROK = 15 * 60 * 1000;
+const MINUTA = 60 * 1000;
+const GODZINA = 60 * MINUTA;
+/** Dozwolone kroki próbkowania; wykres bierze najdrobniejszy, przy którym próbek nie jest więcej, niż mieści szerokość. */
+const KROKI = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720, 1440].map((m) => m * MINUTA);
+/** Jedna próbka na tyle pikseli szerokości: zmiana kursu ma wtedy widoczny, łagodny skos zamiast pionowej kreski. */
+const PIKSELI_NA_PROBKE = 10;
 
 interface Props {
   historia: PunktHistorii[];
@@ -16,42 +19,99 @@ interface Props {
   zywy?: boolean;
   /** Bez wiersza z odczytem i bez dat pod osią (wyróżniony rynek na stronie głównej). */
   kompakt?: boolean;
-  /** Kurs otwarcia: przy braku historii rysowany przerywaną linią zamiast pustego pola. */
-  otwarcie?: number[] | null;
 }
 
 type Punkt = { t: number; kursy: number[] };
 
 const takieSame = (a: number[], b: number[]) => a.length === b.length && a.every((k, i) => k === b[i]);
 
+/** Krok próbkowania dla zakresu czasu i liczby próbek: na szerokim wykresie godzina idzie co minutę, doba co kwadrans. */
+export function krokDla(zakres: number, maksProbek: number): number {
+  return KROKI.find((k) => zakres / k <= maksProbek) ?? KROKI[KROKI.length - 1];
+}
+
 /**
- * Próbkowanie co KROK: na końcu każdego kwadransu ostatni kurs sprzed tej chwili (zmiany w środku kwadransu
- * zlewają się w jeden schodek). Bieżący kwadrans pokazuje ostatnią transakcję od razu.
+ * Próbkowanie w równych krokach od t0 do t1: w każdym kroku ostatni kurs sprzed tej chwili. Krok zależy od zakresu
+ * i szerokości wykresu (`krokDla`), więc młody rynek z kilkoma prognozami na godzinę ma gęste próbki i zwykłą linię,
+ * a nie parę klocków. Kupno i sprzedaż w tym samym kroku nie zostawiają igły. Ostatnia próbka to koniec zakresu
+ * z bieżącym kursem.
  */
-export function wKrokach(pkt: Punkt[]): Punkt[] {
-  if (pkt.length < 2) return pkt;
-  const wynik = [pkt[0]];
-  const ostatni = pkt[pkt.length - 1];
+export function probkuj(pkt: Punkt[], t0: number, t1: number, maksProbek: number): Punkt[] {
+  if (pkt.length === 0) return [];
+  const krok = krokDla(t1 - t0, maksProbek);
+  const wynik: Punkt[] = [{ t: t0, kursy: pkt[0].kursy }];
   let j = 0;
-  for (let g = Math.ceil(pkt[0].t / KROK) * KROK; g <= ostatni.t; g += KROK) {
+  for (let g = Math.floor(t0 / krok) * krok + krok; g < t1; g += krok) {
     while (j + 1 < pkt.length && pkt[j + 1].t <= g) j++;
-    if (!takieSame(pkt[j].kursy, wynik[wynik.length - 1].kursy)) wynik.push({ t: g, kursy: pkt[j].kursy });
+    wynik.push({ t: g, kursy: pkt[j].kursy });
   }
-  if (!takieSame(ostatni.kursy, wynik[wynik.length - 1].kursy)) wynik.push(ostatni);
+  wynik.push({ t: t1, kursy: pkt[pkt.length - 1].kursy });
   return wynik;
+}
+
+/**
+ * Gładka linia przez punkty: odcinki Béziera ze stycznymi Fritscha–Carlsona (interpolacja monotoniczna), więc krzywa
+ * nie wychodzi poza kursy sąsiednich próbek. Płaskie odcinki zostają prostymi.
+ */
+function krzywa(p: { x: number; y: number }[]): string {
+  const n = p.length;
+  if (n === 0) return "";
+  let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+  if (n === 1) return d;
+  const h: number[] = [];
+  const nachylenie: number[] = [];
+  for (let k = 0; k < n - 1; k++) {
+    h.push(p[k + 1].x - p[k].x);
+    nachylenie.push(h[k] > 0 ? (p[k + 1].y - p[k].y) / h[k] : 0);
+  }
+  const m: number[] = new Array<number>(n).fill(0);
+  m[0] = nachylenie[0];
+  m[n - 1] = nachylenie[n - 2];
+  for (let k = 1; k < n - 1; k++) {
+    const a = nachylenie[k - 1];
+    const b = nachylenie[k];
+    m[k] = a * b <= 0 ? 0 : (3 * (h[k - 1] + h[k])) / ((2 * h[k] + h[k - 1]) / a + (h[k] + 2 * h[k - 1]) / b);
+  }
+  for (let k = 0; k < n - 1; k++) {
+    const x1 = p[k + 1].x.toFixed(1);
+    if (nachylenie[k] === 0) {
+      d += ` H${x1}`;
+      continue;
+    }
+    const c1 = `${(p[k].x + h[k] / 3).toFixed(1)},${(p[k].y + (m[k] * h[k]) / 3).toFixed(1)}`;
+    const c2 = `${(p[k + 1].x - h[k] / 3).toFixed(1)},${(p[k + 1].y - (m[k + 1] * h[k]) / 3).toFixed(1)}`;
+    d += ` C${c1} ${c2} ${x1},${p[k + 1].y.toFixed(1)}`;
+  }
+  return d;
 }
 
 function formatujCzas(t: number): string {
   return new Date(t).toLocaleString("pl-PL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function formatujDzien(t: number): string {
+/** Podpis początku i końca osi czasu: w obrębie doby godzina, przy dłuższym zakresie dzień. */
+function formatujOs(t: number, zakres: number): string {
+  if (zakres <= 24 * GODZINA) return new Date(t).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
   return new Date(t).toLocaleDateString("pl-PL", { day: "numeric", month: "short" });
 }
 
-/** Zakres osi Y w procentach: przycięty do okolic kursów (krok 10 albo 20), a przy dużym rozrzucie pełne 0–100. */
+/**
+ * Zakres osi Y w procentach: przycięty do okolic kursów, a przy dużym rozrzucie pełne 0–100. Gdy kurs ruszył się
+ * tylko o kilka punktów, oś jest ciasna (krok 5, co najmniej 20 punktów), żeby taki ruch było widać.
+ */
 function zakresOsi(wartosci: number[]): { od: number; do: number; krok: number } {
   if (wartosci.length === 0) return { od: 0, do: 100, krok: 25 };
+  const min = Math.min(...wartosci) * 100;
+  const max = Math.max(...wartosci) * 100;
+  if (max - min <= 12) {
+    let od = Math.max(0, Math.floor((min - 3) / 5) * 5);
+    let ku = Math.min(100, Math.ceil((max + 3) / 5) * 5);
+    while (ku - od < 20) {
+      if (od > 0) od -= 5;
+      if (ku - od < 20 && ku < 100) ku += 5;
+    }
+    return { od, do: ku, krok: 5 };
+  }
   let od = Math.max(0, Math.floor((Math.min(...wartosci) * 100 - 6) / 10) * 10);
   let ku = Math.min(100, Math.ceil((Math.max(...wartosci) * 100 + 6) / 10) * 10);
   while (ku - od < 30) {
@@ -66,13 +126,16 @@ function zakresOsi(wartosci: number[]): { od: number; do: number; krok: number }
 }
 
 /**
- * Wykres kursu w czasie (SVG, bez bibliotek). Linie schodkowe jak na giełdzie prognoz: kurs zmienia się
- * tylko w chwili zakładu. Pojedyncza seria ma wypełnione pole pod linią; kolory serii są w arkuszu.
+ * Wykres kursu w czasie (SVG, bez bibliotek). Linia przez próbki w równych krokach: zmiana kursu to odcinek między
+ * sąsiednimi próbkami. Pojedyncza seria ma wypełnione pole pod linią; kolory serii są w arkuszu.
+ * Bez historii (kurs jeszcze nieodsłonięty, rynek bez prognoz) wykres się nie rysuje i nic o tym nie pisze.
  */
-export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = false, kompakt = false, otwarcie = null }: Props) {
+export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = false, kompakt = false }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const [szer, setSzer] = useState(720);
+  const pusty = historia.length === 0;
+  // szerokość mierzona od chwili, gdy wykres jest na stronie (bez historii nie ma go wcale)
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -81,7 +144,7 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
     const ro = new ResizeObserver(ustaw);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [pusty]);
   const pad = { l: 2, r: 40, t: 10, b: kompakt ? 8 : 24 };
   const wybrane = serie ?? (odpowiedzi.length === 2 ? [0] : odpowiedzi.map((_, i) => i));
 
@@ -94,24 +157,20 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
   }, [historia.length]);
 
   const { punkty, t0, t1 } = useMemo(() => {
-    const pkt = wKrokach(
-      historia
-        .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
-        .filter((h) => Number.isFinite(h.t))
-        .sort((a, b) => a.t - b.t),
-    );
+    const pkt = historia
+      .map((h) => ({ t: new Date(h.czas).getTime(), kursy: h.kursy }))
+      .filter((h) => Number.isFinite(h.t))
+      .sort((a, b) => a.t - b.t);
     if (pkt.length === 0) return { punkty: pkt, t0: 0, t1: 1 };
     const a = pkt[0].t;
     let b = pkt[pkt.length - 1].t;
     if (zywy) b = Math.max(b, Date.now());
     if (b - a < GODZINA) b = a + GODZINA;
-    return { punkty: pkt, t0: a, t1: b };
-  }, [historia, zywy]);
+    return { punkty: probkuj(pkt, a, b, Math.max(24, Math.round((szer - pad.l - pad.r) / PIKSELI_NA_PROBKE))), t0: a, t1: b };
+  }, [historia, zywy, szer, pad.l, pad.r]);
 
-  const brakHistorii = punkty.length === 0;
-  const wartosci = brakHistorii
-    ? wybrane.map((i) => otwarcie?.[i]).filter((k): k is number => k != null)
-    : punkty.flatMap((p) => wybrane.map((i) => p.kursy[i] ?? 0));
+  if (punkty.length === 0) return null;
+  const wartosci = punkty.flatMap((p) => wybrane.map((i) => p.kursy[i] ?? 0));
   const os = zakresOsi(wartosci);
   const podzialki: number[] = [];
   for (let k = os.od; k <= os.do; k += os.krok) podzialki.push(k);
@@ -130,50 +189,31 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
     </g>
   ));
 
-  if (brakHistorii) {
-    return (
-      <div className="wykres wykres-bez-historii" ref={ref}>
-        <svg viewBox={`0 0 ${szer} ${wysokosc}`} width={szer} height={wysokosc} role="img" aria-label="Wykres kursu: brak historii">
-          {siatka}
-          {otwarcie
-            ? wybrane.map((i) =>
-                otwarcie[i] != null ? (
-                  <line key={i} x1={pad.l} x2={prawy} y1={y(otwarcie[i])} y2={y(otwarcie[i])} className="wykres-otwarcie" />
-                ) : null,
-              )
-            : null}
-        </svg>
-        <p className="wykres-uwaga">Kurs jest ukryty, dopóki rynek ma za mało prognoz. Wykres ruszy po odsłonięciu.</p>
-      </div>
-    );
-  }
-
-  const sciezka = (i: number) => {
-    let d = "";
-    for (let j = 0; j < punkty.length; j++) {
-      const px = x(punkty[j].t).toFixed(1);
-      const py = y(punkty[j].kursy[i] ?? 0).toFixed(1);
-      d += j === 0 ? `M${px},${py}` : ` H${px} V${py}`;
+  /** Gładka linia przez próbki od indeksu `od`; środkowe punkty płaskich odcinków są pomijane. */
+  const sciezka = (i: number, od = 0) => {
+    const wezly: { x: number; y: number }[] = [];
+    for (let j = od; j < punkty.length; j++) {
+      const k = punkty[j].kursy[i] ?? 0;
+      if (j > od && j < punkty.length - 1 && (punkty[j - 1].kursy[i] ?? 0) === k && (punkty[j + 1].kursy[i] ?? 0) === k) continue;
+      wezly.push({ x: x(punkty[j].t), y: y(k) });
     }
-    return `${d} H${prawy.toFixed(1)}`;
+    return krzywa(wezly);
   };
 
   const ostatni = punkty[punkty.length - 1];
   const akt = hover != null ? punkty[hover] : ostatni;
   const xAkt = hover != null ? x(akt.t) : prawy;
-  const ostatniOdcinek = (i: number) => {
-    if (punkty.length < 2) return "";
-    const a = punkty[punkty.length - 2];
-    const b = punkty[punkty.length - 1];
-    return `M${x(a.t).toFixed(1)},${y(a.kursy[i] ?? 0).toFixed(1)} H${x(b.t).toFixed(1)} V${y(b.kursy[i] ?? 0).toFixed(1)} H${prawy.toFixed(1)}`;
-  };
+  // Ostatni ruch kursu: od próbki tuż przed ostatnią zmianą do końca linii (dorysowywany animacją po nowej prognozie).
+  let przedZmiana = punkty.length - 1;
+  while (przedZmiana > 0 && takieSame(punkty[przedZmiana].kursy, ostatni.kursy)) przedZmiana--;
+  const ostatniOdcinek = (i: number) => sciezka(i, przedZmiana);
 
   const naRuch = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * szer;
     let najblizszy = 0;
     for (let j = 0; j < punkty.length; j++) {
-      if (x(punkty[j].t) <= px) najblizszy = j;
+      if (Math.abs(x(punkty[j].t) - px) < Math.abs(x(punkty[najblizszy].t) - px)) najblizszy = j;
     }
     setHover(najblizszy);
   };
@@ -221,10 +261,10 @@ export function Wykres({ historia, odpowiedzi, serie, wysokosc = 240, zywy = fal
         {!kompakt ? (
           <>
             <text x={pad.l} y={wysokosc - 6} className="wykres-os">
-              {formatujDzien(t0)}
+              {formatujOs(t0, t1 - t0)}
             </text>
             <text x={prawy} y={wysokosc - 6} className="wykres-os" textAnchor="end">
-              {zywy ? "teraz" : formatujDzien(t1)}
+              {zywy ? "teraz" : formatujOs(t1, t1 - t0)}
             </text>
           </>
         ) : null}
