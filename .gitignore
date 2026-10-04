@@ -20,8 +20,9 @@
 # vercel
 .vercel
 
-# lokalne ustawienia Claude Code
-/.claude
+# lokalne ustawienia Claude Code (skille projektu są w repo)
+/.claude/*
+!/.claude/skills/
 
 # pliki robocze skryptów (surowe odpowiedzi API, lokalna baza testowa)
 /data/surowe/

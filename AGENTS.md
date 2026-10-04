@@ -24,3 +24,5 @@
   Testy w `db/test` i `scripts/test_db_local.sh` liczą bilans z transakcji (kupno − sprzedaż), nie z `wydane_punkty`.
 - Sprawdzenie UI bez sieci: `npm run build && npm run test:ui` (Chromium, zamockowane Supabase).
 - Deploy: Vercel (projekt `zdaza`), zmienne `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`.
+- Przed upublicznieniem repo i przed większym wydaniem: przegląd bezpieczeństwa `/przeglad-bezpieczenstwa`
+  (`.claude/skills/przeglad-bezpieczenstwa/SKILL.md`). Na produkcji tylko odczyt; raport z podatnościami nie trafia do repo.
