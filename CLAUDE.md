@@ -98,3 +98,14 @@ Każdą zmianę w UI oglądaj na zrzucie, zanim uznasz ją za gotową. Nie zgadu
 - Wykres kursu (`src/ui/wykres.tsx`) to gładka linia przez próbki w równych krokach (`probkuj`): krok dobiera się
   do zakresu czasu i szerokości, od minuty do doby, żeby kilka prognoz na godzinę dawało zwykłą linię. Bez stałego
   kroku i bez schodków na każdą transakcję (kupno i sprzedaż w jednym kroku nie mają zostawiać igły).
+
+# Film promocyjny: `npm run wideo`
+
+- `wideo/` to 25-sekundowy film 1920×1080, 60 kl./s: kompozycja w React (`wideo/film.tsx`) na tokenach i krojach
+  aplikacji, każdy kadr liczony z numeru klatki. `npm run wideo` renderuje klatki w Chromium i składa
+  `wideo/out/zdaza-25s.mp4` (potrzebny ffmpeg: `brew install ffmpeg` albo `FFMPEG_PATH=…`); `-- --klatki=300,900`
+  robi same podglądy do `wideo/out/podglad/`. Podgląd na żywo: `npm run dev`, potem `/wideo/index.html?graj`.
+- Materiał z aplikacji (zrzuty, karty, zakład z monetami, kuponem i nowym poziomem) nagrywa `npm run wideo:nagraj`
+  do `wideo/kadry/` na mocku z `wideo/dane.ts`: prawdziwe rynki z produkcji, kursy i gracze na pokaz. Animacje są
+  nagrywane klatka po klatce (zegar Playwrighta i zatrzymane animacje Web Animations), więc wyglądają jak
+  w aplikacji. Po zmianie wyglądu aplikacji nagraj materiał od nowa; wykres w filmie rysuje `krzywa` z `wykres.tsx`.

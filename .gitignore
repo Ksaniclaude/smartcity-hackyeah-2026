@@ -28,3 +28,7 @@
 /data/pglite/
 /data/zrzuty/
 /data/zrzuty_dev/
+
+# film: materiał nagrany z aplikacji i wyrenderowane klatki (npm run wideo)
+/wideo/kadry/
+/wideo/out/

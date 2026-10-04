@@ -53,7 +53,7 @@ export function probkuj(pkt: Punkt[], t0: number, t1: number, maksProbek: number
  * Gładka linia przez punkty: odcinki Béziera ze stycznymi Fritscha–Carlsona (interpolacja monotoniczna), więc krzywa
  * nie wychodzi poza kursy sąsiednich próbek. Płaskie odcinki zostają prostymi.
  */
-function krzywa(p: { x: number; y: number }[]): string {
+export function krzywa(p: { x: number; y: number }[]): string {
   const n = p.length;
   if (n === 0) return "";
   let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
